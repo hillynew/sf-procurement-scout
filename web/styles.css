@@ -1,0 +1,635 @@
+/* NG-Snapshot design tokens + layout (adapted for Streamlit) */
+
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+:root {
+  --brand-blue: #069cd6;
+  --brand-blue-dark: #04719e;
+  --brand-blue-deep: #085d80;
+  --brand-blue-soft: #e9f5fb;
+  --brand-lime: #cfff00;
+  --brand-lime-soft: #f5ffc4;
+  --brand-ink: #0a1a2c;
+  --bg: #f8f9fb;
+  --bg-2: #eef1f5;
+  --surface: #ffffff;
+  --surface-2: #f4f6f8;
+  --panel: #ffffff;
+  --line: #e4e7ec;
+  --line-strong: #cbd2da;
+  --text: #101828;
+  --text-soft: #384250;
+  --muted: #697586;
+  --accent: var(--brand-blue-dark);
+  --accent-hover: #035c82;
+  --accent-soft: var(--brand-blue-soft);
+  --accent-deep: var(--brand-blue-deep);
+  --accent-contrast: #ffffff;
+  --success: #157f3d;
+  --success-soft: #e8f7ee;
+  --warning: #9a6700;
+  --warning-soft: #fff3d1;
+  --danger: #d92c20;
+  --danger-soft: #fdebe9;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --shadow-md: 0 2px 4px -2px rgba(16, 24, 40, 0.06), 0 6px 16px -4px rgba(16, 24, 40, 0.09);
+  --shadow-lg: 0 8px 12px -6px rgba(16, 24, 40, 0.12), 0 24px 48px -12px rgba(16, 24, 40, 0.2);
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --brand-gradient: linear-gradient(135deg, #22b2e5 0%, #069cd6 52%, #04719e 100%);
+}
+
+/* Streamlit chrome overrides */
+html, body, [class*="css"], .stApp {
+  font-family: var(--font-sans) !important;
+  color: var(--text);
+  background: var(--bg) !important;
+}
+
+.stApp {
+  background: var(--bg) !important;
+}
+
+/* Hide default Streamlit chrome bits */
+#MainMenu { visibility: hidden; }
+header[data-testid="stHeader"] { background: transparent; }
+footer { visibility: hidden; }
+div[data-testid="stToolbar"] { display: none; }
+
+/* Main block container */
+.block-container {
+  padding-top: 1.1rem !important;
+  padding-bottom: 2rem !important;
+  max-width: 1400px !important;
+}
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+  background: var(--surface) !important;
+  border-right: 1px solid var(--line);
+}
+section[data-testid="stSidebar"] > div {
+  background: var(--surface);
+  padding-top: 0.75rem;
+}
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] label,
+section[data-testid="stSidebar"] span {
+  color: var(--text-soft);
+}
+
+/* Brand block */
+.ng-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px 14px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line);
+}
+.ng-brand-mark {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--brand-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 0.85rem;
+  box-shadow: var(--shadow-sm);
+  flex-shrink: 0;
+}
+.ng-brand-name {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  font-size: 0.95rem;
+  color: var(--text);
+  line-height: 1.15;
+}
+.ng-brand-sub {
+  font-size: 0.62rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-weight: 600;
+}
+
+/* Nav section headers (drill-down menus) */
+.ng-nav-section {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 12px 4px 6px;
+}
+
+.ng-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 0.83rem;
+  font-weight: 500;
+  color: var(--text-soft);
+  text-decoration: none;
+  cursor: pointer;
+  border: 1px solid transparent;
+  margin-bottom: 2px;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.ng-nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.ng-nav-item.active {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+.ng-nav-badge {
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg-2);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.ng-nav-item.active .ng-nav-badge {
+  background: rgba(6, 156, 214, 0.15);
+  color: var(--accent-deep);
+}
+
+/* Topbar hero */
+.ng-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ng-topbar h1 {
+  font-size: 1.45rem;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+  margin: 0;
+  color: var(--text);
+}
+.ng-topbar .sub {
+  color: var(--muted);
+  font-size: 0.84rem;
+  margin-top: 4px;
+}
+
+/* KPI cards */
+.ng-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ng-kpi {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+  transition: box-shadow 0.14s, border-color 0.14s, transform 0.14s;
+}
+.ng-kpi:before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  opacity: 0.9;
+}
+.ng-kpi:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+.ng-kpi-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ng-kpi-value {
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin-top: 6px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.ng-kpi-sub {
+  font-size: 0.76rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.ng-kpi.urgent .ng-kpi-value { color: var(--danger); }
+.ng-kpi.success .ng-kpi-value { color: var(--success); }
+
+/* Panels / dash grid */
+.ng-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 900px) {
+  .ng-dash-grid { grid-template-columns: 1fr; }
+}
+.ng-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+.ng-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.ng-panel-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+.ng-panel-sub {
+  font-size: 0.74rem;
+  color: var(--muted);
+}
+
+/* Funnel rows */
+.ng-funnel-row {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.8rem;
+  padding: 4px 5px;
+  margin: 0 -5px;
+  border-radius: 4px;
+  border: none;
+  background: none;
+  width: 100%;
+  cursor: pointer;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
+}
+.ng-funnel-row:hover { background: var(--surface-2); }
+.ng-bar-track {
+  background: var(--bg-2);
+  border-radius: 3px;
+  height: 12px;
+  overflow: hidden;
+}
+.ng-bar-fill {
+  background: var(--brand-gradient);
+  height: 100%;
+  border-radius: 3px;
+}
+.ng-bar-value {
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+/* List rows */
+.ng-list-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 7px;
+  margin: 0 -7px;
+  border-bottom: 1px solid var(--line);
+  font-size: 0.82rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: var(--text);
+}
+.ng-list-row:hover { background: var(--surface-2); }
+.ng-list-row:last-child { border-bottom: none; }
+.ng-list-row .muted { color: var(--muted); font-size: 0.76rem; }
+.ng-list-row .num {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Stage tabs */
+.ng-stage-tabs {
+  display: flex;
+  gap: 0;
+  flex-wrap: wrap;
+  margin: 4px 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ng-stage-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 7px 13px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 7px;
+  align-items: baseline;
+  font-size: 0.8rem;
+  transition: all 0.12s;
+  color: var(--muted);
+  font-family: inherit;
+  margin-bottom: -1px;
+}
+.ng-stage-tab:hover { color: var(--text); }
+.ng-stage-tab.active {
+  color: var(--accent-deep);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.ng-stage-tab .st-label {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.72rem;
+}
+.ng-stage-tab .st-meta {
+  font-size: 0.72rem;
+  opacity: 0.85;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+/* Filter chips */
+.ng-filter-bar {
+  margin-bottom: 12px;
+}
+.ng-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+.ng-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
+.ng-chip.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-deep);
+}
+
+/* Kanban */
+.ng-kanban {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.ng-kanban-col {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  width: 260px;
+  min-width: 240px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.ng-kanban-col-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 11px 4px;
+  font-weight: 700;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-soft);
+}
+.ng-kanban-cards {
+  padding: 0 7px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 40px;
+}
+.ng-kanban-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  cursor: pointer;
+  transition: border-color 0.12s, box-shadow 0.12s;
+  box-shadow: var(--shadow-sm);
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  color: var(--text);
+}
+.ng-kanban-card:hover {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow-md);
+}
+.ng-kanban-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(6, 156, 214, 0.2);
+}
+.ng-card-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 4px;
+}
+.ng-card-meta {
+  font-size: 0.72rem;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+}
+.ng-card-tag {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+}
+.ng-card-tag.warn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.ng-card-tag.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.ng-card-tag.ok {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+/* Drill-down panel */
+.ng-drill {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 18px;
+  margin-top: 12px;
+}
+.ng-drill-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.ng-drill-eyebrow {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.ng-drill h2 {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--text);
+  line-height: 1.3;
+}
+.ng-drill-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0;
+}
+.ng-drill-section {
+  margin-top: 14px;
+}
+.ng-drill-section-head {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.ng-drill-desc {
+  font-size: 0.88rem;
+  color: var(--text-soft);
+  line-height: 1.5;
+}
+.ng-drill a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.ng-drill a:hover { text-decoration: underline; }
+
+/* Empty state */
+.ng-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 34px 18px;
+  text-align: center;
+  color: var(--muted);
+}
+.ng-empty-title {
+  font-weight: 700;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
+/* Primary button look for streamlit */
+div.stButton > button[kind="primary"],
+div.stButton > button[data-testid="baseButton-primary"] {
+  background: var(--accent) !important;
+  color: var(--accent-contrast) !important;
+  border: 1px solid var(--accent) !important;
+  border-radius: var(--radius-sm) !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  box-shadow: var(--shadow-sm);
+}
+div.stButton > button {
+  border-radius: var(--radius-sm) !important;
+  font-family: var(--font-sans) !important;
+  font-weight: 500 !important;
+}
+
+/* Expander as nav drill-down */
+section[data-testid="stSidebar"] details {
+  border: none !important;
+  background: transparent !important;
+}
+section[data-testid="stSidebar"] details summary {
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.06em !important;
+  color: var(--muted) !important;
+  padding: 8px 4px !important;
+}
+
+/* Metric / input polish */
+div[data-testid="stMetric"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+div[data-testid="stTextInput"] input,
+div[data-testid="stSelectbox"] > div {
+  border-radius: var(--radius-sm) !important;
+}
