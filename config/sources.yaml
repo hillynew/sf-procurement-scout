@@ -1,0 +1,152 @@
+# South Florida government procurement sources
+# live_fetch: true  -> adapter scrapes live opportunity rows
+# live_fetch: false -> catalog entry only (registration / manual portal)
+
+sources:
+  - id: broward_bpro
+    name: Broward County BPRO (Bonfire)
+    county: broward
+    agency: Broward County
+    live_fetch: true
+    adapter: bonfire
+    portal_url: https://broward.bonfirehub.com/portal/?tab=openOpportunities
+    register_url: https://broward.bonfirehub.com/
+    bonfire_host: broward.bonfirehub.com
+
+  - id: town_palm_beach_bonfire
+    name: Town of Palm Beach (Bonfire)
+    county: palm-beach
+    agency: Town of Palm Beach
+    live_fetch: true
+    adapter: bonfire
+    portal_url: https://townofpalmbeach.bonfirehub.com/portal/?tab=openOpportunities
+    register_url: https://townofpalmbeach.bonfirehub.com/portal/?tab=login
+    bonfire_host: townofpalmbeach.bonfirehub.com
+
+  - id: miami_dade_informs
+    name: Miami-Dade County INFORMS Public Bidding Events
+    county: miami-dade
+    agency: Miami-Dade County
+    live_fetch: true
+    adapter: miami_dade_informs
+    portal_url: https://supplier.miamidade.gov/psc/EXTSUPP/SUPPLIER/ERP/c/SCP_PUBLIC_MENU_FL.SCP_PUB_BID_CMP_FL.GBL
+    register_url: https://supplier.miamidade.gov/
+
+  - id: miami_dade_construction
+    name: Miami-Dade Construction Solicitations
+    county: miami-dade
+    agency: Miami-Dade County
+    live_fetch: true
+    adapter: miami_dade_construction
+    portal_url: https://www.miamidade.gov/apps/ISD/stratproc/Home/CurrentSolicitations
+    register_url: https://supplier.miamidade.gov/
+
+  - id: miami_dade_future
+    name: Miami-Dade Future Solicitations
+    county: miami-dade
+    agency: Miami-Dade County
+    live_fetch: true
+    adapter: miami_dade_future
+    portal_url: https://www.miamidade.gov/apps/ISD/stratproc/Home/FutureSolicitations
+    register_url: https://supplier.miamidade.gov/
+
+  - id: west_palm_beach
+    name: City of West Palm Beach Solicitations
+    county: palm-beach
+    agency: City of West Palm Beach
+    live_fetch: true
+    adapter: west_palm_beach
+    portal_url: https://www.wpb.org/Departments/Procurement/Solicitations
+    register_url: https://network.demandstar.com/for-business
+    demandstar_url: https://www.demandstar.com/app/agencies/florida/city-of-west-palm-beach/procurement-opportunities/47ad4378-e835-4818-a125-fed4a0de10ab
+
+  - id: mdc_college
+    name: Miami Dade College Bid Posting
+    county: miami-dade
+    agency: Miami Dade College
+    live_fetch: true
+    adapter: mdc_college
+    portal_url: https://www.mdc.edu/purchasing/bid-posting/
+    register_url: https://www.bidnetdirect.com/florida/miamidadecollege
+
+  - id: palm_beach_schools
+    name: Palm Beach County School District Construction
+    county: palm-beach
+    agency: School District of Palm Beach County
+    live_fetch: true
+    adapter: palm_beach_schools
+    portal_url: https://www.palmbeachschools.org/doing-business-with-the-district/construction-vendorssuppliers/currentfuture-solicitations
+    register_url: https://www.bidnetdirect.com/palmbeachschools
+
+  - id: swa_pbc
+    name: Solid Waste Authority of Palm Beach County
+    county: palm-beach
+    agency: Solid Waste Authority of Palm Beach County
+    live_fetch: true
+    adapter: swa
+    portal_url: https://www.swa.org/Bids.aspx
+    register_url: https://www.bidsync.com/SupplierRegister?ac=register&pathid=1050
+
+  # Catalog-only portals (login / SPA — deep scrape needs vendor account)
+  - id: mdcps_demandstar
+    name: Miami-Dade County Public Schools (DemandStar)
+    county: miami-dade
+    agency: Miami-Dade County Public Schools
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.demandstar.com/app/agencies/florida/miami-dade-county-public-schools/procurement-opportunities/f27e1be6-883d-4b92-8fa8-fa0cfcf667b7/
+    register_url: https://www.demandstar.com/
+
+  - id: city_of_miami_bidnet
+    name: City of Miami (Bidnet Direct)
+    county: miami-dade
+    agency: City of Miami
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.bidnetdirect.com/florida/cityofmiami
+    register_url: https://www.bidnetdirect.com/public/user-registration?purchasingGroupId=8408751
+
+  - id: broward_schools
+    name: Broward County Public Schools
+    county: broward
+    agency: Broward County Public Schools
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.browardschools.com/bcps-departments/procurement/district-bid-opportunities-demandstar
+    register_url: https://www.browardschools.com/bcps-departments/procurement/eprocure-supplier-portal
+
+  - id: broward_health
+    name: Broward Health Procurement
+    county: broward
+    agency: Broward Health
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.browardhealth.org/vendor/current-opportunities
+    register_url: https://www.browardhealth.org/vendor/current-opportunities
+
+  - id: fort_lauderdale
+    name: City of Fort Lauderdale Procurement
+    county: broward
+    agency: City of Fort Lauderdale
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.fortlauderdale.gov/Government/Departments/Procurement-Services
+    register_url: https://sms-fortlauderdale-prd.inforcloudsuite.com/fsm/SupplyManagementSupplier/page/EventPage?csk.SupplierGroup=COFL&menu=XiSupplierHome.Event
+
+  - id: palm_beach_county_vss
+    name: Palm Beach County Procurement (VSS)
+    county: palm-beach
+    agency: Palm Beach County
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://discover.pbc.gov/procurement/Pages/IFB-RFP.aspx
+    register_url: https://pbcvssp.pbc.gov/vssprd/Advantage4
+
+  - id: pbc_facilities
+    name: Palm Beach County Facilities Construction Bids
+    county: palm-beach
+    agency: Palm Beach County FDO
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://discover.pbc.gov/fdo/CID/Current-Construction-Bids.aspx
+    register_url: https://discover.pbc.gov/fdo/CID/Current-Construction-Bids.aspx
