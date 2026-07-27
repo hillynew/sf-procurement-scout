@@ -1,4 +1,4 @@
-"""SF Procurement Scout — polished pipeline UI (NG-Snapshot inspired)."""
+"""SF Procurement Scout — permanent left menu + pipeline UI."""
 
 from __future__ import annotations
 
@@ -22,22 +22,18 @@ from src.pipeline.store import load_latest, save_snapshot
 from src.summarize import apply_briefs, make_brief
 
 # ---------------------------------------------------------------------------
-# Page config + CSS
+# Page + CSS
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
     page_title="Procurement Pipeline · SF Scout",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",  # native sidebar unused; permanent left menu instead
 )
 
-_CSS_PATH = Path(__file__).parent / "styles.css"
-st.markdown(f"<style>{_CSS_PATH.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
+_CSS = (Path(__file__).parent / "styles.css").read_text(encoding="utf-8")
+st.markdown(f"<style>{_CSS}</style>", unsafe_allow_html=True)
 
 COUNTY_LABELS = {
     "miami-dade": "Miami-Dade",
@@ -71,7 +67,7 @@ def _init_state() -> None:
         "agency_filter": "All",
         "query": "",
         "selected_id": None,
-        "view_mode": "board",
+        "view_mode": "list",
         "include_catalog": False,
         "board_group": "county",
         "show_only_urgent": False,
@@ -114,14 +110,11 @@ def offer_label(o: Opportunity) -> str:
 
 
 def ensure_brief(o: Opportunity) -> str:
-    if o.brief and o.brief.strip():
-        return o.brief
     return make_brief(o)
 
 
 def short_brief(o: Opportunity, n: int = 140) -> str:
-    b = ensure_brief(o)
-    b = " ".join(b.split())
+    b = " ".join(ensure_brief(o).split())
     return b if len(b) <= n else b[: n - 1] + "…"
 
 
@@ -144,14 +137,11 @@ def fmt_due(o: Opportunity) -> str:
 
 
 def urgency_badge(o: Opportunity) -> Tuple[str, str]:
-    """Return (css_class, label)."""
     days = o.days_until_due
     if o.status in {"closed", "cancelled"}:
         return "muted", o.status
     if days is None:
-        if o.status == "upcoming":
-            return "info", "upcoming"
-        return "ok", "open"
+        return ("info", "upcoming") if o.status == "upcoming" else ("ok", "open")
     if days < 0:
         return "muted", "past due"
     if days == 0:
@@ -191,14 +181,9 @@ def load_data(force: bool = False):
             save_snapshot(opps, health, tag="dashboard")
             return opps, health
     opps, health = load_latest()
-    # Always re-apply briefs so UI never shows blank summaries
     if opps:
         for o in opps:
-            if not o.brief:
-                o.brief = make_brief(o)
-            else:
-                # refresh timing language
-                o.brief = make_brief(o)
+            o.brief = make_brief(o)
     return opps, health
 
 
@@ -212,7 +197,6 @@ def apply_filters(opps: List[Opportunity]) -> List[Opportunity]:
 
     out = list(opps)
     if county != "All":
-        # map label back to key
         inv = {v: k for k, v in COUNTY_LABELS.items()}
         key = inv.get(county, county.lower().replace(" ", "-"))
         out = [o for o in out if o.county == key]
@@ -247,299 +231,6 @@ def apply_filters(opps: List[Opportunity]) -> List[Opportunity]:
     return sort_opps(out)
 
 
-# ---------------------------------------------------------------------------
-# Data
-# ---------------------------------------------------------------------------
-
-if st.session_state.do_fetch:
-    all_opps, health = load_data(force=True)
-    st.session_state.do_fetch = False
-    st.session_state.selected_id = None
-else:
-    all_opps, health = load_data(force=False)
-
-# Sidebar always visible — even when empty
-with st.sidebar:
-    st.markdown(
-        """
-        <div class="ng-brand">
-          <div class="ng-brand-mark">SF</div>
-          <div>
-            <div class="ng-brand-name">SF Procure Scout</div>
-            <div class="ng-brand-sub">South Florida bids</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown('<div class="ng-nav-section">Actions</div>', unsafe_allow_html=True)
-    if st.button("🔄  Fetch live data", type="primary", use_container_width=True):
-        st.session_state.do_fetch = True
-        st.rerun()
-    st.session_state.include_catalog = st.checkbox(
-        "Include catalog portals",
-        value=st.session_state.include_catalog,
-        help="DemandStar / Bidnet / VSS registration entries",
-    )
-    st.session_state.show_only_urgent = st.checkbox(
-        "Urgent only (≤ 7 days)",
-        value=st.session_state.show_only_urgent,
-    )
-
-    st.markdown('<div class="ng-nav-section">Filters</div>', unsafe_allow_html=True)
-
-    # Stable selectbox menus — never disappear on click
-    county_opts = ["All"] + [COUNTY_LABELS[k] for k in COUNTY_LABELS]
-    st.session_state.county_filter = st.selectbox(
-        "County",
-        county_opts,
-        index=county_opts.index(st.session_state.county_filter)
-        if st.session_state.county_filter in county_opts
-        else 0,
-    )
-
-    # Build option lists from data
-    if all_opps:
-        offer_opts = ["All"] + sorted(
-            {
-                offer_key(o).replace("_", " ").title()
-                for o in all_opps
-                if offer_key(o) != "unknown"
-            }
-        )
-        cat_opts = ["All"] + sorted(
-            {
-                c.replace("_", " ").title()
-                for o in all_opps
-                for c in (o.categories or [])
-                if c != "portal_directory"
-            }
-        )
-        agency_opts = ["All"] + sorted({o.agency for o in all_opps if o.agency})
-    else:
-        offer_opts, cat_opts, agency_opts = ["All"], ["All"], ["All"]
-
-    if st.session_state.offer_filter not in offer_opts:
-        st.session_state.offer_filter = "All"
-    if st.session_state.category_filter not in cat_opts:
-        st.session_state.category_filter = "All"
-    if st.session_state.agency_filter not in agency_opts:
-        st.session_state.agency_filter = "All"
-
-    st.session_state.offer_filter = st.selectbox(
-        "Offer type",
-        offer_opts,
-        index=offer_opts.index(st.session_state.offer_filter),
-    )
-    st.session_state.category_filter = st.selectbox(
-        "Category",
-        cat_opts,
-        index=cat_opts.index(st.session_state.category_filter),
-    )
-    st.session_state.agency_filter = st.selectbox(
-        "Agency",
-        agency_opts,
-        index=agency_opts.index(st.session_state.agency_filter),
-    )
-
-    st.session_state.sort_by = st.selectbox(
-        "Sort by",
-        ["due_soon", "newest", "agency", "title"],
-        format_func=lambda x: {
-            "due_soon": "Due soonest",
-            "newest": "Newest posted",
-            "agency": "Agency A–Z",
-            "title": "Title A–Z",
-        }[x],
-        index=["due_soon", "newest", "agency", "title"].index(st.session_state.sort_by),
-    )
-
-    st.session_state.board_group = st.selectbox(
-        "Board columns",
-        ["county", "status", "offer_type"],
-        format_func=lambda x: {
-            "county": "By county",
-            "status": "By status",
-            "offer_type": "By offer type",
-        }[x],
-        index=["county", "status", "offer_type"].index(st.session_state.board_group),
-    )
-
-    if st.button("Clear all filters", use_container_width=True):
-        st.session_state.county_filter = "All"
-        st.session_state.offer_filter = "All"
-        st.session_state.category_filter = "All"
-        st.session_state.agency_filter = "All"
-        st.session_state.query = ""
-        st.session_state.stage_tab = "open"
-        st.session_state.show_only_urgent = False
-        st.session_state.selected_id = None
-        st.rerun()
-
-    st.markdown("---")
-    st.markdown('<div class="ng-nav-section">View</div>', unsafe_allow_html=True)
-    st.session_state.view_mode = st.radio(
-        "Layout",
-        ["board", "list", "insights"],
-        format_func=lambda x: {"board": "🗂  Board", "list": "📋  List + detail", "insights": "📊  Insights"}[x],
-        index=["board", "list", "insights"].index(st.session_state.view_mode),
-        label_visibility="collapsed",
-    )
-
-    if health:
-        ok = sum(1 for h in health if h.ok)
-        st.caption(f"Sources: {ok}/{len(health)} healthy · {len(all_opps)} deals loaded")
-    if os.environ.get("RENDER"):
-        st.caption("Render free tier may sleep when idle")
-
-# Empty state
-if not all_opps:
-    st.markdown(
-        """
-        <div class="ng-hero">
-          <h1>Procurement Pipeline</h1>
-          <p>Live government bids across Miami-Dade, Broward &amp; Palm Beach</p>
-        </div>
-        <div class="ng-empty">
-          <div class="ng-empty-icon">📥</div>
-          <div class="ng-empty-title">No opportunities loaded</div>
-          <div>Use <strong>Fetch live data</strong> in the left menu to pull from county portals.</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.stop()
-
-visible = apply_filters(all_opps)
-open_pool = [o for o in all_opps if o.status in {"open", "upcoming"}]
-# filtered open for KPIs
-open_vis = [o for o in visible if o.status in {"open", "upcoming"}]
-urgent = [o for o in open_vis if o.days_until_due is not None and 0 <= o.days_until_due <= 7]
-due_today = [o for o in open_vis if o.days_until_due is not None and o.days_until_due == 0]
-
-# Index for selection
-by_id: Dict[str, Opportunity] = {o.opportunity_id: o for o in all_opps}
-selected = by_id.get(st.session_state.selected_id) if st.session_state.selected_id else None
-
-# ---------------------------------------------------------------------------
-# Header
-# ---------------------------------------------------------------------------
-
-st.markdown(
-    f"""
-    <div class="ng-hero">
-      <div class="ng-hero-row">
-        <div>
-          <h1>Procurement Pipeline</h1>
-          <p>Miami-Dade · Broward · Palm Beach &nbsp;·&nbsp;
-             <strong>{len(open_vis)}</strong> open in view &nbsp;·&nbsp;
-             <strong>{len(visible)}</strong> matching filters</p>
-        </div>
-      </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# KPIs
-st.markdown(
-    f"""
-    <div class="ng-kpi-grid">
-      <div class="ng-kpi">
-        <div class="ng-kpi-label">Open in view</div>
-        <div class="ng-kpi-value">{len(open_vis)}</div>
-        <div class="ng-kpi-sub">{len(open_pool)} open system-wide</div>
-      </div>
-      <div class="ng-kpi {'urgent' if urgent else ''}">
-        <div class="ng-kpi-label">Due within 7 days</div>
-        <div class="ng-kpi-value">{len(urgent)}</div>
-        <div class="ng-kpi-sub">priority response window</div>
-      </div>
-      <div class="ng-kpi {'urgent' if due_today else ''}">
-        <div class="ng-kpi-label">Due today</div>
-        <div class="ng-kpi-value">{len(due_today)}</div>
-        <div class="ng-kpi-sub">closes end of day</div>
-      </div>
-      <div class="ng-kpi">
-        <div class="ng-kpi-label">Matching filters</div>
-        <div class="ng-kpi-value">{len(visible)}</div>
-        <div class="ng-kpi-sub">{len(all_opps)} total loaded</div>
-      </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# Search + stage tabs
-s1, s2 = st.columns([3, 1])
-with s1:
-    q = st.text_input(
-        "Search deals",
-        value=st.session_state.query,
-        placeholder="Search title, agency, ref #, or summary…",
-        label_visibility="collapsed",
-    )
-    if q != st.session_state.query:
-        st.session_state.query = q
-        st.rerun()
-with s2:
-    st.markdown(
-        f'<div class="ng-result-pill">{len(visible)} results</div>',
-        unsafe_allow_html=True,
-    )
-
-# Stage tabs
-tab_keys = ["open", "upcoming", "closed", "catalog", "all"]
-tab_labels = {
-    "open": "All open",
-    "upcoming": "Upcoming",
-    "closed": "Closed",
-    "catalog": "Catalog",
-    "all": "Everything",
-}
-tcols = st.columns(len(tab_keys))
-for i, key in enumerate(tab_keys):
-    saved = st.session_state.stage_tab
-    st.session_state.stage_tab = key
-    n = len(apply_filters(all_opps))
-    st.session_state.stage_tab = saved
-    with tcols[i]:
-        active = st.session_state.stage_tab == key
-        if st.button(
-            f"{tab_labels[key]} ({n})",
-            key=f"stage_{key}",
-            use_container_width=True,
-            type="primary" if active else "secondary",
-        ):
-            st.session_state.stage_tab = key
-            st.rerun()
-
-# Active filter chips (display only)
-chips = []
-if st.session_state.county_filter != "All":
-    chips.append(st.session_state.county_filter)
-if st.session_state.offer_filter != "All":
-    chips.append(st.session_state.offer_filter)
-if st.session_state.category_filter != "All":
-    chips.append(st.session_state.category_filter)
-if st.session_state.agency_filter != "All":
-    chips.append(st.session_state.agency_filter[:36])
-if st.session_state.show_only_urgent:
-    chips.append("Urgent ≤7d")
-if chips:
-    st.markdown(
-        '<div class="ng-chips">'
-        + "".join(f'<span class="ng-chip active">{esc(c)}</span>' for c in chips)
-        + "</div>",
-        unsafe_allow_html=True,
-    )
-
-
-# ---------------------------------------------------------------------------
-# Card / list renderers
-# ---------------------------------------------------------------------------
-
 def card_html(o: Opportunity, selected: bool = False) -> str:
     ucss, ulabel = urgency_badge(o)
     brief = short_brief(o, 160)
@@ -566,11 +257,9 @@ def card_html(o: Opportunity, selected: bool = False) -> str:
 
 
 def render_deal_actions(o: Opportunity, key: str) -> None:
-    """Working portal link + select for summary."""
-    c1, c2 = st.columns([1, 1])
+    c1, c2 = st.columns(2)
     with c1:
-        # Native Streamlit link — always works
-        st.link_button("🔗 Portal", o.url or "#", use_container_width=True)
+        st.link_button("🔗 Open portal", o.url or "#", use_container_width=True)
     with c2:
         is_sel = st.session_state.selected_id == o.opportunity_id
         if st.button(
@@ -579,10 +268,7 @@ def render_deal_actions(o: Opportunity, key: str) -> None:
             use_container_width=True,
             type="primary" if is_sel else "secondary",
         ):
-            st.session_state.selected_id = (
-                None if is_sel else o.opportunity_id
-            )
-            # Prefer list layout so summary is visible
+            st.session_state.selected_id = None if is_sel else o.opportunity_id
             if st.session_state.view_mode == "board" and not is_sel:
                 st.session_state.view_mode = "list"
             st.rerun()
@@ -631,247 +317,511 @@ def render_summary_panel(o: Opportunity) -> None:
     with a1:
         st.link_button("Open official portal ↗", o.url or "#", use_container_width=True, type="primary")
     with a2:
-        # mailto share stub
         subject = quote(f"Bid opportunity: {o.title[:80]}")
         body = quote(f"{brief}\n\nPortal: {o.url}")
-        st.link_button(
-            "Share via email",
-            f"mailto:?subject={subject}&body={body}",
-            use_container_width=True,
-        )
+        st.link_button("Share via email", f"mailto:?subject={subject}&body={body}", use_container_width=True)
     with a3:
-        if st.button("Close summary", use_container_width=True):
+        if st.button("Close summary", use_container_width=True, key=f"close_{o.opportunity_id}"):
             st.session_state.selected_id = None
             st.rerun()
 
 
-# ---------------------------------------------------------------------------
-# Views
-# ---------------------------------------------------------------------------
-
-view = st.session_state.view_mode
-
-if not visible:
+def render_left_menu(all_opps: List[Opportunity], health) -> None:
+    """Always-visible left navigation (main layout column — not Streamlit sidebar)."""
     st.markdown(
         """
-        <div class="ng-empty">
-          <div class="ng-empty-icon">🔎</div>
-          <div class="ng-empty-title">No deals match these filters</div>
-          <div>Clear filters in the sidebar or switch stage tabs.</div>
+        <div class="left-menu-brand">
+          <div class="ng-brand-mark">SF</div>
+          <div>
+            <div class="ng-brand-name">SF Procure Scout</div>
+            <div class="ng-brand-sub">South Florida bids</div>
+          </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-elif view == "insights":
-    # Funnel + hot list + category breakdown (preserve stage/urgent toggles)
-    saved_stage = st.session_state.stage_tab
-    saved_urgent = st.session_state.show_only_urgent
-    st.session_state.stage_tab = "all"
-    st.session_state.show_only_urgent = False
-    all_filtered = apply_filters(all_opps)
-    st.session_state.stage_tab = saved_stage
-    st.session_state.show_only_urgent = saved_urgent
 
-    left, right = st.columns(2)
-    with left:
-        stages = ["open", "upcoming", "catalog", "closed"]
-        rows = []
-        max_n = 1
-        for sk in stages:
-            n = sum(1 for o in all_filtered if o.status == sk)
-            max_n = max(max_n, n)
-            rows.append((STATUS_LABELS[sk], n))
-        html_rows = []
-        for label, n in rows:
-            pct = int(100 * n / max_n) if max_n else 0
-            html_rows.append(
-                f"""
-                <div class="ng-funnel-row">
-                  <span>{esc(label)}</span>
-                  <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
-                  <span class="ng-bar-value">{n}</span>
-                </div>
-                """
-            )
-        st.markdown(
-            f"""
-            <div class="ng-panel">
-              <div class="ng-panel-head">
-                <div class="ng-panel-title">Status funnel</div>
-                <div class="ng-panel-sub">{len(all_filtered)} filtered</div>
-              </div>
-              {''.join(html_rows)}
-            </div>
-            """,
-            unsafe_allow_html=True,
+    st.markdown('<p class="left-menu-label">Actions</p>', unsafe_allow_html=True)
+    if st.button("🔄  Fetch live data", type="primary", use_container_width=True, key="fetch_btn"):
+        st.session_state.do_fetch = True
+        st.rerun()
+
+    st.checkbox(
+        "Include catalog portals",
+        key="include_catalog",
+        help="DemandStar / Bidnet / VSS registration entries",
+    )
+    st.checkbox("Urgent only (≤ 7 days)", key="show_only_urgent")
+
+    st.markdown('<p class="left-menu-label">Filters</p>', unsafe_allow_html=True)
+
+    county_opts = ["All"] + list(COUNTY_LABELS.values())
+    if st.session_state.county_filter not in county_opts:
+        st.session_state.county_filter = "All"
+    st.selectbox("County", county_opts, key="county_filter")
+
+    if all_opps:
+        offer_opts = ["All"] + sorted(
+            {offer_key(o).replace("_", " ").title() for o in all_opps if offer_key(o) != "unknown"}
         )
-
-        cat_c: Counter = Counter()
-        for o in all_filtered:
-            for c in o.categories or ["general"]:
-                if c != "portal_directory":
-                    cat_c[c] += 1
-        top_cats = cat_c.most_common(8)
-        max_c = top_cats[0][1] if top_cats else 1
-        crow = []
-        for c, n in top_cats:
-            pct = int(100 * n / max_c) if max_c else 0
-            crow.append(
-                f"""
-                <div class="ng-funnel-row">
-                  <span>{esc(c.replace('_', ' '))}</span>
-                  <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
-                  <span class="ng-bar-value">{n}</span>
-                </div>
-                """
-            )
-        st.markdown(
-            f"""
-            <div class="ng-panel" style="margin-top:12px">
-              <div class="ng-panel-head">
-                <div class="ng-panel-title">Top categories</div>
-              </div>
-              {''.join(crow) if crow else '<div class="ng-empty-title">No categories</div>'}
-            </div>
-            """,
-            unsafe_allow_html=True,
+        cat_opts = ["All"] + sorted(
+            {
+                c.replace("_", " ").title()
+                for o in all_opps
+                for c in (o.categories or [])
+                if c != "portal_directory"
+            }
         )
-
-    with right:
-        hot = sort_opps(
-            [
-                o
-                for o in all_filtered
-                if o.status in {"open", "upcoming"}
-                and o.days_until_due is not None
-                and 0 <= o.days_until_due <= 14
-            ]
-        )[:10]
-        st.markdown(
-            f"""
-            <div class="ng-panel">
-              <div class="ng-panel-head">
-                <div class="ng-panel-title">Hot pipeline (next 14 days)</div>
-                <div class="ng-panel-sub">{len(hot)} deals</div>
-              </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        if not hot:
-            st.info("No open deals due in the next 14 days with current filters.")
-        for o in hot:
-            st.markdown(card_html(o), unsafe_allow_html=True)
-            render_deal_actions(o, key=f"ins_{o.opportunity_id}")
-
-elif view == "board":
-    group = st.session_state.board_group
-    buckets: Dict[str, List[Opportunity]] = defaultdict(list)
-    for o in visible:
-        if group == "county":
-            k = COUNTY_LABELS.get(o.county, o.county)
-        elif group == "offer_type":
-            k = offer_label(o)
-        else:
-            k = STATUS_LABELS.get(o.status, o.status)
-        buckets[k].append(o)
-
-    if group == "status":
-        order = [STATUS_LABELS[s] for s in STATUS_ORDER if STATUS_LABELS[s] in buckets]
-        for k in buckets:
-            if k not in order:
-                order.append(k)
-    elif group == "county":
-        order = [COUNTY_LABELS[k] for k in COUNTY_LABELS if COUNTY_LABELS[k] in buckets]
-        for k in buckets:
-            if k not in order:
-                order.append(k)
+        agency_opts = ["All"] + sorted({o.agency for o in all_opps if o.agency})
     else:
-        order = sorted(buckets.keys(), key=lambda x: (-len(buckets[x]), x))
+        offer_opts, cat_opts, agency_opts = ["All"], ["All"], ["All"]
 
-    # Show up to 4 columns side by side for readability
-    n = min(len(order), 4)
-    if n == 0:
-        st.info("No columns to show.")
+    for key, opts in (
+        ("offer_filter", offer_opts),
+        ("category_filter", cat_opts),
+        ("agency_filter", agency_opts),
+    ):
+        if st.session_state.get(key) not in opts:
+            st.session_state[key] = "All"
+
+    st.selectbox("Offer type", offer_opts, key="offer_filter")
+    st.selectbox("Category", cat_opts, key="category_filter")
+    st.selectbox("Agency", agency_opts, key="agency_filter")
+    st.selectbox(
+        "Sort by",
+        ["due_soon", "newest", "agency", "title"],
+        format_func=lambda x: {
+            "due_soon": "Due soonest",
+            "newest": "Newest posted",
+            "agency": "Agency A–Z",
+            "title": "Title A–Z",
+        }[x],
+        key="sort_by",
+    )
+    st.selectbox(
+        "Board columns",
+        ["county", "status", "offer_type"],
+        format_func=lambda x: {
+            "county": "By county",
+            "status": "By status",
+            "offer_type": "By offer type",
+        }[x],
+        key="board_group",
+    )
+
+    if st.button("Clear all filters", use_container_width=True, key="clear_filters"):
+        st.session_state.county_filter = "All"
+        st.session_state.offer_filter = "All"
+        st.session_state.category_filter = "All"
+        st.session_state.agency_filter = "All"
+        st.session_state.query = ""
+        st.session_state.stage_tab = "open"
+        st.session_state.show_only_urgent = False
+        st.session_state.selected_id = None
+        st.rerun()
+
+    st.markdown('<p class="left-menu-label">Layout</p>', unsafe_allow_html=True)
+    st.radio(
+        "Layout",
+        ["list", "board", "insights"],
+        format_func=lambda x: {
+            "list": "📋  List + detail",
+            "board": "🗂  Board",
+            "insights": "📊  Insights",
+        }[x],
+        key="view_mode",
+        label_visibility="collapsed",
+    )
+
+    st.markdown('<p class="left-menu-label">Quick county</p>', unsafe_allow_html=True)
+    if st.button("All counties", use_container_width=True, key="qc_all"):
+        st.session_state.county_filter = "All"
+        st.rerun()
+    for ck, label in COUNTY_LABELS.items():
+        n = sum(1 for o in all_opps if o.county == ck) if all_opps else 0
+        active = st.session_state.county_filter == label
+        if st.button(
+            f"{'● ' if active else ''}{label}  ({n})",
+            use_container_width=True,
+            key=f"qc_{ck}",
+            type="primary" if active else "secondary",
+        ):
+            st.session_state.county_filter = label
+            st.rerun()
+
+    if health:
+        ok = sum(1 for h in health if h.ok)
+        st.caption(f"Sources: {ok}/{len(health)} OK · {len(all_opps)} deals")
+    if os.environ.get("RENDER"):
+        st.caption("Hosted on Render")
+
+
+# ---------------------------------------------------------------------------
+# Data load
+# ---------------------------------------------------------------------------
+
+if st.session_state.do_fetch:
+    all_opps, health = load_data(force=True)
+    st.session_state.do_fetch = False
+    st.session_state.selected_id = None
+else:
+    all_opps, health = load_data(force=False)
+
+# ---------------------------------------------------------------------------
+# Layout: permanent left menu | main
+# ---------------------------------------------------------------------------
+
+menu_col, main_col = st.columns([1, 3.15], gap="large")
+
+with menu_col:
+    st.markdown('<div class="left-menu">', unsafe_allow_html=True)
+    render_left_menu(all_opps, health)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+with main_col:
+    if not all_opps:
+        st.markdown(
+            """
+            <div class="ng-hero">
+              <h1>Procurement Pipeline</h1>
+              <p>Live government bids across Miami-Dade, Broward &amp; Palm Beach</p>
+            </div>
+            <div class="ng-empty">
+              <div class="ng-empty-icon">📥</div>
+              <div class="ng-empty-title">No opportunities loaded</div>
+              <div>Click <strong>Fetch live data</strong> in the <strong>left menu</strong>.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     else:
-        cols = st.columns(n)
-        for i, name in enumerate(order[:n]):
-            items = sort_opps(buckets[name])
-            with cols[i]:
+        visible = apply_filters(all_opps)
+        open_pool = [o for o in all_opps if o.status in {"open", "upcoming"}]
+        open_vis = [o for o in visible if o.status in {"open", "upcoming"}]
+        urgent = [
+            o for o in open_vis if o.days_until_due is not None and 0 <= o.days_until_due <= 7
+        ]
+        due_today = [
+            o for o in open_vis if o.days_until_due is not None and o.days_until_due == 0
+        ]
+        by_id: Dict[str, Opportunity] = {o.opportunity_id: o for o in all_opps}
+        selected = by_id.get(st.session_state.selected_id) if st.session_state.selected_id else None
+        view = st.session_state.view_mode
+
+        st.markdown(
+            f"""
+            <div class="ng-hero">
+              <div class="ng-hero-row">
+                <div>
+                  <h1>Procurement Pipeline</h1>
+                  <p>Miami-Dade · Broward · Palm Beach &nbsp;·&nbsp;
+                     <strong>{len(open_vis)}</strong> open in view &nbsp;·&nbsp;
+                     <strong>{len(visible)}</strong> matching filters</p>
+                </div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.markdown(
+            f"""
+            <div class="ng-kpi-grid">
+              <div class="ng-kpi">
+                <div class="ng-kpi-label">Open in view</div>
+                <div class="ng-kpi-value">{len(open_vis)}</div>
+                <div class="ng-kpi-sub">{len(open_pool)} open system-wide</div>
+              </div>
+              <div class="ng-kpi {'urgent' if urgent else ''}">
+                <div class="ng-kpi-label">Due within 7 days</div>
+                <div class="ng-kpi-value">{len(urgent)}</div>
+                <div class="ng-kpi-sub">priority response window</div>
+              </div>
+              <div class="ng-kpi {'urgent' if due_today else ''}">
+                <div class="ng-kpi-label">Due today</div>
+                <div class="ng-kpi-value">{len(due_today)}</div>
+                <div class="ng-kpi-sub">closes end of day</div>
+              </div>
+              <div class="ng-kpi">
+                <div class="ng-kpi-label">Matching filters</div>
+                <div class="ng-kpi-value">{len(visible)}</div>
+                <div class="ng-kpi-sub">{len(all_opps)} total loaded</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        s1, s2 = st.columns([3, 1])
+        with s1:
+            q = st.text_input(
+                "Search deals",
+                value=st.session_state.query,
+                placeholder="Search title, agency, ref #, or summary…",
+                label_visibility="collapsed",
+                key="search_input",
+            )
+            if q != st.session_state.query:
+                st.session_state.query = q
+                st.rerun()
+        with s2:
+            st.markdown(
+                f'<div class="ng-result-pill">{len(visible)} results</div>',
+                unsafe_allow_html=True,
+            )
+
+        tab_keys = ["open", "upcoming", "closed", "catalog", "all"]
+        tab_labels = {
+            "open": "All open",
+            "upcoming": "Upcoming",
+            "closed": "Closed",
+            "catalog": "Catalog",
+            "all": "Everything",
+        }
+        tcols = st.columns(len(tab_keys))
+        for i, key in enumerate(tab_keys):
+            saved = st.session_state.stage_tab
+            st.session_state.stage_tab = key
+            n = len(apply_filters(all_opps))
+            st.session_state.stage_tab = saved
+            with tcols[i]:
+                active = st.session_state.stage_tab == key
+                if st.button(
+                    f"{tab_labels[key]} ({n})",
+                    key=f"stage_{key}",
+                    use_container_width=True,
+                    type="primary" if active else "secondary",
+                ):
+                    st.session_state.stage_tab = key
+                    st.rerun()
+
+        chips = []
+        if st.session_state.county_filter != "All":
+            chips.append(st.session_state.county_filter)
+        if st.session_state.offer_filter != "All":
+            chips.append(st.session_state.offer_filter)
+        if st.session_state.category_filter != "All":
+            chips.append(st.session_state.category_filter)
+        if st.session_state.agency_filter != "All":
+            chips.append(st.session_state.agency_filter[:36])
+        if st.session_state.show_only_urgent:
+            chips.append("Urgent ≤7d")
+        if chips:
+            st.markdown(
+                '<div class="ng-chips">'
+                + "".join(f'<span class="ng-chip active">{esc(c)}</span>' for c in chips)
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+
+        # ----- Views -----
+        if not visible:
+            st.markdown(
+                """
+                <div class="ng-empty">
+                  <div class="ng-empty-icon">🔎</div>
+                  <div class="ng-empty-title">No deals match these filters</div>
+                  <div>Clear filters in the <strong>left menu</strong> or switch stage tabs.</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        elif view == "insights":
+            saved_stage = st.session_state.stage_tab
+            saved_urgent = st.session_state.show_only_urgent
+            st.session_state.stage_tab = "all"
+            st.session_state.show_only_urgent = False
+            all_filtered = apply_filters(all_opps)
+            st.session_state.stage_tab = saved_stage
+            st.session_state.show_only_urgent = saved_urgent
+
+            left, right = st.columns(2)
+            with left:
+                stages = ["open", "upcoming", "catalog", "closed"]
+                rows = []
+                max_n = 1
+                for sk in stages:
+                    n = sum(1 for o in all_filtered if o.status == sk)
+                    max_n = max(max_n, n)
+                    rows.append((STATUS_LABELS[sk], n))
+                html_rows = []
+                for label, n in rows:
+                    pct = int(100 * n / max_n) if max_n else 0
+                    html_rows.append(
+                        f"""
+                        <div class="ng-funnel-row">
+                          <span>{esc(label)}</span>
+                          <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
+                          <span class="ng-bar-value">{n}</span>
+                        </div>
+                        """
+                    )
                 st.markdown(
                     f"""
-                    <div class="board-col-head">
-                      <span>{esc(name)}</span>
-                      <span class="board-count">{len(items)}</span>
+                    <div class="ng-panel">
+                      <div class="ng-panel-head">
+                        <div class="ng-panel-title">Status funnel</div>
+                        <div class="ng-panel-sub">{len(all_filtered)} filtered</div>
+                      </div>
+                      {''.join(html_rows)}
                     </div>
                     """,
                     unsafe_allow_html=True,
                 )
-                for o in items[:15]:
+                cat_c: Counter = Counter()
+                for o in all_filtered:
+                    for c in o.categories or ["general"]:
+                        if c != "portal_directory":
+                            cat_c[c] += 1
+                top_cats = cat_c.most_common(8)
+                max_c = top_cats[0][1] if top_cats else 1
+                crow = []
+                for c, n in top_cats:
+                    pct = int(100 * n / max_c) if max_c else 0
+                    crow.append(
+                        f"""
+                        <div class="ng-funnel-row">
+                          <span>{esc(c.replace('_', ' '))}</span>
+                          <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
+                          <span class="ng-bar-value">{n}</span>
+                        </div>
+                        """
+                    )
+                st.markdown(
+                    f"""
+                    <div class="ng-panel" style="margin-top:12px">
+                      <div class="ng-panel-head"><div class="ng-panel-title">Top categories</div></div>
+                      {''.join(crow) if crow else '<div class="ng-empty-title">No categories</div>'}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+            with right:
+                hot = sort_opps(
+                    [
+                        o
+                        for o in all_filtered
+                        if o.status in {"open", "upcoming"}
+                        and o.days_until_due is not None
+                        and 0 <= o.days_until_due <= 14
+                    ]
+                )[:10]
+                st.markdown(
+                    f"""
+                    <div class="ng-panel">
+                      <div class="ng-panel-head">
+                        <div class="ng-panel-title">Hot pipeline (next 14 days)</div>
+                        <div class="ng-panel-sub">{len(hot)} deals</div>
+                      </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                if not hot:
+                    st.info("No open deals due in the next 14 days with current filters.")
+                for o in hot:
+                    st.markdown(card_html(o), unsafe_allow_html=True)
+                    render_deal_actions(o, key=f"ins_{o.opportunity_id}")
+
+        elif view == "board":
+            group = st.session_state.board_group
+            buckets: Dict[str, List[Opportunity]] = defaultdict(list)
+            for o in visible:
+                if group == "county":
+                    k = COUNTY_LABELS.get(o.county, o.county)
+                elif group == "offer_type":
+                    k = offer_label(o)
+                else:
+                    k = STATUS_LABELS.get(o.status, o.status)
+                buckets[k].append(o)
+
+            if group == "status":
+                order = [STATUS_LABELS[s] for s in STATUS_ORDER if STATUS_LABELS[s] in buckets]
+                for k in buckets:
+                    if k not in order:
+                        order.append(k)
+            elif group == "county":
+                order = [COUNTY_LABELS[k] for k in COUNTY_LABELS if COUNTY_LABELS[k] in buckets]
+                for k in buckets:
+                    if k not in order:
+                        order.append(k)
+            else:
+                order = sorted(buckets.keys(), key=lambda x: (-len(buckets[x]), x))
+
+            n = min(len(order), 4)
+            if n == 0:
+                st.info("No columns to show.")
+            else:
+                cols = st.columns(n)
+                for i, name in enumerate(order[:n]):
+                    items = sort_opps(buckets[name])
+                    with cols[i]:
+                        st.markdown(
+                            f"""
+                            <div class="board-col-head">
+                              <span>{esc(name)}</span>
+                              <span class="board-count">{len(items)}</span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        for o in items[:15]:
+                            sel = st.session_state.selected_id == o.opportunity_id
+                            st.markdown(card_html(o, selected=sel), unsafe_allow_html=True)
+                            render_deal_actions(o, key=f"bd_{i}_{o.opportunity_id}")
+                        if len(items) > 15:
+                            st.caption(f"+ {len(items) - 15} more")
+            if selected:
+                st.markdown("---")
+                render_summary_panel(selected)
+
+        else:  # list + detail (default)
+            list_col, detail_col = st.columns([1.15, 1], gap="large")
+            with list_col:
+                st.markdown(
+                    f'<div class="list-head">Deals <span class="board-count">{len(visible)}</span></div>',
+                    unsafe_allow_html=True,
+                )
+                for o in visible[:80]:
                     sel = st.session_state.selected_id == o.opportunity_id
                     st.markdown(card_html(o, selected=sel), unsafe_allow_html=True)
-                    render_deal_actions(o, key=f"bd_{i}_{o.opportunity_id}")
-                if len(items) > 15:
-                    st.caption(f"+ {len(items) - 15} more in this column")
-        if len(order) > n:
-            with st.expander(f"More columns ({len(order) - n})"):
-                for name in order[n:]:
-                    st.markdown(f"### {name} ({len(buckets[name])})")
-                    for o in sort_opps(buckets[name])[:8]:
-                        st.markdown(card_html(o), unsafe_allow_html=True)
-                        render_deal_actions(o, key=f"bx_{name}_{o.opportunity_id}")
+                    render_deal_actions(o, key=f"ls_{o.opportunity_id}")
+                if len(visible) > 80:
+                    st.caption(f"Showing 80 of {len(visible)}")
 
-else:  # list + persistent detail pane
-    list_col, detail_col = st.columns([1.15, 1], gap="large")
-    with list_col:
-        st.markdown(
-            f'<div class="list-head">Deals <span class="board-count">{len(visible)}</span></div>',
-            unsafe_allow_html=True,
-        )
-        for o in visible[:80]:
-            sel = st.session_state.selected_id == o.opportunity_id
-            st.markdown(card_html(o, selected=sel), unsafe_allow_html=True)
-            render_deal_actions(o, key=f"ls_{o.opportunity_id}")
-        if len(visible) > 80:
-            st.caption(f"Showing 80 of {len(visible)} — refine filters to narrow.")
+            with detail_col:
+                st.markdown('<div class="list-head">Deal summary</div>', unsafe_allow_html=True)
+                if selected:
+                    render_summary_panel(selected)
+                else:
+                    preview = urgent or open_vis or visible
+                    if preview:
+                        st.caption("Auto-preview of top match — click Summary on any card to pin it.")
+                        render_summary_panel(preview[0])
+                    else:
+                        st.markdown(
+                            """
+                            <div class="ng-empty">
+                              <div class="ng-empty-title">Select a deal</div>
+                              <div>Click <strong>Summary</strong> on any card.</div>
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
 
-    with detail_col:
-        st.markdown('<div class="list-head">Deal summary</div>', unsafe_allow_html=True)
-        if selected:
-            render_summary_panel(selected)
-        else:
-            # Auto-preview first urgent or first item
-            preview = (urgent or open_vis or visible)
-            if preview:
-                st.caption("Select **Summary** on a deal, or reviewing top match:")
-                render_summary_panel(preview[0])
-            else:
-                st.markdown(
-                    """
-                    <div class="ng-empty">
-                      <div class="ng-empty-title">Select a deal</div>
-                      <div>Click <strong>Summary</strong> on any card to open the full brief here.</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
+        if health:
+            with st.expander("Source health", expanded=False):
+                st.dataframe(
+                    [
+                        {
+                            "Source": h.name,
+                            "Status": "OK" if h.ok else "Error",
+                            "Deals": h.count,
+                            "ms": h.elapsed_ms,
+                            "Error": (h.error or "")[:80],
+                        }
+                        for h in health
+                    ],
+                    use_container_width=True,
+                    hide_index=True,
                 )
-
-# Floating summary when selected from board/insights
-if selected and view in {"board", "insights"}:
-    st.markdown("---")
-    render_summary_panel(selected)
-
-# Footer sources health (compact)
-if health:
-    with st.expander("Source health", expanded=False):
-        rows = [
-            {
-                "Source": h.name,
-                "Status": "OK" if h.ok else "Error",
-                "Deals": h.count,
-                "ms": h.elapsed_ms,
-                "Error": (h.error or "")[:80],
-            }
-            for h in health
-        ]
-        st.dataframe(rows, use_container_width=True, hide_index=True)
