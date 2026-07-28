@@ -19,9 +19,11 @@ from ..summarize import apply_briefs
 
 console = Console()
 
-# Portals are independent, so fetch them concurrently. Kept modest to stay
-# polite to public government sites (each adapter also paces its own requests).
-MAX_WORKERS = 6
+# Portals are independent, so fetch them concurrently. Every source targets a
+# different host and each adapter still paces its own requests, so the limit is
+# about not opening an unbounded number of sockets rather than politeness to any
+# one site.
+MAX_WORKERS = 12
 
 # An "open" listing with no published due date is only credible for so long;
 # some portals never retire their rows.

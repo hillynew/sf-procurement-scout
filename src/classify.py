@@ -11,12 +11,18 @@ from .models.opportunity import OfferType, SolicitationType
 SOLICITATION_PATTERNS = [
     (r"\bITN\b", SolicitationType.ITN),
     (r"\bCCNA\b", SolicitationType.CCNA),
+    (r"\bRPQ\b", SolicitationType.RPQ),
+    (r"\bITQ\b", SolicitationType.ITQ),
+    (r"\bRLI\b", SolicitationType.RLI),
     (r"\bRFQ\b", SolicitationType.RFQ),
     (r"\bRFI\b", SolicitationType.RFI),
     (r"\bRFP\b", SolicitationType.RFP),
     (r"\bIFB\b", SolicitationType.IFB),
     (r"\bITB\b", SolicitationType.ITB),
     (r"invitation\s+to\s+negotiate", SolicitationType.ITN),
+    (r"request\s+for\s+(?:price\s+)?quotations?", SolicitationType.RPQ),
+    (r"invitation\s+to\s+quote", SolicitationType.ITQ),
+    (r"request\s+for\s+letters?\s+of\s+interest", SolicitationType.RLI),
     (r"request\s+for\s+qualifications?", SolicitationType.RFQ),
     (r"request\s+for\s+information", SolicitationType.RFI),
     (r"request\s+for\s+proposals?", SolicitationType.RFP),
@@ -227,7 +233,7 @@ def extract_external_id(text: str) -> Optional[str]:
     if not text:
         return None
     patterns = [
-        r"\b((?:ITB|IFB|RFP|RFQ|RFI|ITN)\s*(?:No\.?\s*)?[\d][\w./-]{2,})",
+        r"\b((?:ITB|IFB|RFP|RFQ|RFI|ITN|RPQ|ITQ|RLI)\s*(?:No\.?\s*)?[\d][\w./-]{2,})",
         r"\b((?:RFP|ITB|EVN|IFB)\d{5,})",
         r"\b([A-Z]{2,}\d{6,}[A-Z0-9]*)\b",
         r"\b(\d{2}C-\d{3}[A-Z]?)\b",

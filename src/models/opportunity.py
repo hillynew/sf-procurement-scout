@@ -11,12 +11,15 @@ import hashlib
 
 class SolicitationType(str, Enum):
     ITB = "ITB"  # Invitation to Bid
-    IFB = "IFB"
-    RFP = "RFP"
-    RFQ = "RFQ"
-    RFI = "RFI"
-    ITN = "ITN"
-    CCNA = "CCNA"
+    IFB = "IFB"  # Invitation for Bids
+    RFP = "RFP"  # Request for Proposals
+    RFQ = "RFQ"  # Request for Qualifications
+    RFI = "RFI"  # Request for Information
+    ITN = "ITN"  # Invitation to Negotiate
+    RPQ = "RPQ"  # Request for Price Quotation — Miami-Dade's most common type
+    ITQ = "ITQ"  # Invitation to Quote
+    RLI = "RLI"  # Request for Letters of Interest
+    CCNA = "CCNA"  # Consultants' Competitive Negotiation Act
     OTHER = "OTHER"
     UNKNOWN = "UNKNOWN"
 

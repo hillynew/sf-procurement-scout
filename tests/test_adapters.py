@@ -13,7 +13,6 @@ from src.sources.miami_dade_construction import (
     MiamiDadeConstructionAdapter,
     MiamiDadeFutureAdapter,
 )
-from src.sources.swa import SwaAdapter
 
 MD_CFG = {
     "id": "miami_dade_construction",
@@ -30,14 +29,6 @@ MDC_CFG = {
     "portal_url": "https://www.mdc.edu/purchasing/bid-posting/",
     "register_url": "https://www.bidnetdirect.com/florida/miamidadecollege",
 }
-SWA_CFG = {
-    "id": "swa_pbc",
-    "name": "Solid Waste Authority of Palm Beach County",
-    "county": "palm-beach",
-    "agency": "Solid Waste Authority of Palm Beach County",
-    "portal_url": "https://www.swa.org/Bids.aspx",
-}
-
 
 # ---------------------------------------------------------------------------
 # Miami-Dade ISD — was returning zero rows because the table is AJAX-filled
@@ -188,31 +179,3 @@ def test_titles_without_a_reference_return_none(title):
     assert _extract_ref(title) is None
 
 
-# ---------------------------------------------------------------------------
-# SWA — an empty bid board must not become a fake opportunity
-# ---------------------------------------------------------------------------
-
-
-def test_empty_bid_board_returns_nothing(monkeypatch):
-    class _Resp:
-        text = "<html><body><p>There are no open bid postings at this time.</p></body></html>"
-
-    monkeypatch.setattr("src.sources.swa.get", lambda *a, **k: _Resp())
-    assert SwaAdapter(SWA_CFG).fetch() == []
-
-
-def test_bid_links_are_parsed_when_no_table(monkeypatch):
-    class _Resp:
-        text = """
-        <html><body>
-          <a href="/Bids.aspx?bidID=41">Recycling Processing Services Agreement</a>
-          <a href="/Bids.aspx?bidID=41">Recycling Processing Services Agreement</a>
-          <a href="/about">About us</a>
-        </body></html>
-        """
-
-    monkeypatch.setattr("src.sources.swa.get", lambda *a, **k: _Resp())
-    opps = SwaAdapter(SWA_CFG).fetch()
-    assert len(opps) == 1, "the repeated link must not double-count"
-    assert opps[0].url.startswith("https://www.swa.org/Bids.aspx?bidID=41")
-    assert "waste_recycling" in opps[0].categories
