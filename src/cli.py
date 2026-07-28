@@ -54,22 +54,7 @@ def fetch(
         open_only=False,
     )
 
-    # Health table
-    ht = Table(title="Source Health")
-    ht.add_column("Source")
-    ht.add_column("OK")
-    ht.add_column("Count", justify="right")
-    ht.add_column("ms", justify="right")
-    ht.add_column("Error")
-    for h in health:
-        ht.add_row(
-            h.name[:40],
-            "✓" if h.ok else "✗",
-            str(h.count),
-            str(h.elapsed_ms),
-            (h.error or "")[:60],
-        )
-    console.print(ht)
+    _print_health(health)
 
     if save:
         json_path, csv_path, latest = save_snapshot(all_opps, health)
@@ -100,6 +85,51 @@ def fetch(
         console.print(f"[bold]{label}:[/bold] {counts}")
 
     console.print(f"\n[bold]Matching opportunities:[/bold] {len(opps)}  (full snapshot: {len(all_opps)})")
+
+
+HEALTH_STYLES = {
+    "ok": ("[green]OK[/green]", ""),
+    "empty": ("[dim]empty[/dim]", "no listings published"),
+    "degraded": ("[yellow]DEGRADED[/yellow]", ""),
+    "error": ("[red]ERROR[/red]", ""),
+}
+
+
+def _print_health(health) -> None:
+    ht = Table(title="Source Health")
+    ht.add_column("Source")
+    ht.add_column("Status")
+    ht.add_column("Count", justify="right")
+    ht.add_column("ms", justify="right")
+    ht.add_column("Detail", overflow="fold")
+    for h in health:
+        label, fallback = HEALTH_STYLES.get(h.status, (h.status, ""))
+        ht.add_row(
+            h.name[:38],
+            label,
+            str(h.count),
+            str(h.elapsed_ms),
+            (h.error or h.note or fallback)[:70],
+        )
+    console.print(ht)
+
+    problems = [h for h in health if h.status in {"degraded", "error"}]
+    if problems:
+        console.print(
+            f"[yellow]{len(problems)} source(s) need attention:[/yellow] "
+            + ", ".join(h.source_id for h in problems)
+        )
+
+
+@app.command()
+def health():
+    """Show source health from the last saved snapshot."""
+    opps, health_rows = load_latest()
+    if not health_rows:
+        console.print("[yellow]No snapshot found. Run: python run.py fetch[/yellow]")
+        raise typer.Exit(1)
+    _print_health(health_rows)
+    console.print(f"[bold]Opportunities in snapshot:[/bold] {len(opps)}")
 
 
 @app.command("list-sources")

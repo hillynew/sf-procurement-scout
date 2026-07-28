@@ -119,6 +119,20 @@ class Opportunity(BaseModel):
         }
 
 
+class HealthStatus(str, Enum):
+    """Outcome of a single source fetch.
+
+    `ok` and `error` are not enough: a scraper whose page layout changed
+    returns zero rows without raising, and a WAF-blocked portal falls back to
+    a registration pointer. Both looked healthy before this distinction.
+    """
+
+    OK = "ok"
+    EMPTY = "empty"  # fetched cleanly, portal genuinely has nothing listed
+    DEGRADED = "degraded"  # blocked or parsed nothing where rows were expected
+    ERROR = "error"
+
+
 class SourceHealth(BaseModel):
     source_id: str
     name: str
@@ -126,3 +140,12 @@ class SourceHealth(BaseModel):
     count: int = 0
     error: Optional[str] = None
     elapsed_ms: int = 0
+    status: HealthStatus = HealthStatus.OK
+    note: Optional[str] = None
+
+    model_config = {"use_enum_values": True}
+
+    @property
+    def healthy(self) -> bool:
+        """True only when the source returned usable rows (or is legitimately empty)."""
+        return self.status in (HealthStatus.OK, HealthStatus.OK.value, "ok")
