@@ -9,12 +9,12 @@ import yaml
 
 from .base import SourceAdapter
 from .bonfire import BonfireAdapter
+from .civicplus import CivicPlusAdapter
 from .miami_dade_informs import MiamiDadeInformsAdapter
 from .miami_dade_construction import MiamiDadeConstructionAdapter, MiamiDadeFutureAdapter
 from .mdc_college import MdcCollegeAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
-from .swa import SwaAdapter
 from .catalog import CatalogAdapter
 
 ADAPTERS: Dict[str, Type[SourceAdapter]] = {
@@ -25,7 +25,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "mdc_college": MdcCollegeAdapter,
     "west_palm_beach": WestPalmBeachAdapter,
     "palm_beach_schools": PalmBeachSchoolsAdapter,
-    "swa": SwaAdapter,
+    "civicplus": CivicPlusAdapter,
     "catalog": CatalogAdapter,
 }
 

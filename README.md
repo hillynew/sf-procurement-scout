@@ -113,9 +113,41 @@ re-capture the fixture and update the adapter together.
 | City of West Palm Beach | City page / DemandStar fallback |
 | Miami Dade College | Bid posting page (announcements grouped per solicitation) |
 | Palm Beach Schools construction | District tables |
-| SWA Palm Beach County | Bid board |
+| **15 city bid boards + SWA** | CivicPlus Bids module (one shared adapter) |
 
-**Catalog (register to bid):** City of Miami Bidnet, M-DCPS DemandStar, Broward Schools, Broward Health, Fort Lauderdale, Palm Beach County VSS, PBC Facilities.
+### Adding a city
+
+Most South Florida municipalities run the **CivicPlus Bids module** at
+`/bids.aspx`, so they all share `src/sources/civicplus.py`. Adding one is a
+config entry, not a new scraper:
+
+```yaml
+  - id: my_city
+    name: City of Somewhere
+    county: broward
+    agency: City of Somewhere
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.somewhere.gov/bids.aspx
+```
+
+Optional keys: `default_categories` (tags every row from a single-purpose
+board, e.g. the waste authority) and `base_url` (if relative links resolve
+against a different origin).
+
+Cities currently covered: Hialeah, North Miami, Miami Gardens, Homestead,
+Aventura, Hollywood, Pembroke Pines, Davie, Deerfield Beach, Tamarac, Boca
+Raton, Boynton Beach, Jupiter, Palm Beach Gardens and Wellington.
+
+Many of these boards are empty at any given moment — they report `no listings`
+rather than an error, and start producing rows the moment the city posts one,
+with no code change.
+
+**Catalog (register to bid):** City of Miami Bidnet, M-DCPS DemandStar, Broward
+Schools, Broward Health, Fort Lauderdale, Palm Beach County VSS, PBC Facilities,
+plus the cities whose portals refuse automated clients — Coral Springs, Miramar,
+Plantation, Sunrise, Doral and Delray Beach. Catalog entries are hidden in the
+dashboard unless **Include catalog portals** is ticked.
 
 ## Project layout
 

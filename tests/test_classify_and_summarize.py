@@ -24,12 +24,24 @@ from src.summarize import apply_briefs, make_brief
         ("Invitation to Negotiate — Software", SolicitationType.ITN),
         ("Request for Qualifications for Fence Repair", SolicitationType.RFQ),
         ("CCNA Continuing Services", SolicitationType.CCNA),
+        # Florida-specific types that appear throughout the live data
+        ("RPQ No P16370 Pump Station Generator Relocation", SolicitationType.RPQ),
+        ("Request for Price Quotation — Sidewalk Repair", SolicitationType.RPQ),
+        ("ITQ No. 20-25-26 Neat Streets Tree Planting", SolicitationType.ITQ),
+        ("Invitation to Quote for Safety Boots", SolicitationType.ITQ),
+        ("RLI No. 12-26 Design Services", SolicitationType.RLI),
         ("Lost and Found Management Software", SolicitationType.UNKNOWN),
         ("", SolicitationType.UNKNOWN),
     ],
 )
 def test_solicitation_type_detection(text, expected):
     assert detect_solicitation_type(text) == expected
+
+
+def test_price_quotation_is_not_confused_with_qualifications():
+    """RPQ and RFQ are different instruments; both appear in Miami-Dade data."""
+    assert detect_solicitation_type("RPQ No AC013A") == SolicitationType.RPQ
+    assert detect_solicitation_type("Request for Qualifications") == SolicitationType.RFQ
 
 
 @pytest.mark.parametrize(

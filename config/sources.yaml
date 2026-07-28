@@ -83,9 +83,152 @@ sources:
     county: palm-beach
     agency: Solid Waste Authority of Palm Beach County
     live_fetch: true
-    adapter: swa
+    adapter: civicplus
+    default_categories: [waste_recycling]
     portal_url: https://www.swa.org/Bids.aspx
     register_url: https://www.bidsync.com/SupplierRegister?ac=register&pathid=1050
+
+
+  # ---------------------------------------------------------------------
+  # Municipal bid boards on the CivicPlus "Bids" module.
+  # All share one adapter, so adding a city is a config entry.
+  # A board with nothing posted reports `empty`, not a failure.
+  # ---------------------------------------------------------------------
+
+  - id: hialeah
+    name: City of Hialeah
+    county: miami-dade
+    agency: City of Hialeah
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.hialeahfl.gov/bids.aspx
+    register_url: https://www.hialeahfl.gov/bids.aspx
+
+  - id: north_miami
+    name: City of North Miami
+    county: miami-dade
+    agency: City of North Miami
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.northmiamifl.gov/bids.aspx
+    register_url: https://www.northmiamifl.gov/bids.aspx
+
+  - id: miami_gardens
+    name: City of Miami Gardens
+    county: miami-dade
+    agency: City of Miami Gardens
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.miamigardens-fl.gov/bids.aspx
+    register_url: https://www.miamigardens-fl.gov/bids.aspx
+
+  - id: homestead
+    name: City of Homestead
+    county: miami-dade
+    agency: City of Homestead
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.cityofhomestead.com/bids.aspx
+    register_url: https://www.cityofhomestead.com/bids.aspx
+
+  - id: aventura
+    name: City of Aventura
+    county: miami-dade
+    agency: City of Aventura
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.cityofaventura.com/bids.aspx
+    register_url: https://www.cityofaventura.com/bids.aspx
+
+  - id: hollywood
+    name: City of Hollywood
+    county: broward
+    agency: City of Hollywood
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.hollywoodfl.org/bids.aspx
+    register_url: https://www.bidsync.com/hollywood/
+
+  - id: pembroke_pines
+    name: City of Pembroke Pines
+    county: broward
+    agency: City of Pembroke Pines
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.ppines.com/bids.aspx
+    register_url: https://www.ppines.com/bids.aspx
+
+  - id: davie
+    name: Town of Davie
+    county: broward
+    agency: Town of Davie
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.davie-fl.gov/bids.aspx
+    register_url: https://www.davie-fl.gov/bids.aspx
+
+  - id: deerfield_beach
+    name: City of Deerfield Beach
+    county: broward
+    agency: City of Deerfield Beach
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.deerfield-beach.com/bids.aspx
+    register_url: https://www.deerfield-beach.com/bids.aspx
+
+  - id: tamarac
+    name: City of Tamarac
+    county: broward
+    agency: City of Tamarac
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.tamarac.org/bids.aspx
+    register_url: https://www.tamarac.org/bids.aspx
+
+  - id: boca_raton
+    name: City of Boca Raton
+    county: palm-beach
+    agency: City of Boca Raton
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.myboca.us/bids.aspx
+    register_url: https://www.myboca.us/bids.aspx
+
+  - id: boynton_beach
+    name: City of Boynton Beach
+    county: palm-beach
+    agency: City of Boynton Beach
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.boynton-beach.org/bids.aspx
+    register_url: https://www.boynton-beach.org/bids.aspx
+
+  - id: jupiter
+    name: Town of Jupiter
+    county: palm-beach
+    agency: Town of Jupiter
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.jupiter.fl.us/bids.aspx
+    register_url: https://www.jupiter.fl.us/bids.aspx
+
+  - id: palm_beach_gardens
+    name: City of Palm Beach Gardens
+    county: palm-beach
+    agency: City of Palm Beach Gardens
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.pbgfl.com/bids.aspx
+    register_url: https://www.pbgfl.com/bids.aspx
+
+  - id: wellington
+    name: Village of Wellington
+    county: palm-beach
+    agency: Village of Wellington
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.wellingtonfl.gov/bids.aspx
+    register_url: https://www.wellingtonfl.gov/bids.aspx
 
   # Catalog-only portals (login / SPA — deep scrape needs vendor account)
   - id: mdcps_demandstar
@@ -150,3 +293,59 @@ sources:
     adapter: catalog
     portal_url: https://discover.pbc.gov/fdo/CID/Current-Construction-Bids.aspx
     register_url: https://discover.pbc.gov/fdo/CID/Current-Construction-Bids.aspx
+
+  # Cities whose portals refuse automated clients (WAF 403) — listed so the
+  # registration path is still discoverable.
+  - id: coral_springs
+    name: City of Coral Springs
+    county: broward
+    agency: City of Coral Springs
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.coralsprings.gov/bids.aspx
+    register_url: https://www.coralsprings.gov/bids.aspx
+
+  - id: miramar
+    name: City of Miramar
+    county: broward
+    agency: City of Miramar
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.miramarfl.gov/bids.aspx
+    register_url: https://www.miramarfl.gov/bids.aspx
+
+  - id: plantation
+    name: City of Plantation
+    county: broward
+    agency: City of Plantation
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.plantation.org/bids.aspx
+    register_url: https://www.plantation.org/bids.aspx
+
+  - id: sunrise
+    name: City of Sunrise
+    county: broward
+    agency: City of Sunrise
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://sunrisefl.gov/bids.aspx
+    register_url: https://sunrisefl.gov/bids.aspx
+
+  - id: doral
+    name: City of Doral
+    county: miami-dade
+    agency: City of Doral
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.cityofdoral.com/bids.aspx
+    register_url: https://www.cityofdoral.com/bids.aspx
+
+  - id: delray_beach
+    name: City of Delray Beach
+    county: palm-beach
+    agency: City of Delray Beach
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.delraybeachfl.gov/bids.aspx
+    register_url: https://www.delraybeachfl.gov/bids.aspx
