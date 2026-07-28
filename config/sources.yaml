@@ -230,6 +230,147 @@ sources:
     portal_url: https://www.wellingtonfl.gov/bids.aspx
     register_url: https://www.wellingtonfl.gov/bids.aspx
 
+
+  # --- Additional Bonfire tenants -------------------------------------
+  - id: fau
+    name: Florida Atlantic University (Bonfire)
+    county: palm-beach
+    agency: Florida Atlantic University
+    live_fetch: true
+    adapter: bonfire
+    portal_url: https://fau.bonfirehub.com/portal/?tab=openOpportunities
+    register_url: https://fau.bonfirehub.com/
+    bonfire_host: fau.bonfirehub.com
+
+  - id: sfrta_tri_rail
+    name: Tri-Rail / SFRTA (Bonfire)
+    county: broward
+    agency: South Florida Regional Transportation Authority
+    live_fetch: true
+    adapter: bonfire
+    portal_url: https://tri-rail.bonfirehub.com/portal/?tab=openOpportunities
+    register_url: https://tri-rail.bonfirehub.com/
+    bonfire_host: tri-rail.bonfirehub.com
+
+  # --- Public-notice link lists ---------------------------------------
+  - id: coral_gables
+    name: City of Coral Gables Procurement Notices
+    county: miami-dade
+    agency: City of Coral Gables
+    live_fetch: true
+    adapter: notice_links
+    portal_url: https://www.coralgables.com/department/procurement/procurement-notices
+    register_url: https://www1.publicpurchase.com/gems/coralgables,fl/buyer/public/home
+
+  # --- More CivicPlus municipal boards --------------------------------
+  - id: opa_locka
+    name: City of Opa-locka
+    county: miami-dade
+    agency: City of Opa-locka
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.opalockafl.gov/bids.aspx
+    register_url: https://www.opalockafl.gov/bids.aspx
+
+  - id: south_miami
+    name: City of South Miami
+    county: miami-dade
+    agency: City of South Miami
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.southmiamifl.gov/bids.aspx
+    register_url: https://www.southmiamifl.gov/bids.aspx
+
+  - id: palmetto_bay
+    name: Village of Palmetto Bay
+    county: miami-dade
+    agency: Village of Palmetto Bay
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.palmettobay-fl.gov/bids.aspx
+    register_url: https://www.palmettobay-fl.gov/bids.aspx
+
+  - id: key_biscayne
+    name: Village of Key Biscayne
+    county: miami-dade
+    agency: Village of Key Biscayne
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.keybiscayne.fl.gov/Bids.aspx
+    register_url: https://www.keybiscayne.fl.gov/Bids.aspx
+
+  - id: sweetwater
+    name: City of Sweetwater
+    county: miami-dade
+    agency: City of Sweetwater
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.cityofsweetwater.fl.gov/bids.aspx
+    register_url: https://www.cityofsweetwater.fl.gov/bids.aspx
+
+  - id: wilton_manors
+    name: City of Wilton Manors
+    county: broward
+    agency: City of Wilton Manors
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.wiltonmanors.gov/bids.aspx
+    register_url: https://www.wiltonmanors.gov/bids.aspx
+
+  - id: oakland_park
+    name: City of Oakland Park
+    county: broward
+    agency: City of Oakland Park
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.oaklandparkfl.gov/bids.aspx
+    register_url: https://www.oaklandparkfl.gov/bids.aspx
+
+  - id: hallandale_beach
+    name: City of Hallandale Beach
+    county: broward
+    agency: City of Hallandale Beach
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.cohb.org/bids.aspx
+    register_url: https://www.cohb.org/bids.aspx
+
+  - id: dania_beach
+    name: City of Dania Beach
+    county: broward
+    agency: City of Dania Beach
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.daniabeachfl.gov/bids.aspx
+    register_url: https://www.daniabeachfl.gov/bids.aspx
+
+  - id: lauderdale_lakes
+    name: City of Lauderdale Lakes
+    county: broward
+    agency: City of Lauderdale Lakes
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.lauderdalelakes.org/bids.aspx
+    register_url: https://www.lauderdalelakes.org/bids.aspx
+
+  - id: parkland
+    name: City of Parkland
+    county: broward
+    agency: City of Parkland
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.cityofparkland.org/bids.aspx
+    register_url: https://www.cityofparkland.org/bids.aspx
+
+  - id: palm_springs
+    name: Village of Palm Springs
+    county: palm-beach
+    agency: Village of Palm Springs
+    live_fetch: true
+    adapter: civicplus
+    portal_url: https://www.vpsfl.org/bids.aspx
+    register_url: https://www.vpsfl.org/bids.aspx
+
   # Catalog-only portals (login / SPA — deep scrape needs vendor account)
   - id: mdcps_demandstar
     name: Miami-Dade County Public Schools (DemandStar)
@@ -315,13 +456,14 @@ sources:
     register_url: https://www.miramarfl.gov/bids.aspx
 
   - id: plantation
-    name: City of Plantation
+    name: City of Plantation (Bonfire)
     county: broward
     agency: City of Plantation
-    live_fetch: false
-    adapter: catalog
-    portal_url: https://www.plantation.org/bids.aspx
-    register_url: https://www.plantation.org/bids.aspx
+    live_fetch: true
+    adapter: bonfire
+    portal_url: https://plantation.bonfirehub.com/portal/?tab=openOpportunities
+    register_url: https://plantation.bonfirehub.com/
+    bonfire_host: plantation.bonfirehub.com
 
   - id: sunrise
     name: City of Sunrise
@@ -349,3 +491,67 @@ sources:
     adapter: catalog
     portal_url: https://www.delraybeachfl.gov/bids.aspx
     register_url: https://www.delraybeachfl.gov/bids.aspx
+
+  # Colleges and agencies that publish only through a vendor platform.
+  - id: miami_beach
+    name: City of Miami Beach (Periscope S2G / BidNet)
+    county: miami-dade
+    agency: City of Miami Beach
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.miamibeachfl.gov/city-hall/procurement/bid-opportunities/
+    register_url: https://www.bidnetdirect.com/florida/cityofmiamibeach
+
+  - id: pompano_beach
+    name: City of Pompano Beach (eBid / OpenGov)
+    county: broward
+    agency: City of Pompano Beach
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.pompanobeachfl.gov/government/general-services-procurement
+    register_url: https://www.pompanobeachfl.gov/government/general-services-procurement
+
+  - id: north_miami_beach
+    name: City of North Miami Beach
+    county: miami-dade
+    agency: City of North Miami Beach
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.citynmb.com/214/Bid-Opportunities
+    register_url: https://www.citynmb.com/214/Bid-Opportunities
+
+  - id: miami_springs
+    name: City of Miami Springs
+    county: miami-dade
+    agency: City of Miami Springs
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.miamisprings-fl.gov/bids.aspx
+    register_url: https://www.miamisprings-fl.gov/bids.aspx
+
+  - id: broward_college
+    name: Broward College (Euna OpenBids / DemandStar)
+    county: broward
+    agency: Broward College
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.broward.edu/about/community/vendor/
+    register_url: https://www.demandstar.com/app/agencies/Florida/Broward-College/procurement-opportunities/541477CD-9050-4370-8CFF-A59C88C5C17A
+
+  - id: palm_beach_state
+    name: Palm Beach State College (DemandStar)
+    county: palm-beach
+    agency: Palm Beach State College
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://www.palmbeachstate.edu/purchasing/competitive-solicitations.aspx
+    register_url: https://network.demandstar.com/
+
+  - id: fiu
+    name: Florida International University (Jaggaer)
+    county: miami-dade
+    agency: Florida International University
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://bids.fiu.edu/
+    register_url: https://bids.fiu.edu/

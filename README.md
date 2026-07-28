@@ -113,7 +113,11 @@ re-capture the fixture and update the adapter together.
 | City of West Palm Beach | City page / DemandStar fallback |
 | Miami Dade College | Bid posting page (announcements grouped per solicitation) |
 | Palm Beach Schools construction | District tables |
-| **15 city bid boards + SWA** | CivicPlus Bids module (one shared adapter) |
+| Florida Atlantic University | Bonfire public API |
+| Tri-Rail / SFRTA | Bonfire public API |
+| City of Plantation | Bonfire public API |
+| City of Coral Gables | Public-notice link list |
+| **27 city bid boards + SWA** | CivicPlus Bids module (one shared adapter) |
 
 ### Adding a city
 
@@ -135,18 +139,46 @@ Optional keys: `default_categories` (tags every row from a single-purpose
 board, e.g. the waste authority) and `base_url` (if relative links resolve
 against a different origin).
 
-Cities currently covered: Hialeah, North Miami, Miami Gardens, Homestead,
-Aventura, Hollywood, Pembroke Pines, Davie, Deerfield Beach, Tamarac, Boca
-Raton, Boynton Beach, Jupiter, Palm Beach Gardens and Wellington.
+Cities currently covered — Miami-Dade: Hialeah, North Miami, Miami Gardens,
+Homestead, Aventura, Opa-locka, South Miami, Palmetto Bay, Key Biscayne,
+Sweetwater. Broward: Hollywood, Pembroke Pines, Davie, Deerfield Beach,
+Tamarac, Wilton Manors, Oakland Park, Hallandale Beach, Dania Beach,
+Lauderdale Lakes, Parkland. Palm Beach: Boca Raton, Boynton Beach, Jupiter,
+Palm Beach Gardens, Wellington, Palm Springs.
 
 Many of these boards are empty at any given moment — they report `no listings`
 rather than an error, and start producing rows the moment the city posts one,
 with no code change.
 
+Two other adapters are equally generic:
+
+- **`bonfire`** — any agency on Bonfire/Euna. Needs only `bonfire_host`
+  (e.g. `fau.bonfirehub.com`); the public opportunities API does the rest.
+- **`notice_links`** — agencies that publish solicitations as a list of
+  public-notice documents rather than a bid table. It pulls the reference and
+  subject out of each link's text. Optional `link_selector` scopes the search
+  to one part of the page.
+
+### Agencies that procure through a parent
+
+Some agencies do not run their own portal, so scraping them separately would
+duplicate rows already collected:
+
+| Agency | Procures through |
+|--------|------------------|
+| Port Everglades | Broward County BPRO |
+| Broward Aviation (FLL) | Broward County BPRO |
+| Miami-Dade Aviation (MDAD) | Miami-Dade ISD / INFORMS |
+| Miami-Dade Water & Sewer | Miami-Dade ISD / INFORMS |
+
+Their solicitations already appear under the parent county's source.
+
 **Catalog (register to bid):** City of Miami Bidnet, M-DCPS DemandStar, Broward
 Schools, Broward Health, Fort Lauderdale, Palm Beach County VSS, PBC Facilities,
-plus the cities whose portals refuse automated clients — Coral Springs, Miramar,
-Plantation, Sunrise, Doral and Delray Beach. Catalog entries are hidden in the
+the colleges and cities that publish only through a vendor platform (Miami
+Beach, Pompano Beach, North Miami Beach, Broward College, Palm Beach State,
+FIU), and the cities whose portals refuse automated clients — Coral Springs,
+Miramar, Sunrise, Doral, Delray Beach and Miami Springs. Catalog entries are hidden in the
 dashboard unless **Include catalog portals** is ticked.
 
 ## Project layout
