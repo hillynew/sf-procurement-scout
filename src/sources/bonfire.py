@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import List, Optional
-from dateutil import parser as dateparser
+from typing import List
 
 from ..classify import enrich
+from ..dates import parse_dt
 from ..http_util import get, session
 from ..models.opportunity import Opportunity
 from .base import SourceAdapter
@@ -48,7 +47,7 @@ class BonfireAdapter(SourceAdapter):
             project_id = str(p.get("ProjectID") or "")
             url = f"https://{host}/opportunities/{project_id}" if project_id else self.portal_url
 
-            due = _parse_dt(p.get("DateClose"))
+            due = parse_dt(p.get("DateClose"))
             dept_id = str(p.get("DepartmentID") or "")
             dept_name = None
             if dept_id and isinstance(departments, dict):
@@ -74,11 +73,3 @@ class BonfireAdapter(SourceAdapter):
             out.append(opp)
         return out
 
-
-def _parse_dt(val: Optional[str]) -> Optional[datetime]:
-    if not val:
-        return None
-    try:
-        return dateparser.parse(val)
-    except Exception:
-        return None

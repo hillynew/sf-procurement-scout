@@ -6,10 +6,10 @@ import re
 from datetime import datetime
 from typing import List, Optional
 from urllib.parse import urljoin
-from dateutil import parser as dateparser
 from bs4 import BeautifulSoup
 
 from ..classify import enrich
+from ..dates import parse_dt
 from ..http_util import get
 from ..models.opportunity import Opportunity
 from .base import SourceAdapter
@@ -17,7 +17,9 @@ from .base import SourceAdapter
 
 class WestPalmBeachAdapter(SourceAdapter):
     def fetch(self) -> List[Opportunity]:
-        # City site sometimes blocks bare scrapers (403). Warm homepage first.
+        # The city site sits behind a WAF that 403s scrapers. Warm the homepage
+        # first; if that still fails, degrade to the DemandStar pointer and let
+        # the runner mark this source degraded rather than silently healthy.
         from ..http_util import session
 
         s = session()
@@ -25,10 +27,10 @@ class WestPalmBeachAdapter(SourceAdapter):
             get("https://www.wpb.org/", s=s)
             resp = get(self.portal_url, s=s, referer="https://www.wpb.org/")
         except Exception as first_err:
-            # Fallback: DemandStar agency page + catalog pointer
             ds = self.cfg.get("demandstar_url")
             if not ds:
-                raise first_err
+                raise
+            self.degraded_reason = f"city portal unreachable ({_brief_err(first_err)})"
             return [
                 Opportunity(
                     **self._base_kwargs(),
@@ -37,7 +39,7 @@ class WestPalmBeachAdapter(SourceAdapter):
                     categories=["portal_directory"],
                     status="catalog",
                     description=(
-                        f"Direct city page returned an error ({first_err}). "
+                        f"Direct city page returned an error ({_brief_err(first_err)}). "
                         f"Browse/register on DemandStar: {ds}"
                     ),
                     raw={"error": str(first_err)},
@@ -95,6 +97,12 @@ class WestPalmBeachAdapter(SourceAdapter):
         return out
 
 
+def _brief_err(err: Exception) -> str:
+    """One-line error text — the raw requests message embeds the whole URL."""
+    msg = str(err).split(" for url:")[0].strip()
+    return msg[:120] or type(err).__name__
+
+
 def _status_from_text(text: str) -> str:
     t = text.lower()
     if "cancel" in t:
@@ -148,10 +156,7 @@ def _extract_closing(text: str) -> Optional[datetime]:
         )
     if not m:
         return None
-    try:
-        return dateparser.parse(m.group(1))
-    except Exception:
-        return None
+    return parse_dt(m.group(1))
 
 
 def _extract_description(text: str) -> Optional[str]:

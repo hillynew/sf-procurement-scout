@@ -71,7 +71,11 @@ button[kind="header"] {
 }
 
 /* Permanent left menu panel */
-.left-menu {
+/* The menu panel styles the real first column. An empty `<div class="left-menu">`
+   emitted via st.markdown cannot wrap sibling widgets — Streamlit closes it
+   immediately — so it only ever rendered as an empty bordered card. */
+div[data-testid="stHorizontalBlock"]:first-of-type
+  > div[data-testid="column"]:first-child {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);

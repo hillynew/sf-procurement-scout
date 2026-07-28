@@ -11,6 +11,30 @@ Live aggregator for government procurement opportunities across **Miami-Dade**, 
 | **A. Capture** | Live titles, refs, due dates, and links from public county/city portals |
 | **B. Organize** | County, agency, solicitation type, goods/services/construction, topic categories |
 | **C. Deal briefs** | One-paragraph summary with urgency and link for scanning |
+| **D. Dedupe** | One record per solicitation, even when portals overlap or repeat announcements |
+| **E. Source health** | Every portal reports `ok` / `no listings` / `degraded` / `error` so silent breakage is visible |
+
+Sources are fetched concurrently, so a full refresh takes a few seconds rather
+than a minute.
+
+## Source health
+
+Scrapers break quietly — a portal changes its layout and the adapter returns
+zero rows while still reporting success. Each fetch therefore classifies every
+source:
+
+| Status | Meaning | What to do |
+|--------|---------|------------|
+| `ok` | Returned live rows | Nothing |
+| `no listings` | Fetched cleanly; the portal genuinely has nothing posted | Nothing |
+| `degraded` | Blocked by the portal, or parsed nothing where rows were expected | Check that agency directly; the adapter may need updating |
+| `error` | The request itself failed | Check connectivity, then the adapter |
+
+`python run.py health` prints this for the last snapshot, and the dashboard
+surfaces it in the left menu and the **Source health** panel.
+
+> The City of West Palm Beach portal sits behind a WAF that blocks scrapers, so
+> that source reports `degraded` and falls back to its DemandStar listing.
 
 ## Deploy on Render
 
@@ -59,12 +83,24 @@ pip install -r requirements.txt
 python run.py fetch
 python run.py fetch --county broward -q "software"
 python run.py show
+python run.py health
 python run.py list-sources
 
 # Web UI
 python run.py dashboard
 # or: streamlit run web/app.py
 ```
+
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+
+Tests run offline against saved portal responses in `tests/fixtures/`, so they
+stay fast and do not hammer public sites. When a portal changes its layout,
+re-capture the fixture and update the adapter together.
 
 ## Live sources
 
@@ -73,9 +109,9 @@ python run.py dashboard
 | Broward County BPRO | Bonfire public API |
 | Town of Palm Beach | Bonfire public API |
 | Miami-Dade INFORMS | Public bidding events HTML |
-| Miami-Dade construction / future | ISD pages |
+| Miami-Dade construction / future | ISD DataTables JSON endpoints |
 | City of West Palm Beach | City page / DemandStar fallback |
-| Miami Dade College | Bid posting page |
+| Miami Dade College | Bid posting page (announcements grouped per solicitation) |
 | Palm Beach Schools construction | District tables |
 | SWA Palm Beach County | Bid board |
 
@@ -89,14 +125,17 @@ Procfile                # alternate start command
 runtime.txt             # Python version hint
 .streamlit/config.toml  # Streamlit production config
 config/sources.yaml     # portal registry
-src/models/             # Opportunity model
+src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-portal adapters
 src/classify.py         # categories + offer type
+src/dates.py            # shared date parsing (Eastern wall clock)
+src/http_util.py        # session, retries, blocked-portal detection
 src/summarize.py        # deal briefs
-src/pipeline/           # fetch + store
+src/pipeline/           # concurrent fetch, dedupe, store
 src/cli.py              # Typer CLI
 web/app.py              # Streamlit UI (Render entrypoint)
-data/                   # latest.json / latest.csv snapshots
+tests/                  # offline test suite + portal fixtures
+data/                   # latest.json / latest.csv snapshots (last 10 kept)
 ```
 
 ## Always verify on the official portal

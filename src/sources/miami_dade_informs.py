@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import List, Optional
-from dateutil import parser as dateparser
+from typing import List
 from bs4 import BeautifulSoup
 
 from ..classify import enrich
+from ..dates import parse_dt
 from ..http_util import get
 from ..models.opportunity import Opportunity
 from .base import SourceAdapter
@@ -76,7 +75,7 @@ class MiamiDadeInformsAdapter(SourceAdapter):
             start_date = cell(cells, "start date")
             business_unit = cell(cells, "business unit")
 
-            due = _parse_dt(end_date)
+            due = parse_dt(end_date)
             desc_bits = [b for b in [event_format, event_type, business_unit] if b]
             fields = enrich(title, " ".join(desc_bits), external_id=event_id or None)
 
@@ -96,7 +95,7 @@ class MiamiDadeInformsAdapter(SourceAdapter):
                 categories=fields["categories"],
                 keywords=fields["keywords"],
                 due_date=due,
-                posted_date=_parse_dt(start_date).date() if _parse_dt(start_date) else None,
+                posted_date=parse_dt(start_date).date() if parse_dt(start_date) else None,
                 status="open",
                 description="; ".join(desc_bits) if desc_bits else None,
                 raw={"cells": cells, "headers": headers},
@@ -104,11 +103,3 @@ class MiamiDadeInformsAdapter(SourceAdapter):
             out.append(opp)
         return out
 
-
-def _parse_dt(val: Optional[str]) -> Optional[datetime]:
-    if not val:
-        return None
-    try:
-        return dateparser.parse(val)
-    except Exception:
-        return None

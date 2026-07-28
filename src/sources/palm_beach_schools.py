@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import List, Optional
-from dateutil import parser as dateparser
+from typing import List
 from bs4 import BeautifulSoup
 
 from ..classify import enrich
+from ..dates import parse_dt
 from ..http_util import get
 from ..models.opportunity import Opportunity, OfferType
 from .base import SourceAdapter
@@ -63,8 +62,8 @@ class PalmBeachSchoolsAdapter(SourceAdapter):
                         x for x in [proc_type, project_type, location] if x
                     ) or joined
                     status = "open"
-                    due_dt = _parse_dt(due)
-                    posted = _parse_dt(publish)
+                    due_dt = parse_dt(due)
+                    posted = parse_dt(publish)
                 else:
                     publish = cell(cells, "estimated publish")
                     proc_type = cell(cells, "procurement type")
@@ -77,7 +76,7 @@ class PalmBeachSchoolsAdapter(SourceAdapter):
                     ) or joined
                     status = "upcoming"
                     due_dt = None
-                    posted = _parse_dt(publish)
+                    posted = parse_dt(publish)
 
                 if len(title) < 5:
                     continue
@@ -114,12 +113,3 @@ class PalmBeachSchoolsAdapter(SourceAdapter):
                 out.append(opp)
         return out
 
-
-def _parse_dt(val: Optional[str]) -> Optional[datetime]:
-    if not val:
-        return None
-    try:
-        # "August 2026" -> first of month
-        return dateparser.parse(val, default=datetime(2026, 1, 1))
-    except Exception:
-        return None

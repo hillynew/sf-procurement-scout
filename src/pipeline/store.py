@@ -19,11 +19,33 @@ def data_dir() -> Path:
     return d
 
 
+# Every fetch wrote three timestamped files that were never cleaned up; on the
+# Render free tier that fills the ephemeral disk. Keep a short history only.
+KEEP_SNAPSHOTS = 10
+
+
+def prune_snapshots(keep: int = KEEP_SNAPSHOTS) -> List[Path]:
+    """Delete all but the newest `keep` timestamped snapshots. Returns removals."""
+    base = data_dir()
+    removed: List[Path] = []
+    for pattern in ("opportunities_*.json", "opportunities_*.csv", "health_*.json"):
+        files = sorted(base.glob(pattern), key=lambda p: p.name, reverse=True)
+        for stale in files[keep:]:
+            try:
+                stale.unlink()
+                removed.append(stale)
+            except OSError:
+                # A snapshot we cannot delete is not worth failing the run over.
+                pass
+    return removed
+
+
 def save_snapshot(
     opportunities: List[Opportunity],
     health: List[SourceHealth],
     *,
     tag: Optional[str] = None,
+    keep: int = KEEP_SNAPSHOTS,
 ) -> Tuple[Path, Path, Path]:
     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     label = f"{ts}_{tag}" if tag else ts
@@ -61,6 +83,7 @@ def save_snapshot(
     df.to_csv(csv_path, index=False)
     df.to_csv(latest_csv, index=False)
 
+    prune_snapshots(keep)
     return json_path, csv_path, latest_json
 
 

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import html
+import json
 import os
 import sys
 from collections import Counter, defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import quote
@@ -14,11 +16,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+import pandas as pd
 import streamlit as st
 
-from src.models.opportunity import Opportunity
+from src.models.opportunity import HealthStatus, Opportunity
 from src.pipeline.runner import run_fetch
-from src.pipeline.store import load_latest, save_snapshot
+from src.pipeline.store import data_dir, load_latest, save_snapshot
 from src.summarize import apply_briefs, make_brief
 
 # ---------------------------------------------------------------------------
@@ -47,6 +50,13 @@ STATUS_LABELS = {
     "catalog": "Catalog",
     "closed": "Closed",
     "cancelled": "Cancelled",
+}
+_PROBLEM_STATUSES = {HealthStatus.DEGRADED.value, HealthStatus.ERROR.value}
+HEALTH_LABELS = {
+    HealthStatus.OK.value: "OK",
+    HealthStatus.EMPTY.value: "No listings",
+    HealthStatus.DEGRADED.value: "Degraded",
+    HealthStatus.ERROR.value: "Error",
 }
 OFFER_COLORS = {
     "construction": "#085d80",
@@ -88,6 +98,29 @@ _init_state()
 
 def esc(s: Optional[str]) -> str:
     return html.escape(str(s) if s is not None else "")
+
+
+def block(markup: str) -> str:
+    """Flatten an HTML fragment before handing it to st.markdown.
+
+    Markdown treats any line indented four or more spaces as a code block, so
+    an indented f-string template renders as literal tags instead of HTML.
+    Collapsing the indentation is what keeps these fragments rendering.
+    """
+    return " ".join(line.strip() for line in markup.strip().splitlines() if line.strip())
+
+
+def bar_row(label: str, value: int, peak: int) -> str:
+    pct = int(100 * value / peak) if peak else 0
+    return block(
+        f"""
+        <div class="ng-funnel-row">
+          <span>{esc(label)}</span>
+          <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
+          <span class="ng-bar-value">{value}</span>
+        </div>
+        """
+    )
 
 
 def sol_label(o: Opportunity) -> str:
@@ -170,30 +203,62 @@ def sort_opps(opps: List[Opportunity]) -> List[Opportunity]:
     return sorted(opps, key=key)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _load_snapshot(_cache_key: int):
+    """Read the saved snapshot once per rerun cycle.
+
+    Briefs were being regenerated for every opportunity on every widget
+    interaction; the snapshot only changes when a fetch writes a new one.
+    """
+    opps, health = load_latest()
+    apply_briefs(opps)
+    return opps, health
+
+
+def _snapshot_key() -> int:
+    """Mtime of latest.json, so the cache invalidates when a fetch rewrites it."""
+    path = data_dir() / "latest.json"
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
 def load_data(force: bool = False):
     if force:
         with st.spinner("Fetching live portals from Miami-Dade, Broward & Palm Beach…"):
             opps, health = run_fetch(
                 include_catalog=st.session_state.include_catalog,
                 open_only=False,
+                quiet=True,
             )
             apply_briefs(opps)
             save_snapshot(opps, health, tag="dashboard")
+            _load_snapshot.clear()
             return opps, health
-    opps, health = load_latest()
-    if opps:
-        for o in opps:
-            o.brief = make_brief(o)
-    return opps, health
+    return _load_snapshot(_snapshot_key())
 
 
-def apply_filters(opps: List[Opportunity]) -> List[Opportunity]:
+def apply_filters(
+    opps: List[Opportunity],
+    *,
+    stage: Optional[str] = None,
+    urgent_only: Optional[bool] = None,
+) -> List[Opportunity]:
+    """Filter by the sidebar selections.
+
+    `stage` and `urgent_only` can be overridden so callers (tab counts, the
+    insights view) can ask "what would this look like?" without writing to
+    session state and triggering an extra Streamlit rerun.
+    """
     county = st.session_state.county_filter
     offer = st.session_state.offer_filter
     cat = st.session_state.category_filter
     agency = st.session_state.agency_filter
     q = (st.session_state.query or "").strip().lower()
-    stage = st.session_state.stage_tab
+    stage = st.session_state.stage_tab if stage is None else stage
+    if urgent_only is None:
+        urgent_only = st.session_state.show_only_urgent
 
     out = list(opps)
     if county != "All":
@@ -222,7 +287,7 @@ def apply_filters(opps: List[Opportunity]) -> List[Opportunity]:
         out = [o for o in out if o.status in {"open", "upcoming"}]
     elif stage != "all":
         out = [o for o in out if o.status == stage]
-    if st.session_state.show_only_urgent:
+    if urgent_only:
         out = [
             o
             for o in out
@@ -236,7 +301,8 @@ def card_html(o: Opportunity, selected: bool = False) -> str:
     brief = short_brief(o, 160)
     color = OFFER_COLORS.get(offer_key(o), OFFER_COLORS["unknown"])
     ref = esc(o.external_id) if o.external_id else ""
-    return f"""
+    return block(
+        f"""
     <div class="deal-card {'selected' if selected else ''}" style="--accent-bar:{color}">
       <div class="deal-card-top">
         <span class="deal-type">{esc(sol_label(o))}</span>
@@ -254,18 +320,19 @@ def card_html(o: Opportunity, selected: bool = False) -> str:
       </div>
     </div>
     """
+    )
 
 
 def render_deal_actions(o: Opportunity, key: str) -> None:
     c1, c2 = st.columns(2)
     with c1:
-        st.link_button("🔗 Open portal", o.url or "#", use_container_width=True)
+        st.link_button("🔗 Open portal", o.url or "#", width="stretch")
     with c2:
         is_sel = st.session_state.selected_id == o.opportunity_id
         if st.button(
             "✓ Selected" if is_sel else "📄 Summary",
             key=key,
-            use_container_width=True,
+            width="stretch",
             type="primary" if is_sel else "secondary",
         ):
             st.session_state.selected_id = None if is_sel else o.opportunity_id
@@ -282,7 +349,8 @@ def render_summary_panel(o: Opportunity) -> None:
     keywords = ", ".join(o.keywords[:8]) if o.keywords else "—"
 
     st.markdown(
-        f"""
+        block(
+            f"""
         <div class="summary-panel">
           <div class="summary-eyebrow">Deal summary</div>
           <h2>{esc(o.title)}</h2>
@@ -310,26 +378,58 @@ def render_summary_panel(o: Opportunity) -> None:
             <div><div class="summary-label">Source</div><div class="summary-text">{esc(o.source_name)}</div></div>
           </div>
         </div>
-        """,
+        """
+        ),
         unsafe_allow_html=True,
     )
     a1, a2, a3 = st.columns(3)
     with a1:
-        st.link_button("Open official portal ↗", o.url or "#", use_container_width=True, type="primary")
+        st.link_button("Open official portal ↗", o.url or "#", width="stretch", type="primary")
     with a2:
         subject = quote(f"Bid opportunity: {o.title[:80]}")
         body = quote(f"{brief}\n\nPortal: {o.url}")
-        st.link_button("Share via email", f"mailto:?subject={subject}&body={body}", use_container_width=True)
+        st.link_button("Share via email", f"mailto:?subject={subject}&body={body}", width="stretch")
     with a3:
-        if st.button("Close summary", use_container_width=True, key=f"close_{o.opportunity_id}"):
+        if st.button("Close summary", width="stretch", key=f"close_{o.opportunity_id}"):
             st.session_state.selected_id = None
             st.rerun()
+
+
+def render_export(opps: List[Opportunity]) -> None:
+    """Let the user take the *filtered* view away as CSV or JSON."""
+    if not opps:
+        return
+    with st.expander(f"Export these {len(opps)} deals", expanded=False):
+        rows = [o.to_row() for o in opps]
+        csv = pd.DataFrame(rows).to_csv(index=False).encode("utf-8")
+        payload = json.dumps(
+            {"count": len(opps), "opportunities": rows}, indent=2, default=str
+        ).encode("utf-8")
+        stamp = datetime.now().strftime("%Y%m%d")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.download_button(
+                "⬇️  CSV",
+                csv,
+                file_name=f"sf-procurement-{stamp}.csv",
+                mime="text/csv",
+                width="stretch",
+            )
+        with c2:
+            st.download_button(
+                "⬇️  JSON",
+                payload,
+                file_name=f"sf-procurement-{stamp}.json",
+                mime="application/json",
+                width="stretch",
+            )
 
 
 def render_left_menu(all_opps: List[Opportunity], health) -> None:
     """Always-visible left navigation (main layout column — not Streamlit sidebar)."""
     st.markdown(
-        """
+        block(
+            """
         <div class="left-menu-brand">
           <div class="ng-brand-mark">SF</div>
           <div>
@@ -337,12 +437,13 @@ def render_left_menu(all_opps: List[Opportunity], health) -> None:
             <div class="ng-brand-sub">South Florida bids</div>
           </div>
         </div>
-        """,
+        """
+        ),
         unsafe_allow_html=True,
     )
 
     st.markdown('<p class="left-menu-label">Actions</p>', unsafe_allow_html=True)
-    if st.button("🔄  Fetch live data", type="primary", use_container_width=True, key="fetch_btn"):
+    if st.button("🔄  Fetch live data", type="primary", width="stretch", key="fetch_btn"):
         st.session_state.do_fetch = True
         st.rerun()
 
@@ -409,7 +510,7 @@ def render_left_menu(all_opps: List[Opportunity], health) -> None:
         key="board_group",
     )
 
-    if st.button("Clear all filters", use_container_width=True, key="clear_filters"):
+    if st.button("Clear all filters", width="stretch", key="clear_filters"):
         st.session_state.county_filter = "All"
         st.session_state.offer_filter = "All"
         st.session_state.category_filter = "All"
@@ -434,7 +535,7 @@ def render_left_menu(all_opps: List[Opportunity], health) -> None:
     )
 
     st.markdown('<p class="left-menu-label">Quick county</p>', unsafe_allow_html=True)
-    if st.button("All counties", use_container_width=True, key="qc_all"):
+    if st.button("All counties", width="stretch", key="qc_all"):
         st.session_state.county_filter = "All"
         st.rerun()
     for ck, label in COUNTY_LABELS.items():
@@ -442,7 +543,7 @@ def render_left_menu(all_opps: List[Opportunity], health) -> None:
         active = st.session_state.county_filter == label
         if st.button(
             f"{'● ' if active else ''}{label}  ({n})",
-            use_container_width=True,
+            width="stretch",
             key=f"qc_{ck}",
             type="primary" if active else "secondary",
         ):
@@ -450,8 +551,15 @@ def render_left_menu(all_opps: List[Opportunity], health) -> None:
             st.rerun()
 
     if health:
-        ok = sum(1 for h in health if h.ok)
-        st.caption(f"Sources: {ok}/{len(health)} OK · {len(all_opps)} deals")
+        ok = sum(1 for h in health if h.status == HealthStatus.OK.value)
+        st.caption(f"Sources: {ok}/{len(health)} reporting · {len(all_opps)} deals")
+        broken = [h for h in health if h.status in _PROBLEM_STATUSES]
+        if broken:
+            st.warning(
+                f"{len(broken)} source(s) need attention: "
+                + ", ".join(h.name.split("(")[0].strip() for h in broken[:3]),
+                icon="⚠️",
+            )
     if os.environ.get("RENDER"):
         st.caption("Hosted on Render")
 
@@ -474,14 +582,13 @@ else:
 menu_col, main_col = st.columns([1, 3.15], gap="large")
 
 with menu_col:
-    st.markdown('<div class="left-menu">', unsafe_allow_html=True)
     render_left_menu(all_opps, health)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 with main_col:
     if not all_opps:
         st.markdown(
-            """
+            block(
+                """
             <div class="ng-hero">
               <h1>Procurement Pipeline</h1>
               <p>Live government bids across Miami-Dade, Broward &amp; Palm Beach</p>
@@ -491,7 +598,8 @@ with main_col:
               <div class="ng-empty-title">No opportunities loaded</div>
               <div>Click <strong>Fetch live data</strong> in the <strong>left menu</strong>.</div>
             </div>
-            """,
+            """
+            ),
             unsafe_allow_html=True,
         )
     else:
@@ -509,7 +617,8 @@ with main_col:
         view = st.session_state.view_mode
 
         st.markdown(
-            f"""
+            block(
+                f"""
             <div class="ng-hero">
               <div class="ng-hero-row">
                 <div>
@@ -520,12 +629,14 @@ with main_col:
                 </div>
               </div>
             </div>
-            """,
+            """
+            ),
             unsafe_allow_html=True,
         )
 
         st.markdown(
-            f"""
+            block(
+                f"""
             <div class="ng-kpi-grid">
               <div class="ng-kpi">
                 <div class="ng-kpi-label">Open in view</div>
@@ -548,7 +659,8 @@ with main_col:
                 <div class="ng-kpi-sub">{len(all_opps)} total loaded</div>
               </div>
             </div>
-            """,
+            """
+            ),
             unsafe_allow_html=True,
         )
 
@@ -580,16 +692,13 @@ with main_col:
         }
         tcols = st.columns(len(tab_keys))
         for i, key in enumerate(tab_keys):
-            saved = st.session_state.stage_tab
-            st.session_state.stage_tab = key
-            n = len(apply_filters(all_opps))
-            st.session_state.stage_tab = saved
+            n = len(apply_filters(all_opps, stage=key))
             with tcols[i]:
                 active = st.session_state.stage_tab == key
                 if st.button(
                     f"{tab_labels[key]} ({n})",
                     key=f"stage_{key}",
-                    use_container_width=True,
+                    width="stretch",
                     type="primary" if active else "secondary",
                 ):
                     st.session_state.stage_tab = key
@@ -617,23 +726,20 @@ with main_col:
         # ----- Views -----
         if not visible:
             st.markdown(
-                """
+                block(
+                    """
                 <div class="ng-empty">
                   <div class="ng-empty-icon">🔎</div>
                   <div class="ng-empty-title">No deals match these filters</div>
                   <div>Clear filters in the <strong>left menu</strong> or switch stage tabs.</div>
                 </div>
-                """,
+                """
+                ),
                 unsafe_allow_html=True,
             )
         elif view == "insights":
-            saved_stage = st.session_state.stage_tab
-            saved_urgent = st.session_state.show_only_urgent
-            st.session_state.stage_tab = "all"
-            st.session_state.show_only_urgent = False
-            all_filtered = apply_filters(all_opps)
-            st.session_state.stage_tab = saved_stage
-            st.session_state.show_only_urgent = saved_urgent
+            # Insights always describe the whole pipeline, not the active tab.
+            all_filtered = apply_filters(all_opps, stage="all", urgent_only=False)
 
             left, right = st.columns(2)
             with left:
@@ -644,20 +750,10 @@ with main_col:
                     n = sum(1 for o in all_filtered if o.status == sk)
                     max_n = max(max_n, n)
                     rows.append((STATUS_LABELS[sk], n))
-                html_rows = []
-                for label, n in rows:
-                    pct = int(100 * n / max_n) if max_n else 0
-                    html_rows.append(
-                        f"""
-                        <div class="ng-funnel-row">
-                          <span>{esc(label)}</span>
-                          <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
-                          <span class="ng-bar-value">{n}</span>
-                        </div>
-                        """
-                    )
+                html_rows = [bar_row(label, n, max_n) for label, n in rows]
                 st.markdown(
-                    f"""
+                    block(
+                        f"""
                     <div class="ng-panel">
                       <div class="ng-panel-head">
                         <div class="ng-panel-title">Status funnel</div>
@@ -665,7 +761,8 @@ with main_col:
                       </div>
                       {''.join(html_rows)}
                     </div>
-                    """,
+                    """
+                    ),
                     unsafe_allow_html=True,
                 )
                 cat_c: Counter = Counter()
@@ -675,25 +772,16 @@ with main_col:
                             cat_c[c] += 1
                 top_cats = cat_c.most_common(8)
                 max_c = top_cats[0][1] if top_cats else 1
-                crow = []
-                for c, n in top_cats:
-                    pct = int(100 * n / max_c) if max_c else 0
-                    crow.append(
-                        f"""
-                        <div class="ng-funnel-row">
-                          <span>{esc(c.replace('_', ' '))}</span>
-                          <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
-                          <span class="ng-bar-value">{n}</span>
-                        </div>
-                        """
-                    )
+                crow = [bar_row(c.replace("_", " "), n, max_c) for c, n in top_cats]
                 st.markdown(
-                    f"""
+                    block(
+                        f"""
                     <div class="ng-panel" style="margin-top:12px">
                       <div class="ng-panel-head"><div class="ng-panel-title">Top categories</div></div>
                       {''.join(crow) if crow else '<div class="ng-empty-title">No categories</div>'}
                     </div>
-                    """,
+                    """
+                    ),
                     unsafe_allow_html=True,
                 )
             with right:
@@ -707,14 +795,16 @@ with main_col:
                     ]
                 )[:10]
                 st.markdown(
-                    f"""
+                    block(
+                        f"""
                     <div class="ng-panel">
                       <div class="ng-panel-head">
                         <div class="ng-panel-title">Hot pipeline (next 14 days)</div>
                         <div class="ng-panel-sub">{len(hot)} deals</div>
                       </div>
                     </div>
-                    """,
+                    """
+                    ),
                     unsafe_allow_html=True,
                 )
                 if not hot:
@@ -757,12 +847,14 @@ with main_col:
                     items = sort_opps(buckets[name])
                     with cols[i]:
                         st.markdown(
-                            f"""
+                            block(
+                                f"""
                             <div class="board-col-head">
                               <span>{esc(name)}</span>
                               <span class="board-count">{len(items)}</span>
                             </div>
-                            """,
+                            """
+                            ),
                             unsafe_allow_html=True,
                         )
                         for o in items[:15]:
@@ -800,28 +892,39 @@ with main_col:
                         render_summary_panel(preview[0])
                     else:
                         st.markdown(
-                            """
+                            block(
+                                """
                             <div class="ng-empty">
                               <div class="ng-empty-title">Select a deal</div>
                               <div>Click <strong>Summary</strong> on any card.</div>
                             </div>
-                            """,
+                            """
+                            ),
                             unsafe_allow_html=True,
                         )
 
+        render_export(visible)
+
         if health:
-            with st.expander("Source health", expanded=False):
+            problems = sum(1 for h in health if h.status in _PROBLEM_STATUSES)
+            label = "Source health" + (f" — {problems} need attention" if problems else "")
+            with st.expander(label, expanded=bool(problems)):
                 st.dataframe(
                     [
                         {
                             "Source": h.name,
-                            "Status": "OK" if h.ok else "Error",
+                            "Status": HEALTH_LABELS.get(h.status, h.status),
                             "Deals": h.count,
                             "ms": h.elapsed_ms,
-                            "Error": (h.error or "")[:80],
+                            "Detail": (h.error or h.note or "")[:90],
                         }
                         for h in health
                     ],
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
+                )
+                st.caption(
+                    "**Degraded** means the portal blocked us or its layout changed — "
+                    "check that agency directly. **No listings** means the portal is "
+                    "genuinely empty right now."
                 )

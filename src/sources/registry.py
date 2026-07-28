@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 from typing import Any, Dict, List, Type
 import yaml
@@ -40,25 +41,55 @@ def load_source_config(path: Path | None = None) -> List[Dict[str, Any]]:
     return list(data.get("sources") or [])
 
 
+REQUIRED_KEYS = ("id", "name", "county", "agency", "portal_url", "adapter")
+
+
 def get_adapters(
     *,
     only: List[str] | None = None,
     live_only: bool = False,
     include_catalog: bool = True,
     config_path: Path | None = None,
+    strict: bool = False,
 ) -> List[SourceAdapter]:
+    """Build adapters from config.
+
+    A malformed or unknown entry is skipped with a warning rather than raising:
+    one bad line in sources.yaml should not take down every other portal.
+    Pass ``strict=True`` (used by the tests) to surface config errors instead.
+    """
     configs = load_source_config(config_path)
     adapters: List[SourceAdapter] = []
     for cfg in configs:
+        if not isinstance(cfg, dict):
+            _reject(strict, f"Source entry is not a mapping: {cfg!r}")
+            continue
+        missing = [k for k in REQUIRED_KEYS if not cfg.get(k)]
+        if missing:
+            _reject(strict, f"Source {cfg.get('id', '?')} missing keys: {', '.join(missing)}")
+            continue
         if only and cfg["id"] not in only:
             continue
         if live_only and not cfg.get("live_fetch", True):
             continue
         if not include_catalog and cfg.get("adapter") == "catalog":
             continue
-        adapter_key = cfg.get("adapter")
-        cls = ADAPTERS.get(adapter_key)
+
+        cls = ADAPTERS.get(cfg["adapter"])
         if not cls:
-            raise KeyError(f"Unknown adapter: {adapter_key} for source {cfg.get('id')}")
+            _reject(strict, f"Unknown adapter '{cfg['adapter']}' for source {cfg['id']}")
+            continue
         adapters.append(cls(cfg))
+
+    if only:
+        found = {a.source_id for a in adapters}
+        for sid in only:
+            if sid not in found:
+                _reject(strict, f"No configured source with id '{sid}'")
     return adapters
+
+
+def _reject(strict: bool, message: str) -> None:
+    if strict:
+        raise KeyError(message)
+    warnings.warn(f"sources.yaml: {message}", RuntimeWarning, stacklevel=3)
