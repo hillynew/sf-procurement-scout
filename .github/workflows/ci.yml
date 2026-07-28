@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # runtime.txt is the deployment's source of truth for the Python version
+      # (Render reads it), so CI derives its version from the same file rather
+      # than pinning a second copy that can drift. setup-python does not read
+      # runtime.txt itself — it only understands .python-version and friends.
+      - name: Resolve Python version
+        id: py
+        run: echo "version=$(sed 's/^python-//' runtime.txt)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ steps.py.outputs.version }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: python -m pyflakes src/ web/ tests/ run.py
+
+      - name: Test
+        # The suite runs against saved portal fixtures, so it never reaches out
+        # to the public procurement sites it scrapes.
+        run: python -m pytest
