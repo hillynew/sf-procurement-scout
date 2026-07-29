@@ -163,6 +163,108 @@ def health():
     console.print(f"[bold]Opportunities in snapshot:[/bold] {len(opps)}")
 
 
+@app.command("auth-status")
+def auth_status():
+    """Show which Bonfire agencies have a signed-in vendor session configured.
+
+    Never prints a credential — only which environment variable, if any, is
+    supplying one for each host.
+    """
+    from .auth import describe_bonfire
+    from .sources.registry import load_source_config
+
+    configs = [c for c in load_source_config() if c.get("adapter") == "bonfire"]
+    t = Table(title="Bonfire vendor sessions")
+    t.add_column("Agency")
+    t.add_column("Host")
+    t.add_column("Session")
+    for c in configs:
+        host = c.get("bonfire_host", "")
+        source = describe_bonfire(host)
+        t.add_row(
+            c["name"][:36],
+            host,
+            f"[green]{source}[/green]" if source != "not set" else "[dim]not set[/dim]",
+        )
+    console.print(t)
+    console.print(
+        "\nTo add a session: sign in to the agency's Bonfire portal in a browser, "
+        "copy the request's Cookie header (dev tools → Network), and set "
+        "SF_SCOUT_BONFIRE_COOKIE (or a host-specific "
+        "SF_SCOUT_BONFIRE_COOKIE_<HOST>) in your .env. See README."
+    )
+
+
+@app.command("check-mailbox")
+def check_mailbox():
+    """Verify the bid-alert mailbox is reachable, without running a full fetch.
+
+    Connects read-only, counts recent messages, and reports how many look
+    like bid notices — a quick way to confirm SF_SCOUT_IMAP_* is right before
+    trusting it in a scheduled fetch.
+    """
+    from .sources.email_alerts import (
+        MailboxNotConfigured,
+        is_configured,
+        looks_like_a_bid_notice,
+        mailbox_settings,
+        read_messages,
+    )
+
+    if not is_configured():
+        console.print(
+            "[yellow]No mailbox configured.[/yellow] Set SF_SCOUT_IMAP_HOST, "
+            "SF_SCOUT_IMAP_USER and SF_SCOUT_IMAP_PASSWORD — see .env.example."
+        )
+        raise typer.Exit(1)
+
+    host, user, _ = mailbox_settings()
+    console.print(f"Connecting to [bold]{host}[/bold] as [bold]{user}[/bold] (read-only)…")
+    try:
+        messages = read_messages()
+    except MailboxNotConfigured:
+        raise
+    except Exception as e:  # noqa: BLE001 — report whatever IMAP raised, plainly
+        console.print(f"[red]Connection failed:[/red] {type(e).__name__}: {e}")
+        raise typer.Exit(1)
+
+    bid_like = sum(1 for m in messages if looks_like_a_bid_notice(m.get("Subject") or ""))
+    console.print(f"[green]Connected.[/green] {len(messages)} messages in the lookback window.")
+    console.print(f"{bid_like} look like bid notices by subject.")
+    if messages and not bid_like:
+        console.print(
+            "[yellow]None matched.[/yellow] Confirm the mailbox is actually subscribed "
+            "to a city's bid alerts, not just receiving other mail."
+        )
+
+
+@app.command("subscribe-links")
+def subscribe_links():
+    """List each CivicPlus city's 'Notify Me' bid-alert subscription page.
+
+    Subscribing is manual and per-city — this is the checklist, not an
+    automation of it. Work down the list, subscribe the mailbox configured in
+    SF_SCOUT_IMAP_*, then `python run.py check-mailbox` to confirm it.
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    configs = [c for c in load_source_config() if c.get("adapter") == "civicplus"]
+    t = Table(title="CivicPlus bid-alert subscriptions")
+    t.add_column("Agency")
+    t.add_column("Subscribe here")
+    for c in sorted(configs, key=lambda c: c["name"]):
+        parts = urlsplit(c["portal_url"])
+        notify_url = urlunsplit(
+            (parts.scheme, parts.netloc, "/list.aspx", "Mode=Subscribe", "bids")
+        )
+        t.add_row(c["name"][:36], notify_url)
+    console.print(t)
+    console.print(
+        f"\n{len(configs)} cities. Each subscription is a manual step on that "
+        "city's own site — there is no API for it."
+    )
+
+
 @app.command("list-sources")
 def list_sources():
     """List configured procurement sources."""

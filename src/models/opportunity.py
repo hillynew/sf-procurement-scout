@@ -103,6 +103,11 @@ class Opportunity(BaseModel):
     prior_cycles: int = 0
     last_cycle_closed: Optional[date] = None
 
+    # Set when a configured vendor session surfaced this listing as one this
+    # account was invited to or is following — visible only to a signed-in
+    # vendor, never to an anonymous scrape.
+    personalized: bool = False
+
     # Meta
     raw: Optional[dict] = None
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
@@ -193,6 +198,7 @@ class Opportunity(BaseModel):
             "licenses": self.licenses or "",
             "prior_cycles": self.prior_cycles,
             "last_cycle_closed": self.last_cycle_closed.isoformat() if self.last_cycle_closed else "",
+            "personalized": self.personalized,
             "questions_due": self.questions_due.isoformat() if self.questions_due else "",
             "submittal_info": self.submittal_info or "",
             "detail_score": self.detail_score,

@@ -4,12 +4,19 @@ The portal is a JSON API in all but name. Alongside the open-opportunities
 endpoint it publishes a *past* one — several hundred closed solicitations per
 agency — which is how the app knows a contract's re-bid cadence rather than
 only what happens to be open today.
+
+A third endpoint, `getMyOpportunitiesSectionData`, returns solicitations this
+account has been invited to or is following — but only to a signed-in session.
+When a vendor session cookie is configured (see `src/auth.py`), it is merged
+into the open list and tagged `personalized`, rather than requiring a second,
+separate source per agency.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+from ..auth import bonfire_cookie
 from ..classify import enrich
 from ..dates import parse_dt
 from ..http_util import get, get_json, session
@@ -18,12 +25,15 @@ from .base import SourceAdapter
 
 OPEN_ENDPOINT = "getOpenPublicOpportunitiesSectionData"
 PAST_ENDPOINT = "getPastPublicOpportunitiesSectionData"
+MY_ENDPOINT = "getMyOpportunitiesSectionData"
 
 
 class BonfireAdapter(SourceAdapter):
     def fetch(self) -> List[Opportunity]:
         payload = self._payload(OPEN_ENDPOINT)
-        return self._from_payload(payload, status="open")
+        opps = self._from_payload(payload, status="open")
+        self._merge_personalized(opps)
+        return opps
 
     def fetch_history(self) -> List[Opportunity]:
         """Closed solicitations this agency has run before.
@@ -44,19 +54,52 @@ class BonfireAdapter(SourceAdapter):
             raise ValueError(f"{self.source_id}: bonfire_host required")
         return str(host)
 
-    def _payload(self, endpoint: str) -> Dict[str, Any]:
+    def _payload(self, endpoint: str, *, cookie: Optional[str] = None) -> Dict[str, Any]:
         host = self._host()
         s = session()
-        # warm session / cookies
-        get(f"https://{host}/portal/", s=s)
+        headers = {}
+        if cookie:
+            # A real vendor session is presented as-is; skipping the anonymous
+            # warm-up matters here, since populating the cookiejar first would
+            # give requests two competing sources for the Cookie header.
+            headers["Cookie"] = cookie
+        else:
+            get(f"https://{host}/portal/", s=s)
         data = get_json(
             f"https://{host}/PublicPortal/{endpoint}",
             s=s,
             referer=f"https://{host}/portal/",
+            headers=headers or None,
         )
         if not data.get("success"):
             raise RuntimeError(f"Bonfire API error: {data}")
         return data.get("payload") or {}
+
+    def _merge_personalized(self, opps: List[Opportunity]) -> None:
+        """Fold in invited/followed opportunities when a session is configured.
+
+        Best-effort: an expired or absent cookie must not disturb the public
+        listing that already succeeded.
+        """
+        cookie = bonfire_cookie(self._host())
+        if not cookie:
+            return
+        try:
+            payload = self._payload(MY_ENDPOINT, cookie=cookie)
+            mine = self._from_payload(payload, status="open")
+        except Exception:  # noqa: BLE001 — a stale session is not a fetch failure
+            return
+
+        by_url = {o.url: o for o in opps}
+        for o in mine:
+            existing = by_url.get(o.url)
+            target = existing or o
+            target.personalized = True
+            if "invited" not in target.categories:
+                target.categories = ["invited"] + target.categories
+            if existing is None:
+                opps.append(o)
+                by_url[o.url] = o
 
     def _from_payload(self, payload: Dict[str, Any], *, status: str) -> List[Opportunity]:
         projects = payload.get("projects") or {}
