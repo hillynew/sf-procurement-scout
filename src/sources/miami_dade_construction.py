@@ -8,15 +8,24 @@ directly and keep the table parse only as a fallback.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
-from urllib.parse import quote
+from urllib.parse import quote, urljoin
 
 from bs4 import BeautifulSoup
 
 from ..classify import enrich
 from ..dates import looks_like_bare_date, parse_dt
 from ..http_util import get, get_json, session
-from ..models.opportunity import Opportunity, OfferType
+from ..requirements import (
+    extract_contact_email,
+    extract_contact_phone,
+    extract_estimated_value,
+    extract_pre_bid_meeting,
+    extract_questions_due,
+    extract_requirements,
+)
+from ..models.opportunity import Document, Opportunity, OfferType
 from .base import SourceAdapter
 
 MD_HOST = "https://www.miamidade.gov"
@@ -27,6 +36,31 @@ class MiamiDadeConstructionAdapter(SourceAdapter):
     """Current solicitations (open, with an opening date)."""
 
     list_path = "/apps/ISD/stratproc/Home/CurrentSolicitationsList"
+    supports_detail = True
+
+    def fetch_detail(self, opp: Opportunity) -> None:
+        """The ISD detail page carries the full announcement text and the PDF.
+
+        Its layout is a flat sequence of `Label:` nodes followed by their
+        values, so we walk labels rather than relying on table geometry.
+        """
+        if DETAILS_PATH not in opp.url:
+            return
+        soup = BeautifulSoup(get(opp.url, referer=self.portal_url).text, "lxml")
+        fields = _detail_fields(soup)
+        scope = fields.get("announcement info") or fields.get("announcement  info")
+        if scope:
+            opp.scope = scope
+            if not opp.description or len(scope) > len(opp.description or ""):
+                opp.description = scope[:400]
+
+        cert = fields.get("technical certification") or fields.get("technical  certification")
+        if cert and cert not in opp.requirements:
+            opp.requirements.append(f"Technical certification: {cert}"[:120])
+
+        opp.documents = _detail_documents(soup, opp.url)
+        _apply_extracted(opp, scope, cert)
+        opp.detail_fetched = True
 
     def fetch(self) -> List[Opportunity]:
         rows = _fetch_list(self.list_path, self.portal_url)
@@ -113,6 +147,73 @@ class MiamiDadeFutureAdapter(SourceAdapter):
             ),
             raw=r,
         )
+
+
+def _detail_fields(soup: BeautifulSoup) -> Dict[str, str]:
+    """Collect `Label:` → value pairs from the flat detail layout."""
+    fields: Dict[str, str] = {}
+    for node in soup.find_all(["label", "strong", "b", "dt", "span", "div"]):
+        text = _clean(node.get_text(" ", strip=True))
+        if not text.endswith(":") or len(text) > 40:
+            continue
+        label = text.rstrip(":").strip().lower()
+        label = re.sub(r"\s+", " ", label)
+        if not label or label in fields:
+            continue
+        value = _value_after(node)
+        if value:
+            fields[label] = value
+    return fields
+
+
+def _value_after(node) -> str:
+    """The first substantial text following a label node."""
+    for sib in node.next_siblings:
+        text = _clean(getattr(sib, "get_text", lambda *a, **k: str(sib))(" ", strip=True))
+        if text and not text.endswith(":"):
+            return text
+    parent = node.parent
+    if parent is not None:
+        for sib in parent.next_siblings:
+            text = _clean(getattr(sib, "get_text", lambda *a, **k: str(sib))(" ", strip=True))
+            if text and not text.endswith(":"):
+                return text
+    return ""
+
+
+def _detail_documents(soup: BeautifulSoup, page_url: str) -> List[Document]:
+    docs: List[Document] = []
+    seen: set = set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if not re.search(r"\.(pdf|docx?|xlsx?|zip)$", href, re.I):
+            continue
+        name = _clean(a.get_text(" ", strip=True)) or href.rsplit("/", 1)[-1]
+        url = urljoin(page_url, href)
+        if url in seen:
+            continue
+        seen.add(url)
+        kind = "addendum" if "addend" in name.lower() else "document"
+        docs.append(Document(name=name[:160], url=url, kind=kind))
+    return docs[:40]
+
+
+def _apply_extracted(opp: Opportunity, *texts: Optional[str]) -> None:
+    blob = [t for t in texts if t]
+    if not blob:
+        return
+    for r in extract_requirements(*blob):
+        if r not in opp.requirements:
+            opp.requirements.append(r)
+    opp.budget = opp.budget or extract_estimated_value(*blob)
+    opp.pre_bid_meeting = opp.pre_bid_meeting or extract_pre_bid_meeting(*blob)
+    opp.questions_due = opp.questions_due or extract_questions_due(*blob)
+    opp.contact_email = opp.contact_email or extract_contact_email(*blob)
+    opp.contact_phone = opp.contact_phone or extract_contact_phone(*blob)
+
+
+def _clean(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").replace("\xa0", " ")).strip()
 
 
 def _fetch_list(path: str, referer: str) -> List[Dict[str, Any]]:

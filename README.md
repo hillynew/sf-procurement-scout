@@ -12,10 +12,36 @@ Live aggregator for government procurement opportunities across **Miami-Dade**, 
 | **B. Organize** | County, agency, solicitation type, goods/services/construction, topic categories |
 | **C. Deal briefs** | One-paragraph summary with urgency and link for scanning |
 | **D. Dedupe** | One record per solicitation, even when portals overlap or repeat announcements |
-| **E. Source health** | Every portal reports `ok` / `no listings` / `degraded` / `error` so silent breakage is visible |
+| **E. Detail** | Scope of work, pricing, bid requirements, documents and contacts, read from each bid's own page |
+| **F. Source health** | Every portal reports `ok` / `no listings` / `degraded` / `error` so silent breakage is visible |
 
 Sources are fetched concurrently, so a full refresh takes a few seconds rather
 than a minute.
+
+## What is captured per opportunity
+
+List pages carry little more than a title and a date, so a second pass reads
+each open bid's own page. That is where the fields a contractor actually
+decides on live:
+
+| Field | Source |
+|-------|--------|
+| **Scope of work** | Full narrative from the detail page — often several thousand words |
+| **Estimated value** | Dollar figures qualified by "not to exceed", "budget of", "estimated at"; a bare figure is only used above $25k so a plan fee is never mistaken for the contract |
+| **Requirements to bid** | Bid/performance/payment bonds, insurance, licensing, prequalification, mandatory pre-bid meetings and site visits, E-Verify, SBE/MBE/DBE goals, local preference, prevailing wage, and more |
+| **Documents** | Every bid package file, with addenda tagged separately so changes stand out |
+| **Key dates** | Bid deadline, question deadline, pre-bid meeting, publication date |
+| **Contacts** | Buyer name, email and phone |
+| **Submittal information** | Where and how a response must be delivered |
+
+Each record carries a **detail score** (0–100) summarising how much is known,
+shown as a meter in the UI so a fully-specified bid is visibly more actionable
+than a bare listing.
+
+The detail pass is bounded — it runs only for `open` and `upcoming` listings,
+soonest-due first, capped at 150 requests per refresh. Portals that expose no
+detail page (or block it) still get requirements and pricing mined from the
+blurb they do publish. Disable it with `run_fetch(with_details=False)`.
 
 ## Source health
 
@@ -192,6 +218,7 @@ config/sources.yaml     # portal registry
 src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-portal adapters
 src/classify.py         # categories + offer type
+src/requirements.py     # bid terms, pricing and deadlines from scope prose
 src/dates.py            # shared date parsing (Eastern wall clock)
 src/http_util.py        # session, retries, blocked-portal detection
 src/summarize.py        # deal briefs

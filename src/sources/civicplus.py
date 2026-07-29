@@ -29,7 +29,15 @@ from bs4 import BeautifulSoup
 from ..classify import enrich
 from ..dates import parse_dt
 from ..http_util import get
-from ..models.opportunity import Opportunity
+from ..models.opportunity import Document, Opportunity
+from ..requirements import (
+    extract_contact_email,
+    extract_contact_phone,
+    extract_estimated_value,
+    extract_pre_bid_meeting,
+    extract_questions_due,
+    extract_requirements,
+)
 from .base import SourceAdapter
 
 # Phrases the module prints when a board has nothing posted.
@@ -63,6 +71,54 @@ class CivicPlusAdapter(SourceAdapter):
       default_categories: categories every row from this portal inherits
       base_url:           origin for relative links (defaults to portal_url's)
     """
+
+    supports_detail = True
+
+    def fetch_detail(self, opp: Opportunity) -> None:
+        """Read the per-bid page, which carries the fields the list omits.
+
+        CivicPlus renders detail as `<span class="BidListHeader">Label:</span>`
+        followed by `<span class="BidDetail">value</span>`, so the whole page
+        reduces to a label/value mapping.
+        """
+        if "bidid=" not in opp.url.lower():
+            return
+        soup = BeautifulSoup(get(opp.url).text, "lxml")
+        fields = _detail_fields(soup)
+        if not fields:
+            return
+
+        scope = fields.get("description")
+        if scope:
+            opp.scope = scope
+            if not opp.description or len(scope) > len(opp.description):
+                opp.description = scope[:400]
+
+        opp.submittal_info = fields.get("submittal information") or opp.submittal_info
+        opp.bid_opening = fields.get("bid opening information") or opp.bid_opening
+        opp.pre_bid_meeting = (
+            fields.get("pre-bid meeting")
+            or fields.get("pre bid meeting")
+            or extract_pre_bid_meeting(scope)
+            or opp.pre_bid_meeting
+        )
+
+        for key in ("contact person", "contact", "contact information"):
+            if fields.get(key):
+                opp.contact = fields[key]
+                break
+
+        closing = fields.get("closing date/time") or fields.get("closing date")
+        if closing and opp.due_date is None and not _NON_DATE.search(closing):
+            opp.due_date = parse_dt(closing)
+        published = fields.get("publication date/time") or fields.get("publication date")
+        if published and opp.posted_date is None:
+            parsed = parse_dt(published)
+            opp.posted_date = parsed.date() if parsed else None
+
+        opp.documents = _documents(soup, opp.url)
+        _apply_extracted(opp, scope, fields.get("special requirements"))
+        opp.detail_fetched = True
 
     def fetch(self) -> List[Opportunity]:
         resp = get(self.portal_url)
@@ -124,6 +180,73 @@ class CivicPlusAdapter(SourceAdapter):
             description=description,
             raw={"ref": ref},
         )
+
+
+def _detail_fields(soup: BeautifulSoup) -> dict:
+    """Map each `BidListHeader` label onto the `BidDetail` value that follows."""
+    fields: dict = {}
+    for label_el in soup.select("span.BidListHeader"):
+        label = _clean(label_el.get_text(" ", strip=True)).rstrip(":").lower()
+        if not label:
+            continue
+        cell = label_el.find_parent(["td", "th", "div"])
+        value_el = None
+        # The value normally sits in the next table row, occasionally inline.
+        row = cell.find_parent("tr") if cell else None
+        if row is not None:
+            nxt = row.find_next_sibling("tr")
+            if nxt is not None:
+                value_el = nxt.select_one("span.BidDetail") or nxt
+        if value_el is None and cell is not None:
+            value_el = cell.select_one("span.BidDetail")
+        if value_el is None:
+            continue
+        value = _clean(value_el.get_text("\n", strip=True))
+        if value and value.lower() != label:
+            fields[label] = value
+    return fields
+
+
+def _documents(soup: BeautifulSoup, page_url: str) -> List[Document]:
+    """Bid package files, tagging addenda so changes stand out."""
+    docs: List[Document] = []
+    seen: set[str] = set()
+    for a in soup.find_all("a", href=True):
+        href = a["href"]
+        if not re.search(r"(documentcenter|showdocument|\.pdf|\.docx?|\.xlsx?|\.zip)", href, re.I):
+            continue
+        name = _clean(a.get_text(" ", strip=True))
+        if not name or len(name) < 3:
+            continue
+        url = urljoin(page_url, href)
+        if url in seen:
+            continue
+        seen.add(url)
+        kind = "document"
+        lowered = name.lower()
+        if "addend" in lowered:
+            kind = "addendum"
+        elif re.search(r"\b(plan|drawing|sketch)", lowered):
+            kind = "drawing"
+        elif re.search(r"\bspec", lowered):
+            kind = "specification"
+        docs.append(Document(name=name[:160], url=url, kind=kind))
+    return docs[:40]
+
+
+def _apply_extracted(opp: Opportunity, *texts: Optional[str]) -> None:
+    """Derive requirements, value and contacts from whatever prose we found."""
+    blob = [t for t in texts if t]
+    if not blob:
+        return
+    reqs = extract_requirements(*blob)
+    for r in reqs:
+        if r not in opp.requirements:
+            opp.requirements.append(r)
+    opp.budget = opp.budget or extract_estimated_value(*blob)
+    opp.questions_due = opp.questions_due or extract_questions_due(*blob)
+    opp.contact_email = opp.contact_email or extract_contact_email(*blob)
+    opp.contact_phone = opp.contact_phone or extract_contact_phone(*blob)
 
 
 def _bid_rows(soup: BeautifulSoup) -> list:
