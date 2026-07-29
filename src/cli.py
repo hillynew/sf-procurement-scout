@@ -122,6 +122,37 @@ def _print_health(health) -> None:
 
 
 @app.command()
+def history(
+    only: Optional[List[str]] = typer.Option(None, "--only", help="Source id(s) to refresh."),
+):
+    """Refresh the archive of closed solicitations used for recurrence.
+
+    Runs on its own cadence — history changes slowly, so there is no reason to
+    re-download it on every fetch.
+    """
+    from .pipeline.history import BidHistory, fetch_history, save_history
+
+    console.rule("[bold]Bid history refresh[/bold]")
+    records = fetch_history(only=only)
+    if not records:
+        console.print("[yellow]No source exposed a closed-solicitation archive.[/yellow]")
+        raise typer.Exit(1)
+
+    path = save_history(records)
+    index = BidHistory(records)
+    t = Table(title="Archive by agency")
+    t.add_column("Agency")
+    t.add_column("Past solicitations", justify="right")
+    counts: dict = {}
+    for r in records:
+        counts[r.agency] = counts.get(r.agency, 0) + 1
+    for agency, n in sorted(counts.items(), key=lambda x: -x[1]):
+        t.add_row(agency[:44], str(n))
+    console.print(t)
+    console.print(f"[green]Saved[/green] {len(records)} records ({len(index)} indexed) to {path}")
+
+
+@app.command()
 def health():
     """Show source health from the last saved snapshot."""
     opps, health_rows = load_latest()

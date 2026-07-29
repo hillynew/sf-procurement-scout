@@ -99,6 +99,10 @@ class Opportunity(BaseModel):
     licenses: Optional[str] = None
     package_parsed: bool = False
 
+    # Recurrence, from the agency's archive of closed solicitations.
+    prior_cycles: int = 0
+    last_cycle_closed: Optional[date] = None
+
     # Meta
     raw: Optional[dict] = None
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
@@ -187,6 +191,8 @@ class Opportunity(BaseModel):
             "duration_days": self.duration_days if self.duration_days is not None else "",
             "liquidated_damages": self.liquidated_damages or "",
             "licenses": self.licenses or "",
+            "prior_cycles": self.prior_cycles,
+            "last_cycle_closed": self.last_cycle_closed.isoformat() if self.last_cycle_closed else "",
             "questions_due": self.questions_due.isoformat() if self.questions_due else "",
             "submittal_info": self.submittal_info or "",
             "detail_score": self.detail_score,

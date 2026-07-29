@@ -24,6 +24,7 @@ from ..requirements import (
     dedupe_requirements,
 )
 from ..sources.base import SourceAdapter
+from .history import annotate_recurrence, load_history
 from ..sources.registry import get_adapters
 from ..summarize import apply_briefs
 
@@ -84,7 +85,8 @@ def _classify_health(
     elif opps:
         status, note = HealthStatus.OK, None
     elif adapter.allows_empty:
-        status, note = HealthStatus.EMPTY, "portal listed no open solicitations"
+        status = HealthStatus.EMPTY
+        note = adapter.empty_note or "portal listed no open solicitations"
     else:
         status, note = HealthStatus.DEGRADED, "fetched but parsed zero rows"
 
@@ -306,6 +308,7 @@ def run_fetch(
     detail_limit: int = MAX_DETAIL_FETCHES,
     with_packages: bool = True,
     package_limit: int = MAX_PACKAGE_PARSES,
+    with_history: bool = True,
 ) -> Tuple[List[Opportunity], List[SourceHealth]]:
     adapters = get_adapters(
         only=only,
@@ -343,6 +346,12 @@ def run_fetch(
                 all_opps, max_workers=max_workers, limit=package_limit, quiet=quiet
             )
     derive_fields(all_opps)
+    # Recurrence comes from a separately-refreshed archive (run.py history),
+    # so a missing file simply leaves prior_cycles at zero.
+    if with_history:
+        matched = annotate_recurrence(all_opps, load_history())
+        if matched and not quiet:
+            console.print(f"[cyan]history[/cyan] matched {matched} opportunities to prior cycles")
     apply_briefs(all_opps)
     filtered = filter_opportunities(
         all_opps,

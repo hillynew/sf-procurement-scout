@@ -555,3 +555,15 @@ sources:
     adapter: catalog
     portal_url: https://bids.fiu.edu/
     register_url: https://bids.fiu.edu/
+
+  # Bid notices pushed by email. No portal in this set offers webhooks, so a
+  # subscribed mailbox is the closest thing to real-time alerting. Inert until
+  # SF_SCOUT_IMAP_* is set; see README.
+  - id: email_alerts
+    name: Subscribed bid alerts (email)
+    county: broward
+    agency: Email subscriptions
+    live_fetch: true
+    adapter: email_alerts
+    portal_url: https://www.northmiamifl.gov/list.aspx?Mode=Subscribe#bids
+    register_url: https://www.northmiamifl.gov/list.aspx?Mode=Subscribe#bids

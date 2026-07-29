@@ -9,3 +9,5 @@ data/*.csv
 !data/.gitkeep
 .streamlit/secrets.toml
 data/pdf_cache/
+
+.env

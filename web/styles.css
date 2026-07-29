@@ -788,3 +788,11 @@ div[data-testid="column"] div[data-testid="stLinkButton"] {
     gap: 6px;
   }
 }
+
+/* A solicitation this agency has run before — a warmer lead than a first-time
+   buy, because the incumbent, the cadence and the scope are all knowable. */
+.deal-fact.recur {
+  background: var(--info-soft);
+  color: var(--accent-deep);
+  border-color: transparent;
+}

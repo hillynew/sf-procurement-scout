@@ -63,6 +63,41 @@ blurb they do publish.
 Disable either pass with `run_fetch(with_details=False)` or
 `run_fetch(with_packages=False)`.
 
+## Bid history and recurrence
+
+Knowing a contract is open today is worth less than knowing the agency rebids
+it every three years and the last cycle closed in March. Bonfire publishes a
+public archive of closed solicitations, so `run.py history` collects it into
+`data/history.json` and every fetch matches open bids against it:
+
+```bash
+python run.py history      # refresh the archive (slow-moving; run occasionally)
+python run.py fetch        # matches open bids against it automatically
+```
+
+Matching is per-agency on the significant words of a title, after stripping
+boilerplate ("Request for Proposals", "Services", "City of") and years, so
+"Janitorial Contract 2024" and "Janitorial Services Citywide" are recognised as
+the same recurring buy while "Roof Repairs Fire Station 12" and "Roof Repairs
+Water Plant" stay distinct. Matches show as `prior_cycles` and
+`last_cycle_closed`, and as a 🔁 badge in the UI.
+
+Coverage is limited to agencies whose portal exposes an archive — currently the
+Bonfire ones (Broward County, Town of Palm Beach, FAU, Tri-Rail), about 945
+past solicitations.
+
+## Bid alerts by email
+
+No portal here offers webhooks. CivicPlus cities do offer a "Notify Me"
+email/SMS subscription, so the `email_alerts` source reads a dedicated mailbox
+over IMAP and turns each notice into an opportunity — the closest thing to
+real-time push available.
+
+Subscribe a mailbox at each city's `/list.aspx?Mode=Subscribe#bids`, then copy
+`.env.example` and fill it in. Use an app-specific password; the mailbox is
+opened **read-only** and nothing is deleted. Left unconfigured, the source
+reports `inactive` and changes nothing.
+
 ## Source health
 
 Scrapers break quietly — a portal changes its layout and the adapter returns
@@ -130,6 +165,7 @@ python run.py fetch
 python run.py fetch --county broward -q "software"
 python run.py show
 python run.py health
+python run.py history
 python run.py list-sources
 
 # Web UI
@@ -240,6 +276,7 @@ src/sources/            # per-portal adapters
 src/classify.py         # categories + offer type
 src/requirements.py     # bid terms, pricing and deadlines from scope prose
 src/pdf_extract.py      # commercial terms from the bid package PDF
+src/pipeline/history.py # closed-solicitation archive + recurrence matching
 src/dates.py            # shared date parsing (Eastern wall clock)
 src/http_util.py        # session, retries, blocked-portal detection
 src/summarize.py        # deal briefs

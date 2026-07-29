@@ -310,6 +310,8 @@ def card_html(o: Opportunity, selected: bool = False) -> str:
         facts.append(f'<span class="deal-fact value">💲 {esc(o.budget)}</span>')
     if o.duration_days:
         facts.append(f'<span class="deal-fact">⏱ {o.duration_days} days</span>')
+    if o.prior_cycles:
+        facts.append(f'<span class="deal-fact recur">🔁 bid {o.prior_cycles}x before</span>')
     if o.documents:
         addenda = sum(1 for d in o.documents if d.kind == "addendum")
         label = f"{len(o.documents)} doc" + ("s" if len(o.documents) != 1 else "")
@@ -377,6 +379,13 @@ def _fact_rows(o: Opportunity) -> str:
         ("Liquidated damages", o.liquidated_damages),
         ("Licence required", o.licenses),
         ("Location", o.project_location),
+        (
+            "Previously bid",
+            f"{o.prior_cycles}x by this agency"
+            + (f", last closed {o.last_cycle_closed.isoformat()}" if o.last_cycle_closed else "")
+            if o.prior_cycles
+            else None,
+        ),
         ("Bids due", fmt_due(o)),
         ("Questions due", _fmt_dt(o.questions_due)),
         ("Posted", o.posted_date.isoformat() if o.posted_date else None),
