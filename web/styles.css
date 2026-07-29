@@ -594,3 +594,197 @@ div[data-testid="column"] div[data-testid="stLinkButton"] {
 .deal-card + div {
   margin-bottom: 0.15rem;
 }
+
+/* ===========================================================================
+   Opportunity detail — scope, requirements, documents and the fact grid.
+   Added when the pipeline started fetching each bid's own page, which
+   yields far more than the list view ever had room for.
+   ========================================================================== */
+
+/* --- card enrichments --- */
+.deal-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0 2px;
+}
+.deal-fact {
+  font-size: 0.68rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 7px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  border: 1px solid var(--line);
+  white-space: nowrap;
+}
+.deal-fact.value {
+  background: var(--success-soft);
+  color: var(--success);
+  border-color: transparent;
+}
+.deal-fact.req {
+  background: var(--accent-soft);
+  color: var(--accent-deep);
+  border-color: transparent;
+}
+
+/* --- detail header + completeness meter --- */
+.summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+.detail-meter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+.detail-meter-label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.detail-meter-track {
+  display: block;
+  width: 58px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bg-2);
+  overflow: hidden;
+}
+.detail-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--brand-blue), var(--brand-blue-deep));
+}
+
+/* --- fact grid: auto-fits, so a sparse bid does not leave holes --- */
+.fact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 10px 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.fact-label {
+  font-size: 0.63rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+.fact-value {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+/* --- sections --- */
+.detail-section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-top: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.detail-section-title {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin-bottom: 9px;
+}
+.scope-text {
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--text-soft);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* --- requirement chips --- */
+.req-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.req-chip {
+  font-size: 0.73rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: var(--warning-soft);
+  color: var(--warning);
+  border: 1px solid transparent;
+}
+
+/* --- documents --- */
+.doc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.doc-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--accent-deep) !important;
+  text-decoration: none !important;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-2);
+  transition: border-color 0.12s ease, background 0.12s ease;
+  overflow-wrap: anywhere;
+}
+.doc-link:hover {
+  border-color: var(--brand-blue);
+  background: var(--accent-soft);
+}
+.doc-kind {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.doc-link.addendum {
+  border-left: 3px solid var(--warning);
+}
+.doc-link.addendum .doc-kind {
+  color: var(--warning);
+}
+.doc-more {
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-top: 7px;
+}
+
+@media (max-width: 900px) {
+  .fact-grid {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+  .summary-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}

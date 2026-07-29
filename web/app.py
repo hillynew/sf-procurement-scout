@@ -298,9 +298,27 @@ def apply_filters(
 
 def card_html(o: Opportunity, selected: bool = False) -> str:
     ucss, ulabel = urgency_badge(o)
-    brief = short_brief(o, 160)
     color = OFFER_COLORS.get(offer_key(o), OFFER_COLORS["unknown"])
     ref = esc(o.external_id) if o.external_id else ""
+    # Prefer the agency's own scope text over the generated brief — it says
+    # what the work actually is.
+    blurb = " ".join((o.scope or o.description or ensure_brief(o)).split())
+    blurb = blurb if len(blurb) <= 165 else blurb[:164] + "…"
+
+    facts = []
+    if o.budget:
+        facts.append(f'<span class="deal-fact value">💲 {esc(o.budget)}</span>')
+    if o.documents:
+        addenda = sum(1 for d in o.documents if d.kind == "addendum")
+        label = f"{len(o.documents)} doc" + ("s" if len(o.documents) != 1 else "")
+        if addenda:
+            label += f" · {addenda} addendum" + ("s" if addenda != 1 else "")
+        facts.append(f'<span class="deal-fact">📎 {esc(label)}</span>')
+    for req in o.requirements[:2]:
+        facts.append(f'<span class="deal-fact req">{esc(req)}</span>')
+    if len(o.requirements) > 2:
+        facts.append(f'<span class="deal-fact req">+{len(o.requirements) - 2}</span>')
+
     return block(
         f"""
     <div class="deal-card {'selected' if selected else ''}" style="--accent-bar:{color}">
@@ -313,7 +331,8 @@ def card_html(o: Opportunity, selected: bool = False) -> str:
         · {esc(COUNTY_LABELS.get(o.county, o.county))}
         · {esc(offer_label(o))}
       </div>
-      <div class="deal-brief">{esc(brief)}</div>
+      <div class="deal-brief">{esc(blurb)}</div>
+      {f'<div class="deal-facts">{"".join(facts)}</div>' if facts else ''}
       <div class="deal-foot">
         <span class="deal-due">📅 {esc(fmt_due(o))}</span>
         {f'<span class="deal-ref">{ref}</span>' if ref else ''}
@@ -341,56 +360,162 @@ def render_deal_actions(o: Opportunity, key: str) -> None:
             st.rerun()
 
 
+def _fact_rows(o: Opportunity) -> str:
+    """The at-a-glance grid: only fields that actually have a value."""
+    rows = [
+        ("Reference", o.external_id),
+        ("Agency", o.agency),
+        ("Department", o.department),
+        ("County", COUNTY_LABELS.get(o.county, o.county)),
+        ("Solicitation", sol_label(o)),
+        # "Unknown" work type is an absence, not a fact worth a grid cell.
+        ("Work type", offer_label(o) if offer_key(o) != "unknown" else None),
+        ("Estimated value", o.budget),
+        ("Bids due", fmt_due(o)),
+        ("Questions due", _fmt_dt(o.questions_due)),
+        ("Posted", o.posted_date.isoformat() if o.posted_date else None),
+        ("Pre-bid meeting", o.pre_bid_meeting),
+        ("Bid opening", o.bid_opening),
+        ("Submit to", o.submittal_info),
+        ("Contact", o.contact),
+        ("Email", o.contact_email),
+        ("Phone", o.contact_phone),
+        ("Categories", ", ".join(c.replace("_", " ") for c in (o.categories or [])) or None),
+        ("Source", o.source_name),
+    ]
+    cells = [
+        f'<div class="fact"><div class="fact-label">{esc(label)}</div>'
+        f'<div class="fact-value">{esc(value)}</div></div>'
+        for label, value in rows
+        if value
+    ]
+    return f'<div class="fact-grid">{"".join(cells)}</div>'
+
+
+def _fmt_dt(value) -> Optional[str]:
+    return value.strftime("%b %d, %Y %H:%M") if value else None
+
+
 def render_summary_panel(o: Opportunity) -> None:
     ucss, ulabel = urgency_badge(o)
-    brief = ensure_brief(o)
-    due = fmt_due(o)
-    cats = ", ".join(c.replace("_", " ") for c in (o.categories or [])) or "—"
-    keywords = ", ".join(o.keywords[:8]) if o.keywords else "—"
+    score = o.detail_score
+
+    tags = [
+        f'<span class="ng-card-tag">{esc(sol_label(o))}</span>',
+        f'<span class="ng-card-tag">{esc(offer_label(o))}</span>',
+        f'<span class="ng-card-tag {ucss}">{esc(ulabel)}</span>',
+        f'<span class="ng-card-tag">{esc(STATUS_LABELS.get(o.status, o.status))}</span>',
+    ]
+    if o.external_id:
+        tags.append(f'<span class="ng-card-tag">{esc(o.external_id)}</span>')
 
     st.markdown(
         block(
             f"""
         <div class="summary-panel">
-          <div class="summary-eyebrow">Deal summary</div>
+          <div class="summary-head">
+            <div class="summary-eyebrow">Opportunity detail</div>
+            <div class="detail-meter" title="How much is known about this bid">
+              <span class="detail-meter-label">{score}% detail</span>
+              <span class="detail-meter-track">
+                <span class="detail-meter-fill" style="width:{score}%"></span>
+              </span>
+            </div>
+          </div>
           <h2>{esc(o.title)}</h2>
-          <div class="summary-tags">
-            <span class="ng-card-tag">{esc(sol_label(o))}</span>
-            <span class="ng-card-tag">{esc(offer_label(o))}</span>
-            <span class="ng-card-tag {ucss}">{esc(ulabel)}</span>
-            <span class="ng-card-tag">{esc(STATUS_LABELS.get(o.status, o.status))}</span>
-            {f'<span class="ng-card-tag">{esc(o.external_id)}</span>' if o.external_id else ''}
-          </div>
-          <div class="summary-block">
-            <div class="summary-label">Brief</div>
-            <div class="summary-text">{esc(brief)}</div>
-          </div>
-          <div class="summary-grid">
-            <div><div class="summary-label">Agency</div><div class="summary-text">{esc(o.agency)}</div></div>
-            <div><div class="summary-label">County</div><div class="summary-text">{esc(COUNTY_LABELS.get(o.county, o.county))}</div></div>
-            <div><div class="summary-label">Due</div><div class="summary-text">{esc(due)}</div></div>
-            <div><div class="summary-label">Posted</div><div class="summary-text">{esc(o.posted_date.isoformat() if o.posted_date else "—")}</div></div>
-            <div><div class="summary-label">Department</div><div class="summary-text">{esc(o.department or "—")}</div></div>
-            <div><div class="summary-label">Budget</div><div class="summary-text">{esc(o.budget or "—")}</div></div>
-            <div><div class="summary-label">Categories</div><div class="summary-text">{esc(cats)}</div></div>
-            <div><div class="summary-label">Keywords</div><div class="summary-text">{esc(keywords)}</div></div>
-            <div><div class="summary-label">Contact</div><div class="summary-text">{esc(o.contact or "—")}</div></div>
-            <div><div class="summary-label">Source</div><div class="summary-text">{esc(o.source_name)}</div></div>
-          </div>
+          <div class="summary-tags">{"".join(tags)}</div>
+          {_fact_rows(o)}
         </div>
         """
         ),
         unsafe_allow_html=True,
     )
+
+    if o.requirements:
+        chips = "".join(
+            f'<span class="req-chip">{esc(r)}</span>' for r in o.requirements
+        )
+        st.markdown(
+            block(
+                f"""
+            <div class="detail-section">
+              <div class="detail-section-title">Requirements to bid</div>
+              <div class="req-chips">{chips}</div>
+            </div>
+            """
+            ),
+            unsafe_allow_html=True,
+        )
+
+    if o.scope:
+        scope = " ".join(o.scope.split())
+        preview, rest = scope[:900], scope[900:]
+        st.markdown(
+            block(
+                f"""
+            <div class="detail-section">
+              <div class="detail-section-title">Scope of work</div>
+              <div class="scope-text">{esc(preview)}{'…' if rest else ''}</div>
+            </div>
+            """
+            ),
+            unsafe_allow_html=True,
+        )
+        if rest:
+            with st.expander(f"Read the full scope ({len(scope):,} characters)"):
+                st.write(scope)
+    elif o.description:
+        st.markdown(
+            block(
+                f"""
+            <div class="detail-section">
+              <div class="detail-section-title">Description</div>
+              <div class="scope-text">{esc(o.description)}</div>
+            </div>
+            """
+            ),
+            unsafe_allow_html=True,
+        )
+
+    if o.documents:
+        links = "".join(
+            f'<a class="doc-link {esc(d.kind)}" href="{esc(d.url)}" target="_blank" '
+            f'rel="noopener">{esc(d.name)}<span class="doc-kind">{esc(d.kind)}</span></a>'
+            for d in o.documents[:25]
+        )
+        more = (
+            f'<div class="doc-more">+ {len(o.documents) - 25} more on the portal</div>'
+            if len(o.documents) > 25
+            else ""
+        )
+        st.markdown(
+            block(
+                f"""
+            <div class="detail-section">
+              <div class="detail-section-title">Bid documents ({len(o.documents)})</div>
+              <div class="doc-list">{links}</div>
+              {more}
+            </div>
+            """
+            ),
+            unsafe_allow_html=True,
+        )
+
+    if not o.detail_fetched and o.status in {"open", "upcoming"}:
+        st.caption(
+            "This portal does not publish a machine-readable detail page — "
+            "open the official listing for the full package."
+        )
+
     a1, a2, a3 = st.columns(3)
     with a1:
         st.link_button("Open official portal ↗", o.url or "#", width="stretch", type="primary")
     with a2:
         subject = quote(f"Bid opportunity: {o.title[:80]}")
-        body = quote(f"{brief}\n\nPortal: {o.url}")
+        body = quote(f"{ensure_brief(o)}\n\nPortal: {o.url}")
         st.link_button("Share via email", f"mailto:?subject={subject}&body={body}", width="stretch")
     with a3:
-        if st.button("Close summary", width="stretch", key=f"close_{o.opportunity_id}"):
+        if st.button("Close detail", width="stretch", key=f"close_{o.opportunity_id}"):
             st.session_state.selected_id = None
             st.rerun()
 

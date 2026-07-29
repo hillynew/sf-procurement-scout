@@ -35,6 +35,18 @@ class OfferType(str, Enum):
     UNKNOWN = "unknown"
 
 
+class Document(BaseModel):
+    """A bid package file published alongside a solicitation."""
+
+    name: str
+    url: str
+    kind: str = "document"  # document | addendum | drawing | specification
+
+    @property
+    def is_addendum(self) -> bool:
+        return self.kind == "addendum"
+
+
 class Opportunity(BaseModel):
     """A single government procurement opportunity."""
 
@@ -67,6 +79,19 @@ class Opportunity(BaseModel):
     contact: Optional[str] = None
     budget: Optional[str] = None
 
+    # Detail — populated by a second pass against the solicitation's own page,
+    # since list pages carry almost nothing beyond a title and a date.
+    scope: Optional[str] = None  # full scope-of-work narrative
+    requirements: List[str] = Field(default_factory=list)  # bonding, licensing, insurance…
+    documents: List[Document] = Field(default_factory=list)
+    submittal_info: Optional[str] = None  # where/how to deliver a response
+    pre_bid_meeting: Optional[str] = None
+    questions_due: Optional[datetime] = None
+    contact_email: Optional[str] = None
+    contact_phone: Optional[str] = None
+    bid_opening: Optional[str] = None
+    detail_fetched: bool = False
+
     # Meta
     raw: Optional[dict] = None
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
@@ -87,6 +112,27 @@ class Opportunity(BaseModel):
             return None
         delta = self.due_date.date() - date.today()
         return delta.days
+
+    @computed_field
+    @property
+    def detail_score(self) -> int:
+        """How much is actually known about this bid, 0-100.
+
+        Surfaced in the UI so a listing with a full scope, documents and a
+        contact is visibly more actionable than a bare title and date.
+        """
+        weights = (
+            (bool(self.scope), 25),
+            (bool(self.documents), 20),
+            (bool(self.due_date), 15),
+            (bool(self.requirements), 10),
+            (bool(self.contact or self.contact_email), 10),
+            (bool(self.budget), 8),
+            (bool(self.description), 5),
+            (bool(self.external_id), 4),
+            (bool(self.submittal_info or self.pre_bid_meeting), 3),
+        )
+        return sum(points for present, points in weights if present)
 
     def to_row(self) -> dict:
         sol = (
@@ -117,8 +163,19 @@ class Opportunity(BaseModel):
             "brief": self.brief or "",
             "url": self.url,
             "contact": self.contact or "",
+            "contact_email": self.contact_email or "",
+            "contact_phone": self.contact_phone or "",
             "budget": self.budget or "",
             "department": self.department or "",
+            "requirements": "; ".join(self.requirements),
+            "documents": len(self.documents),
+            "document_urls": " | ".join(d.url for d in self.documents[:10]),
+            "pre_bid_meeting": self.pre_bid_meeting or "",
+            "questions_due": self.questions_due.isoformat() if self.questions_due else "",
+            "submittal_info": self.submittal_info or "",
+            "detail_score": self.detail_score,
+            # Scope last: it is long, and trailing columns keep a CSV readable.
+            "scope": (self.scope or "").replace("\n", " ")[:2000],
         }
 
 

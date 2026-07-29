@@ -13,6 +13,14 @@ from rich.table import Table
 
 from ..http_util import SourceBlocked
 from ..models.opportunity import HealthStatus, Opportunity, SourceHealth
+from ..requirements import (
+    extract_contact_email,
+    extract_contact_phone,
+    extract_estimated_value,
+    extract_pre_bid_meeting,
+    extract_questions_due,
+    extract_requirements,
+)
 from ..sources.base import SourceAdapter
 from ..sources.registry import get_adapters
 from ..summarize import apply_briefs
@@ -28,6 +36,11 @@ MAX_WORKERS = 12
 # An "open" listing with no published due date is only credible for so long;
 # some portals never retire their rows.
 STALE_OPEN_DAYS = 180
+
+# The detail pass costs one request per bid, so it is bounded and applies only
+# to listings someone could still act on.
+DETAIL_STATUSES = {"open", "upcoming"}
+MAX_DETAIL_FETCHES = 150
 
 
 def _normalize_status(opps: List[Opportunity]) -> None:
@@ -111,6 +124,75 @@ def _fetch_one(adapter: SourceAdapter) -> Tuple[List[Opportunity], SourceHealth]
         )
 
 
+def derive_fields(opps: List[Opportunity]) -> None:
+    """Mine structured facts from whatever prose each opportunity already has.
+
+    Portals that expose no detail page still put bonding, licensing and dollar
+    figures in the blurb they do publish, so every listing gets the same
+    treatment even when a second request was never possible.
+    """
+    for o in opps:
+        texts = [o.title, o.description, o.scope, o.submittal_info, o.contact]
+        for label in extract_requirements(*texts):
+            if label not in o.requirements:
+                o.requirements.append(label)
+        o.budget = o.budget or extract_estimated_value(*texts)
+        o.pre_bid_meeting = o.pre_bid_meeting or extract_pre_bid_meeting(*texts)
+        o.questions_due = o.questions_due or extract_questions_due(*texts)
+        o.contact_email = o.contact_email or extract_contact_email(*texts)
+        o.contact_phone = o.contact_phone or extract_contact_phone(*texts)
+
+
+def fetch_details(
+    opps: List[Opportunity],
+    adapters: List[SourceAdapter],
+    *,
+    max_workers: int = MAX_WORKERS,
+    limit: int = MAX_DETAIL_FETCHES,
+    quiet: bool = False,
+) -> int:
+    """Second pass: read each open bid's own page for scope, docs and terms.
+
+    List pages carry a title and a date; everything a bidder actually needs to
+    qualify the work — scope, bonding, documents, contacts — only exists on the
+    detail page. Failures are swallowed per-bid so one bad page cannot cost us
+    the listing we already have.
+    """
+    by_source = {a.source_id: a for a in adapters if a.supports_detail}
+    if not by_source:
+        return 0
+
+    targets = [
+        o
+        for o in opps
+        if o.source_id in by_source and o.status in DETAIL_STATUSES and not o.detail_fetched
+    ]
+    # Richest-first, so a truncated run still enriches the bids closest to due.
+    targets.sort(key=lambda o: (o.due_date or datetime.max))
+    targets = targets[:limit]
+    if not targets:
+        return 0
+
+    done = 0
+
+    def enrich_one(opp: Opportunity) -> bool:
+        try:
+            by_source[opp.source_id].fetch_detail(opp)
+            return opp.detail_fetched
+        except Exception:  # noqa: BLE001 — a detail page is a bonus, not a requirement
+            return False
+
+    with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(targets)))) as pool:
+        for ok in pool.map(enrich_one, targets):
+            done += bool(ok)
+
+    if not quiet:
+        console.print(
+            f"[cyan]detail[/cyan] enriched {done}/{len(targets)} open opportunities"
+        )
+    return done
+
+
 def run_fetch(
     *,
     only: Optional[List[str]] = None,
@@ -123,6 +205,8 @@ def run_fetch(
     query: Optional[str] = None,
     max_workers: int = MAX_WORKERS,
     quiet: bool = False,
+    with_details: bool = True,
+    detail_limit: int = MAX_DETAIL_FETCHES,
 ) -> Tuple[List[Opportunity], List[SourceHealth]]:
     adapters = get_adapters(
         only=only,
@@ -148,6 +232,13 @@ def run_fetch(
 
     _normalize_status(all_opps)
     all_opps = dedupe(all_opps)
+    # Detail runs after dedupe so we never spend a request on a row that is
+    # about to be merged away.
+    if with_details:
+        fetch_details(
+            all_opps, adapters, max_workers=max_workers, limit=detail_limit, quiet=quiet
+        )
+    derive_fields(all_opps)
     apply_briefs(all_opps)
     filtered = filter_opportunities(
         all_opps,
