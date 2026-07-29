@@ -18,3 +18,14 @@ services:
         value: "false"
       - key: STREAMLIT_SERVER_HEADLESS
         value: "true"
+      # Optional integrations, all inert until set. `sync: false` means Render
+      # prompts for a real value in its dashboard and never stores one here —
+      # never fill these in directly in this file. See AGENTS.md.
+      - key: SF_SCOUT_IMAP_HOST       # enables email bid alerts
+        sync: false
+      - key: SF_SCOUT_IMAP_USER
+        sync: false
+      - key: SF_SCOUT_IMAP_PASSWORD
+        sync: false
+      - key: SF_SCOUT_BONFIRE_COOKIE  # enables an authenticated Bonfire session
+        sync: false
