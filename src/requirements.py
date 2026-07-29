@@ -83,6 +83,41 @@ def extract_requirements(*texts: Optional[str]) -> List[str]:
     return [label for label, pattern in _COMPILED if pattern.search(blob)]
 
 
+def dedupe_requirements(labels: List[str]) -> List[str]:
+    """Collapse labels that say the same thing at different specificity.
+
+    Two extractors run over each bid: the prose scanner produces "Bid bond",
+    the package parser produces "Bid bond required". Showing both as separate
+    chips reads as two obligations when it is one, so the more specific label
+    absorbs the shorter one whose words it already contains.
+    """
+    kept: List[str] = []
+    for label in labels:
+        words = _words(label)
+        if not words:
+            continue
+        replaced = False
+        for i, existing in enumerate(kept):
+            other = _words(existing)
+            if words <= other:  # already covered by a more specific label
+                replaced = True
+                break
+            if other < words:  # this label is the more specific one
+                kept[i] = label
+                replaced = True
+                break
+        if not replaced:
+            kept.append(label)
+    return kept
+
+
+def _words(label: str) -> frozenset:
+    return frozenset(re.findall(r"[a-z0-9]+", label.lower())) - _STOPWORDS
+
+
+_STOPWORDS = frozenset({"required", "a", "the", "of", "and", "to"})
+
+
 def extract_estimated_value(*texts: Optional[str]) -> Optional[str]:
     """A contract value, preferring figures that carry an explicit qualifier."""
     blob = "\n".join(t for t in texts if t)

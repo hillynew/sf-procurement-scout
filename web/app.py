@@ -308,6 +308,8 @@ def card_html(o: Opportunity, selected: bool = False) -> str:
     facts = []
     if o.budget:
         facts.append(f'<span class="deal-fact value">💲 {esc(o.budget)}</span>')
+    if o.duration_days:
+        facts.append(f'<span class="deal-fact">⏱ {o.duration_days} days</span>')
     if o.documents:
         addenda = sum(1 for d in o.documents if d.kind == "addendum")
         label = f"{len(o.documents)} doc" + ("s" if len(o.documents) != 1 else "")
@@ -371,6 +373,10 @@ def _fact_rows(o: Opportunity) -> str:
         # "Unknown" work type is an absence, not a fact worth a grid cell.
         ("Work type", offer_label(o) if offer_key(o) != "unknown" else None),
         ("Estimated value", o.budget),
+        ("Project duration", f"{o.duration_days} calendar days" if o.duration_days else None),
+        ("Liquidated damages", o.liquidated_damages),
+        ("Licence required", o.licenses),
+        ("Location", o.project_location),
         ("Bids due", fmt_due(o)),
         ("Questions due", _fmt_dt(o.questions_due)),
         ("Posted", o.posted_date.isoformat() if o.posted_date else None),

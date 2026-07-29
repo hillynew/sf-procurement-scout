@@ -92,6 +92,13 @@ class Opportunity(BaseModel):
     bid_opening: Optional[str] = None
     detail_fetched: bool = False
 
+    # Commercial terms, which only ever appear inside the bid package PDF.
+    project_location: Optional[str] = None
+    duration_days: Optional[int] = None
+    liquidated_damages: Optional[str] = None
+    licenses: Optional[str] = None
+    package_parsed: bool = False
+
     # Meta
     raw: Optional[dict] = None
     fetched_at: datetime = Field(default_factory=datetime.utcnow)
@@ -122,15 +129,20 @@ class Opportunity(BaseModel):
         contact is visibly more actionable than a bare title and date.
         """
         weights = (
-            (bool(self.scope), 25),
-            (bool(self.documents), 20),
-            (bool(self.due_date), 15),
-            (bool(self.requirements), 10),
-            (bool(self.contact or self.contact_email), 10),
+            (bool(self.scope), 22),
+            (bool(self.documents), 16),
+            (bool(self.due_date), 13),
+            (bool(self.requirements), 9),
+            (bool(self.contact or self.contact_email), 8),
             (bool(self.budget), 8),
-            (bool(self.description), 5),
-            (bool(self.external_id), 4),
-            (bool(self.submittal_info or self.pre_bid_meeting), 3),
+            (bool(self.description), 4),
+            (bool(self.external_id), 3),
+            (bool(self.submittal_info or self.pre_bid_meeting), 2),
+            # Terms that only exist inside the bid package.
+            (bool(self.duration_days), 5),
+            (bool(self.liquidated_damages), 5),
+            (bool(self.licenses), 3),
+            (bool(self.project_location), 2),
         )
         return sum(points for present, points in weights if present)
 
@@ -171,6 +183,10 @@ class Opportunity(BaseModel):
             "documents": len(self.documents),
             "document_urls": " | ".join(d.url for d in self.documents[:10]),
             "pre_bid_meeting": self.pre_bid_meeting or "",
+            "project_location": self.project_location or "",
+            "duration_days": self.duration_days if self.duration_days is not None else "",
+            "liquidated_damages": self.liquidated_damages or "",
+            "licenses": self.licenses or "",
             "questions_due": self.questions_due.isoformat() if self.questions_due else "",
             "submittal_info": self.submittal_info or "",
             "detail_score": self.detail_score,

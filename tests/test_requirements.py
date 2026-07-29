@@ -161,3 +161,36 @@ def test_trailing_sentence_period_is_not_part_of_the_email():
 def test_missing_contacts_return_none():
     assert extract_contact_email("No contact listed.") is None
     assert extract_contact_phone("No contact listed.") is None
+
+
+# ---------------------------------------------------------------------------
+# Deduplication across the two extractors
+# ---------------------------------------------------------------------------
+
+
+def test_the_more_specific_label_wins():
+    """The prose scanner says 'Bid bond'; the package says 'Bid bond required'."""
+    from src.requirements import dedupe_requirements
+
+    assert dedupe_requirements(["Bid bond", "Bid bond required"]) == ["Bid bond"]
+    assert dedupe_requirements(["Bid bond required", "Bid bond"]) == ["Bid bond required"]
+
+
+def test_a_broader_label_absorbs_a_narrower_one():
+    from src.requirements import dedupe_requirements
+
+    got = dedupe_requirements(["Payment bond", "Performance & payment bond required"])
+    assert got == ["Performance & payment bond required"]
+
+
+def test_distinct_obligations_are_all_kept():
+    from src.requirements import dedupe_requirements
+
+    labels = ["Bid bond", "Living wage", "Mandatory pre-bid meeting", "E-Verify"]
+    assert dedupe_requirements(labels) == labels
+
+
+def test_dedupe_of_an_empty_list():
+    from src.requirements import dedupe_requirements
+
+    assert dedupe_requirements([]) == []
