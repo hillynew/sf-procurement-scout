@@ -260,6 +260,11 @@ def test_detail_score_rewards_richer_records(opp_factory):
         description="d",
         external_id="ITB-1",
         submittal_info="Deliver to the City Clerk",
+        # Terms that only come from the bid package.
+        duration_days=330,
+        liquidated_damages="$1,000 per day",
+        licenses="General Building Contractor",
+        project_location="Hialeah, FL",
     )
     assert rich.detail_score > bare.detail_score
     assert rich.detail_score == 100, "the weights should total 100 for a complete record"

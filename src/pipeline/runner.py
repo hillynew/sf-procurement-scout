@@ -13,6 +13,7 @@ from rich.table import Table
 
 from ..http_util import SourceBlocked
 from ..models.opportunity import HealthStatus, Opportunity, SourceHealth
+from ..pdf_extract import fetch_text, parse_facts
 from ..requirements import (
     extract_contact_email,
     extract_contact_phone,
@@ -20,6 +21,7 @@ from ..requirements import (
     extract_pre_bid_meeting,
     extract_questions_due,
     extract_requirements,
+    dedupe_requirements,
 )
 from ..sources.base import SourceAdapter
 from ..sources.registry import get_adapters
@@ -41,6 +43,10 @@ STALE_OPEN_DAYS = 180
 # to listings someone could still act on.
 DETAIL_STATUSES = {"open", "upcoming"}
 MAX_DETAIL_FETCHES = 150
+
+# Bid packages are megabytes each, so the PDF pass is capped harder than the
+# HTML one. Extracted text is cached on disk, so repeat refreshes are cheap.
+MAX_PACKAGE_PARSES = 60
 
 
 def _normalize_status(opps: List[Opportunity]) -> None:
@@ -141,6 +147,97 @@ def derive_fields(opps: List[Opportunity]) -> None:
         o.questions_due = o.questions_due or extract_questions_due(*texts)
         o.contact_email = o.contact_email or extract_contact_email(*texts)
         o.contact_phone = o.contact_phone or extract_contact_phone(*texts)
+        # Prose and package extractors overlap; show one chip per obligation.
+        o.requirements = dedupe_requirements(o.requirements)
+
+
+def _primary_package(opp: Opportunity) -> Optional[str]:
+    """The document most likely to be the solicitation itself.
+
+    Addenda amend a package rather than describe it, so they are ranked last;
+    a name matching the solicitation reference is ranked first.
+    """
+    pdfs = [d for d in opp.documents if d.url.lower().split("?")[0].endswith(".pdf")]
+    if not pdfs:
+        return None
+    ref = re.sub(r"[^a-z0-9]", "", (opp.external_id or "").lower())
+
+    def rank(doc) -> tuple:
+        name = re.sub(r"[^a-z0-9]", "", doc.name.lower())
+        return (
+            doc.kind == "addendum",
+            not (ref and len(ref) >= 5 and ref in name),
+        )
+
+    return sorted(pdfs, key=rank)[0].url
+
+
+def parse_packages(
+    opps: List[Opportunity],
+    *,
+    max_workers: int = MAX_WORKERS,
+    limit: int = MAX_PACKAGE_PARSES,
+    quiet: bool = False,
+) -> int:
+    """Read each bid package PDF for the commercial terms HTML never carries.
+
+    Estimated value, bond requirements, licence classes, project duration and
+    liquidated damages are stated in the package and nowhere else. One PDF per
+    opportunity, deduplicated by URL because several solicitations under one
+    framework contract share a package.
+    """
+    targets = [
+        o
+        for o in opps
+        if o.status in DETAIL_STATUSES and not o.package_parsed and _primary_package(o)
+    ]
+    targets.sort(key=lambda o: (o.due_date or datetime.max))
+    targets = targets[:limit]
+    if not targets:
+        return 0
+
+    # Several bids can share one package; parse it once and fan the facts out.
+    by_url: Dict[str, List[Opportunity]] = {}
+    for o in targets:
+        by_url.setdefault(_primary_package(o), []).append(o)
+
+    def read(url: str):
+        try:
+            return url, parse_facts(fetch_text(url))
+        except Exception:  # noqa: BLE001 — a bad package must not fail the run
+            return url, None
+
+    parsed = 0
+    with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(by_url)))) as pool:
+        for url, facts in pool.map(read, list(by_url)):
+            if facts is None or facts.is_empty():
+                continue
+            for opp in by_url[url]:
+                _apply_package_facts(opp, facts)
+                parsed += 1
+
+    if not quiet:
+        console.print(
+            f"[cyan]package[/cyan] read {len(by_url)} PDF(s), "
+            f"enriched {parsed} of {len(targets)} opportunities"
+        )
+    return parsed
+
+
+def _apply_package_facts(opp: Opportunity, facts) -> None:
+    """Package terms are authoritative — they come from the solicitation itself."""
+    if facts.estimated_value:
+        opp.budget = facts.estimated_value
+    opp.project_location = opp.project_location or facts.project_location
+    opp.duration_days = opp.duration_days or facts.duration_days
+    opp.liquidated_damages = opp.liquidated_damages or facts.liquidated_damages
+    opp.licenses = opp.licenses or facts.licenses
+    if facts.scope and len(facts.scope) > len(opp.scope or ""):
+        opp.scope = facts.scope
+    for label in facts.requirements:
+        if label not in opp.requirements:
+            opp.requirements.append(label)
+    opp.package_parsed = True
 
 
 def fetch_details(
@@ -207,6 +304,8 @@ def run_fetch(
     quiet: bool = False,
     with_details: bool = True,
     detail_limit: int = MAX_DETAIL_FETCHES,
+    with_packages: bool = True,
+    package_limit: int = MAX_PACKAGE_PARSES,
 ) -> Tuple[List[Opportunity], List[SourceHealth]]:
     adapters = get_adapters(
         only=only,
@@ -238,6 +337,11 @@ def run_fetch(
         fetch_details(
             all_opps, adapters, max_workers=max_workers, limit=detail_limit, quiet=quiet
         )
+        # Packages are discovered by the detail pass, so this must follow it.
+        if with_packages:
+            parse_packages(
+                all_opps, max_workers=max_workers, limit=package_limit, quiet=quiet
+            )
     derive_fields(all_opps)
     apply_briefs(all_opps)
     filtered = filter_opportunities(

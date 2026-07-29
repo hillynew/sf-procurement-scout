@@ -8,3 +8,4 @@ data/*.json
 data/*.csv
 !data/.gitkeep
 .streamlit/secrets.toml
+data/pdf_cache/

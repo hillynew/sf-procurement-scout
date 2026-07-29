@@ -26,8 +26,12 @@ decides on live:
 
 | Field | Source |
 |-------|--------|
-| **Scope of work** | Full narrative from the detail page — often several thousand words |
-| **Estimated value** | Dollar figures qualified by "not to exceed", "budget of", "estimated at"; a bare figure is only used above $25k so a plan fee is never mistaken for the contract |
+| **Scope of work** | Full narrative from the detail page or the bid package — often several thousand words |
+| **Estimated value** | The figure the agency states in its own package; failing that, dollar amounts qualified by "not to exceed" / "budget of" in the listing prose. A bare figure is only used above $25k, so a plan fee is never mistaken for the contract |
+| **Project duration** | Calendar days allowed for completion |
+| **Liquidated damages** | Daily penalty for late completion |
+| **Licence classes** | The primary and sub-contractor licences a bidder must hold |
+| **Project location** | Site address |
 | **Requirements to bid** | Bid/performance/payment bonds, insurance, licensing, prequalification, mandatory pre-bid meetings and site visits, E-Verify, SBE/MBE/DBE goals, local preference, prevailing wage, and more |
 | **Documents** | Every bid package file, with addenda tagged separately so changes stand out |
 | **Key dates** | Bid deadline, question deadline, pre-bid meeting, publication date |
@@ -38,10 +42,26 @@ Each record carries a **detail score** (0–100) summarising how much is known,
 shown as a meter in the UI so a fully-specified bid is visibly more actionable
 than a bare listing.
 
-The detail pass is bounded — it runs only for `open` and `upcoming` listings,
-soonest-due first, capped at 150 requests per refresh. Portals that expose no
-detail page (or block it) still get requirements and pricing mined from the
-blurb they do publish. Disable it with `run_fetch(with_details=False)`.
+### Where each field comes from
+
+Three passes, each cheaper to skip than the last:
+
+1. **Listing** — title, reference, dates from the portal's index page.
+2. **Detail page** — scope, documents, submittal terms and contacts.
+3. **Bid package PDF** — the commercial terms that appear nowhere else:
+   estimated value, bond requirements, licence classes, project duration and
+   liquidated damages. Miami-Dade's RPQ packages open with a labelled
+   "DETAILED BREAKDOWN" block that states all of them outright.
+
+Both extra passes are bounded and run only for `open` and `upcoming` listings,
+soonest-due first: 150 detail requests and 60 PDFs per refresh. Extracted PDF
+text is cached under `data/pdf_cache/`, and a package shared by several
+solicitations (common for framework contracts) is downloaded once. Portals
+that expose no detail page still get requirements and pricing mined from the
+blurb they do publish.
+
+Disable either pass with `run_fetch(with_details=False)` or
+`run_fetch(with_packages=False)`.
 
 ## Source health
 
@@ -219,6 +239,7 @@ src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-portal adapters
 src/classify.py         # categories + offer type
 src/requirements.py     # bid terms, pricing and deadlines from scope prose
+src/pdf_extract.py      # commercial terms from the bid package PDF
 src/dates.py            # shared date parsing (Eastern wall clock)
 src/http_util.py        # session, retries, blocked-portal detection
 src/summarize.py        # deal briefs
