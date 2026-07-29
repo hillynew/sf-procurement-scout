@@ -67,6 +67,17 @@ class MailboxNotConfigured(RuntimeError):
     """No IMAP settings in the environment."""
 
 
+def looks_like_a_bid_notice(subject: str) -> bool:
+    """Public wrapper so callers (the CLI mailbox check) share this rule
+    instead of re-implementing what counts as a bid subject.
+
+    Takes a raw header value — MIME-encoded subjects are decoded first, since
+    an encoded "=?utf-8?q?Bids...?=" would never match the plain-text pattern.
+    """
+    decoded = _decode(subject)
+    return bool(decoded) and bool(_BID_SUBJECT.search(decoded))
+
+
 class EmailAlertsAdapter(SourceAdapter):
     """Turns subscribed bid-notice emails into opportunities.
 

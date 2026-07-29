@@ -98,6 +98,47 @@ Subscribe a mailbox at each city's `/list.aspx?Mode=Subscribe#bids`, then copy
 opened **read-only** and nothing is deleted. Left unconfigured, the source
 reports `inactive` and changes nothing.
 
+Subscribing is a manual, per-city step — there is no API for it. Two CLI
+commands make it tractable:
+
+```bash
+python run.py subscribe-links   # every CivicPlus city's subscribe page, as a checklist
+python run.py check-mailbox     # confirms SF_SCOUT_IMAP_* actually works, no full fetch
+```
+
+## Authenticated Bonfire sessions
+
+Bonfire's public API only shows what is open to everyone. A signed-in vendor
+account additionally sees `getMyOpportunitiesSectionData` — solicitations this
+account was invited to or is following — which an anonymous scrape cannot see
+at all.
+
+If you have an account with a Bonfire agency, set the session cookie from a
+signed-in browser tab and the adapter merges those in automatically, tagged
+`personalized` with an `invited` category:
+
+```bash
+# .env — one account for every Bonfire agency:
+SF_SCOUT_BONFIRE_COOKIE=<the whole Cookie header from a signed-in session>
+
+# or scope one account to a single host, e.g. broward.bonfirehub.com:
+SF_SCOUT_BONFIRE_COOKIE_BROWARD=<cookie>
+
+python run.py auth-status   # shows which hosts have a session configured — never the cookie itself
+```
+
+Bonfire issues a session cookie rather than an API token, so this expires like
+any browser session. When it does, the source quietly falls back to the
+public list — never a fetch failure — and `auth-status` is the way to notice
+and re-paste a fresh one.
+
+The Euna Supplier Network (`vendor.bonfirehub.com`) additionally exposes a
+cross-agency API covering every Bonfire tenant at once, not just the ones
+configured here — but its API base is only injected into the page at deploy
+time from a signed-in browser session, and could not be confirmed without one.
+If you can capture it (browser dev tools, Network tab, while signed in), it
+would be a natural follow-up.
+
 ## Source health
 
 Scrapers break quietly — a portal changes its layout and the adapter returns
@@ -166,6 +207,9 @@ python run.py fetch --county broward -q "software"
 python run.py show
 python run.py health
 python run.py history
+python run.py auth-status
+python run.py check-mailbox
+python run.py subscribe-links
 python run.py list-sources
 
 # Web UI
@@ -277,6 +321,7 @@ src/classify.py         # categories + offer type
 src/requirements.py     # bid terms, pricing and deadlines from scope prose
 src/pdf_extract.py      # commercial terms from the bid package PDF
 src/pipeline/history.py # closed-solicitation archive + recurrence matching
+src/auth.py             # optional vendor-session credentials (env only)
 src/dates.py            # shared date parsing (Eastern wall clock)
 src/http_util.py        # session, retries, blocked-portal detection
 src/summarize.py        # deal briefs
