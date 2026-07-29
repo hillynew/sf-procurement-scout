@@ -25,6 +25,11 @@ class SourceAdapter(ABC):
     #: empty list. Set False when zero rows always means the parse broke.
     allows_empty: bool = True
 
+    #: Why this source returned nothing, when that is an expected state rather
+    #: than a fault — an optional integration nobody has switched on, say.
+    #: Reported as `empty`, so it never raises a false alarm in the UI.
+    empty_note: Optional[str] = None
+
     def __init__(self, cfg: Dict[str, Any]):
         self.cfg = cfg
         self.source_id = cfg["id"]
@@ -34,6 +39,7 @@ class SourceAdapter(ABC):
         self.portal_url = cfg["portal_url"]
         self.live_fetch = bool(cfg.get("live_fetch", True))
         self.degraded_reason = None
+        self.empty_note = None
 
     #: True when the adapter implements `fetch_detail`. List pages carry little
     #: more than a title and a date, so the detail pass is where scope,

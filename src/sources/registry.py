@@ -10,6 +10,7 @@ import yaml
 from .base import SourceAdapter
 from .bonfire import BonfireAdapter
 from .civicplus import CivicPlusAdapter
+from .email_alerts import EmailAlertsAdapter
 from .notice_links import NoticeLinksAdapter
 from .miami_dade_informs import MiamiDadeInformsAdapter
 from .miami_dade_construction import MiamiDadeConstructionAdapter, MiamiDadeFutureAdapter
@@ -28,6 +29,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "palm_beach_schools": PalmBeachSchoolsAdapter,
     "civicplus": CivicPlusAdapter,
     "notice_links": NoticeLinksAdapter,
+    "email_alerts": EmailAlertsAdapter,
     "catalog": CatalogAdapter,
 }
 

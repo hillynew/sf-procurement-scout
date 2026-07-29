@@ -19,6 +19,7 @@ class _FakeAdapter:
     name = "Fake Source"
     degraded_reason = None
     allows_empty = True
+    empty_note = None
 
 
 # ---------------------------------------------------------------------------
