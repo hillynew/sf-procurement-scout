@@ -160,12 +160,19 @@ surfaces it in the left menu and the **Source health** panel.
 
 ## Deploy on Render
 
+> Handing this to an AI agent (Claude Code, Cursor, Copilot, etc.) to deploy
+> or operate? See [`AGENTS.md`](AGENTS.md) — it has the step-by-step,
+> troubleshooting table, and the exact env var names, written for that.
+
 ### Option A — Blueprint (recommended)
 
 1. Push this repo to GitHub (already at `hillynew/sf-procurement-scout`).
 2. Open [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**.
 3. Connect the `sf-procurement-scout` repo.
-4. Render reads `render.yaml` and creates the web service.
+4. Render reads `render.yaml` and creates the web service. It also declares
+   the optional integration variables below with `sync: false`, so Render's
+   dashboard prompts for each one without ever storing a value in git — leave
+   them blank to keep those integrations inactive.
 5. After deploy, open the service URL and click **Fetch live data now**.
 
 ### Option B — Manual Web Service
