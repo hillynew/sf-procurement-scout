@@ -4,12 +4,11 @@ import { Search } from "lucide-react";
 import { useLoadDemo, useOpportunities } from "../api/hooks";
 import type { Opportunity } from "../api/types";
 import BidRow from "../components/BidRow";
+import FilterPanel, { ActiveFilterChips } from "../components/FilterPanel";
 import SortControl from "../components/SortControl";
-import { Button, EmptyState, FilterChip, Spinner } from "../components/ui";
-import { COUNTY_LABEL, OFFER_LABEL } from "../lib/format";
+import { Button, EmptyState, Spinner } from "../components/ui";
+import { applyFilters, parseFilters, writeFilters, type BidFilters } from "../lib/filters";
 import { BID_SORT_KEYS, sortOpportunities, useSortPref } from "../lib/sort";
-
-const STATUS_TABS = ["all", "open", "upcoming", "closed"] as const;
 
 function matchesQuery(o: Opportunity, q: string): boolean {
   const hay = [o.title, o.agency, o.external_id ?? "", o.brief ?? "",
@@ -23,17 +22,13 @@ export default function AllBids() {
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
   const searchRef = useRef<HTMLInputElement>(null);
-
-  const status = params.get("f") ?? "open";
-  const county = params.get("c") ?? "";
-  const otype = params.get("t") ?? "";
   const [sort, setSort] = useSortPref("bids", { key: "due", dir: "asc" });
 
-  const setParam = (key: string, value: string) => {
-    if (value) params.set(key, value);
-    else params.delete(key);
-    setParams(params, { replace: true });
-  };
+  // One filter object drives everything; state lives in the URL so views
+  // stay shareable and refresh-safe.
+  const filters = useMemo(() => parseFilters(params), [params]);
+  const setFilters = (next: BidFilters) =>
+    setParams(writeFilters(params, next), { replace: true });
 
   useEffect(() => {
     if (params.get("focus")) {
@@ -49,29 +44,18 @@ export default function AllBids() {
     [data],
   );
 
-  const counts = useMemo(() => {
+  const searched = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const pool = all
-      .filter((o) => !county || o.county === county)
-      .filter((o) => !otype || o.offer_type === otype)
-      .filter((o) => !q || matchesQuery(o, q));
-    return {
-      all: pool.length,
-      open: pool.filter((o) => o.status === "open").length,
-      upcoming: pool.filter((o) => o.status === "upcoming").length,
-      closed: pool.filter((o) => ["closed", "cancelled"].includes(o.status)).length,
-      pool,
-    };
-  }, [all, county, otype, query]);
+    return q ? all.filter((o) => matchesQuery(o, q)) : all;
+  }, [all, query]);
 
-  const visible = useMemo(() => {
-    let pool = counts.pool;
-    if (status === "open") pool = pool.filter((o) => o.status === "open");
-    else if (status === "upcoming") pool = pool.filter((o) => o.status === "upcoming");
-    else if (status === "closed")
-      pool = pool.filter((o) => ["closed", "cancelled"].includes(o.status));
-    return sortOpportunities(pool, sort.key, sort.dir);
-  }, [counts.pool, status, sort]);
+  const filtered = useMemo(() => applyFilters(searched, filters), [searched, filters]);
+  const visible = useMemo(
+    () => sortOpportunities(filtered, sort.key, sort.dir),
+    [filtered, sort],
+  );
+
+  const showStatus = filters.statuses.length !== 1 || filters.statuses[0] !== "open";
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
 
@@ -79,7 +63,7 @@ export default function AllBids() {
     return (
       <EmptyState
         title="No bids yet"
-        body="Fetch live data from ~40 South Florida portals, or load the sample data to explore."
+        body="Fetch live data from local, state, and federal portals, or load the sample data to explore."
         action={
           <Button onClick={() => demo.mutate()} disabled={demo.isPending}>
             {demo.isPending ? "Loading…" : "Load sample data"}
@@ -99,46 +83,31 @@ export default function AllBids() {
         <SortControl keys={BID_SORT_KEYS} pref={sort} onChange={setSort} />
       </div>
 
-      <div className="relative mb-3">
-        <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
-        <input
-          ref={searchRef}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search title, agency, reference, scope…"
-          className="w-full rounded-[10px] border border-line bg-surface py-2.5 pl-10 pr-4 text-sm outline-none transition-colors placeholder:text-ink-faint focus:border-accent"
-        />
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint" />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search title, agency, reference, scope…"
+            className="w-full rounded-[10px] border border-line bg-surface py-2.5 pl-10 pr-4 text-sm outline-none transition-colors placeholder:text-ink-faint focus:border-accent"
+          />
+        </div>
+        <FilterPanel filters={filters} onChange={setFilters} matchCount={filtered.length} />
       </div>
 
-      <div className="scrollbar-none mb-4 flex items-center gap-2 overflow-x-auto pb-1">
-        {STATUS_TABS.map((s) => (
-          <FilterChip key={s} active={status === s} onClick={() => setParam("f", s)}>
-            {s[0].toUpperCase() + s.slice(1)} {counts[s] > 0 && `· ${counts[s]}`}
-          </FilterChip>
-        ))}
-        <span className="mx-1 h-5 w-px shrink-0 bg-line" />
-        {Object.entries(COUNTY_LABEL).map(([key, label]) => (
-          <FilterChip key={key} active={county === key}
-                      onClick={() => setParam("c", county === key ? "" : key)}>
-            {label}
-          </FilterChip>
-        ))}
-        <span className="mx-1 h-5 w-px shrink-0 bg-line" />
-        {["construction", "services", "goods", "professional_services"].map((t) => (
-          <FilterChip key={t} active={otype === t}
-                      onClick={() => setParam("t", otype === t ? "" : t)}>
-            {OFFER_LABEL[t]}
-          </FilterChip>
-        ))}
+      <div className="mb-4 flex flex-wrap items-center gap-1.5 empty:mb-0">
+        <ActiveFilterChips filters={filters} onChange={setFilters} />
       </div>
 
       <div className="space-y-2">
         {visible.map((bid) => (
-          <BidRow key={bid.opportunity_id} bid={bid} showStatus={status === "all" || status === "closed"} />
+          <BidRow key={bid.opportunity_id} bid={bid} showStatus={showStatus} />
         ))}
         {visible.length === 0 && (
           <div className="py-16 text-center text-sm text-ink-faint">
-            Nothing matches — try clearing a filter.
+            Nothing matches — loosen a filter or clear the search.
           </div>
         )}
       </div>
