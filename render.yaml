@@ -1,8 +1,15 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
 # Deploy: Dashboard → New → Blueprint → connect this repo
 #
-# The service builds from the repo's Dockerfile (FastAPI + uvicorn). Render
-# injects $PORT; the Dockerfile's CMD honors it.
+# One web service (React SPA + FastAPI, built by the repo's Dockerfile) plus
+# a free Postgres database so tracked bids, notes, results, watchlists, and
+# snapshots survive restarts and deploys.
+
+databases:
+  - name: scout-db
+    plan: free
+    databaseName: scout
+    user: scout
 
 services:
   - type: web
@@ -14,9 +21,21 @@ services:
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: scout-db
+          property: connectionString
       # Optional integrations, all inert until set. `sync: false` means Render
       # prompts for a real value in its dashboard and never stores one here —
       # never fill these in directly in this file. See AGENTS.md.
+      - key: SF_SCOUT_ANTHROPIC_KEY   # enables AI deal briefs (Claude API)
+        sync: false
+      - key: RESEND_API_KEY           # enables email digests
+        sync: false
+      - key: SF_SCOUT_DIGEST_TO       # default digest recipient
+        sync: false
+      - key: SF_SCOUT_DIGEST_FROM     # digest sender, e.g. Scout <scout@yourdomain.com>
+        sync: false
       - key: SF_SCOUT_IMAP_HOST       # enables email bid alerts
         sync: false
       - key: SF_SCOUT_IMAP_USER

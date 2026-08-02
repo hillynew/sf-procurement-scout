@@ -113,7 +113,9 @@ def build_stats(opps: List[Opportunity], workflow: Dict[str, dict]) -> dict:
         if wf["archived"] or wf["stage"] == "result":
             continue
         opp = by_id.get(oid)
-        if opp is None or opp.days_until_due is None:
+        # Past-due bids aren't actionable — the pipeline's Result column is
+        # where those get resolved.
+        if opp is None or opp.days_until_due is None or opp.days_until_due < 0:
             continue
         unmet = [r for i, r in enumerate(opp.requirements)
                  if not (wf["checks"] or {}).get(str(i))]
