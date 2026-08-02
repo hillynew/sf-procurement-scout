@@ -513,7 +513,7 @@ nav_badges = {
 def track_btn(oid: str, **keep) -> str:
     on = oid in state["tracked"]
     return (
-        f'<a class="sc-btn sc-btn-track {"on" if on else ""}" '
+        f'<a target="_self" class="sc-btn sc-btn-track {"on" if on else ""}" '
         f'href="{href(act="track", id=oid, **keep)}">'
         f'{"TRACKING ✓" if on else "TRACK"}</a>'
     )
@@ -530,7 +530,7 @@ def empty_state(title: str, note: str = "") -> str:
         <div class="sc-empty">
           <div class="sc-empty-title">{esc(title)}</div>
           <div class="sc-empty-sub">{note or 'Click <b>FETCH LIVE DATA</b> in the sidebar (30–90s across all portals)'}
-          <br>or <a href="{demo}">load sample data</a> to explore the screens.</div>
+          <br>or <a target="_self" href="{demo}">load sample data</a> to explore the screens.</div>
         </div>
         """
     )
@@ -548,7 +548,7 @@ def today_row(o: Opportunity, closing: bool) -> str:
     return block(
         f"""
         <div class="sc-row {'closing' if closing else ''}">
-          <a class="sc-row-link" href="{href(screen='today', drawer=oid)}" aria-label="{esc(o.title)}"></a>
+          <a target="_self" class="sc-row-link" href="{href(screen='today', drawer=oid)}" aria-label="{esc(o.title)}"></a>
           {slot}
           <div class="sc-row-body">
             <div class="sc-row-title">{esc(o.title)}</div>
@@ -556,7 +556,7 @@ def today_row(o: Opportunity, closing: bool) -> str:
           </div>
           <div class="sc-row-actions">
             {track_btn(oid, screen='today')}
-            <a class="sc-btn sc-btn-skip" href="{href(act='skip', id=oid, screen='today')}">SKIP</a>
+            <a target="_self" class="sc-btn sc-btn-skip" href="{href(act='skip', id=oid, screen='today')}">SKIP</a>
           </div>
         </div>
         """
@@ -608,7 +608,7 @@ def today_html() -> str:
             f"""
             <div class="sc-today-foot">
               <span>click a row for detail · TRACK to add it to your pipeline</span>
-              <a class="sc-undo-link" href="{href(act='undoskips', screen='today')}">{esc(skip_note)}</a>
+              <a target="_self" class="sc-undo-link" href="{href(act='undoskips', screen='today')}">{esc(skip_note)}</a>
             </div>
             """
         )
@@ -650,8 +650,8 @@ def kanban_card(oid: str, stage: str) -> str:
         else:
             subs.append(
                 '<div class="sc-card-sub sc-outcome">record result: '
-                f'<a class="sc-outcome-btn won" href="{href(act="result", id=oid, val="won", screen="pipeline")}">WON</a> '
-                f'<a class="sc-outcome-btn" href="{href(act="result", id=oid, val="lost", screen="pipeline")}">LOST</a>'
+                f'<a target="_self" class="sc-outcome-btn won" href="{href(act="result", id=oid, val="won", screen="pipeline")}">WON</a> '
+                f'<a target="_self" class="sc-outcome-btn" href="{href(act="result", id=oid, val="lost", screen="pipeline")}">LOST</a>'
                 "</div>"
             )
     if not subs:
@@ -670,19 +670,19 @@ def kanban_card(oid: str, stage: str) -> str:
     if idx > 0:
         prev_label = STAGE_LABELS[us.STAGES[idx - 1]].title()
         moves.append(
-            f'<a class="sc-move" href="{href(act="stage", id=oid, to="prev", screen="pipeline")}"'
+            f'<a target="_self" class="sc-move" href="{href(act="stage", id=oid, to="prev", screen="pipeline")}"'
             f' title="Move to {esc(prev_label)}">‹</a>'
         )
     if idx < len(us.STAGES) - 1:
         next_label = STAGE_LABELS[us.STAGES[idx + 1]].title()
         moves.append(
-            f'<a class="sc-move" href="{href(act="stage", id=oid, to="next", screen="pipeline")}"'
+            f'<a target="_self" class="sc-move" href="{href(act="stage", id=oid, to="next", screen="pipeline")}"'
             f' title="Move to {esc(next_label)}">›</a>'
         )
     return block(
         f"""
         <div class="sc-card {cls}">
-          <a class="sc-row-link" href="{target}" aria-label="{esc(o.title)}"></a>
+          <a target="_self" class="sc-row-link" href="{target}" aria-label="{esc(o.title)}"></a>
           <div class="sc-card-moves">{''.join(moves)}</div>
           <div class="sc-card-title">{esc(o.title)}</div>
           {''.join(subs)}
@@ -709,7 +709,7 @@ def pipeline_html() -> str:
     if not tracked_ids:
         return head + empty_state(
             "Nothing tracked yet",
-            "Hit <b>TRACK</b> on any bid in <a href='?screen=today'>Today</a> to start a pipeline",
+            "Hit <b>TRACK</b> on any bid in <a target='_self' href='?screen=today'>Today</a> to start a pipeline",
         )
 
     events = []
@@ -778,7 +778,7 @@ def workroom_html() -> str:
             '<div class="sc-head workroom"><div class="sc-head-title">Bid workroom</div></div>'
             + empty_state(
                 "No bid on the bench",
-                "Track a bid in <a href='?screen=today'>Today</a>, then open it from its"
+                "Track a bid in <a target='_self' href='?screen=today'>Today</a>, then open it from its"
                 " drawer or the pipeline",
             )
         )
@@ -808,7 +808,7 @@ def workroom_html() -> str:
         if stage in next_steps:
             to, label = next_steps[stage]
             stage_html += (
-                f'<div><a class="sc-stage-next" '
+                f'<div><a target="_self" class="sc-stage-next" '
                 f'href="{href(act="stage", id=oid, to=to, screen="workroom", bid=oid)}">'
                 f"{label}</a></div>"
             )
@@ -823,7 +823,7 @@ def workroom_html() -> str:
         f"""
         <div class="sc-head workroom">
           <div>
-            <a class="sc-crumb" href="{href(screen='pipeline')}">{esc(crumb_txt)}</a>
+            <a target="_self" class="sc-crumb" href="{href(screen='pipeline')}">{esc(crumb_txt)}</a>
             <div class="sc-wr-title">{esc(o.title)}</div>
             <div class="sc-wr-meta">{esc(' · '.join(meta_bits))}</div>
           </div>
@@ -849,7 +849,7 @@ def workroom_html() -> str:
             f"""
             <div class="sc-banner {'nogo' if dec == 'nogo' else ''}">
               <span class="sc-banner-text">{esc(text)}</span>
-              <a class="sc-undo-link" href="{href(act='cleardec', id=oid, screen='workroom', bid=oid)}">undo</a>
+              <a target="_self" class="sc-undo-link" href="{href(act='cleardec', id=oid, screen='workroom', bid=oid)}">undo</a>
             </div>
             """
         )
@@ -868,7 +868,7 @@ def workroom_html() -> str:
                 else f"full text, {len(scope_text):,} characters — expand ▾"
             )
             toggle = (
-                f'<a class="sc-scope-toggle" href="'
+                f'<a target="_self" class="sc-scope-toggle" href="'
                 f'{href(screen="workroom", bid=oid, scope=None if scope_open else "1")}'
                 f'">{toggle_label}</a>'
             )
@@ -890,7 +890,7 @@ def workroom_html() -> str:
             rows.append(
                 block(
                     f"""
-                    <a class="sc-check" href="{href(act='check', id=oid, i=i, screen='workroom', bid=oid)}">
+                    <a target="_self" class="sc-check" href="{href(act='check', id=oid, i=i, screen='workroom', bid=oid)}">
                       <span class="sc-checkbox {'on' if done else ''}">{'✓' if done else ''}</span>
                       <span class="sc-check-label {'done' if done else ''}">{esc(req)}</span>
                       <span class="sc-check-note {'urgent' if urgent else ''}">{note}</span>
@@ -998,9 +998,9 @@ def workroom_html() -> str:
         <div class="sc-gonogo">
           {meter_html}
           <div class="sc-gonogo-btns">
-            <a class="sc-btn-go {'chosen' if dec == 'go' else ''}"
+            <a target="_self" class="sc-btn-go {'chosen' if dec == 'go' else ''}"
                href="{href(act='go', id=oid, screen='workroom', bid=oid)}">GO — BID IT</a>
-            <a class="sc-btn-nogo {'chosen' if dec == 'nogo' else ''}"
+            <a target="_self" class="sc-btn-nogo {'chosen' if dec == 'nogo' else ''}"
                href="{href(act='nogo', id=oid, screen='workroom', bid=oid)}">NO-GO</a>
           </div>
         </div>
@@ -1035,7 +1035,7 @@ def watchlists_html() -> str:
         f"""
         <div class="sc-head">
           <div class="sc-head-title">Watchlists</div>
-          <a class="sc-btn sc-btn-ink" style="padding:5px 12px"
+          <a target="_self" class="sc-btn sc-btn-ink" style="padding:5px 12px"
              href="{href(act='savewl', screen='watchlists')}">+ NEW WATCHLIST</a>
         </div>
         """
@@ -1060,7 +1060,7 @@ def watchlists_html() -> str:
             block(
                 f"""
                 <div class="sc-wl-card {'active' if active else ''}">
-                  <a class="sc-row-link" href="{href(act='selwl', wl=wl['id'], screen='watchlists')}"></a>
+                  <a target="_self" class="sc-row-link" href="{href(act='selwl', wl=wl['id'], screen='watchlists')}"></a>
                   <div class="sc-wl-head">
                     <span class="sc-wl-name">{esc(wl['name'])}</span>
                     <span class="sc-wl-new {'zero' if not n_new else ''}">{f'{n_new} NEW' if n_new else '0 new'}</span>
@@ -1075,7 +1075,7 @@ def watchlists_html() -> str:
     for key, label in CHIP_DEFS:
         on = state["builder_chips"].get(key, False)
         chips.append(
-            f'<a class="sc-chip {"on" if on else ""}" '
+            f'<a target="_self" class="sc-chip {"on" if on else ""}" '
             f'href="{href(act="chip", id=key, screen="watchlists")}">{esc(label)}</a>'
         )
     n_chips = sum(1 for k, _ in CHIP_DEFS if state["builder_chips"].get(k))
@@ -1085,7 +1085,7 @@ def watchlists_html() -> str:
           <div class="sc-label">BUILD FROM CHIPS</div>
           <div class="sc-chips">{''.join(chips)}</div>
           <div class="sc-builder-note">{n_chips} filters selected ·
-            <a class="sc-builder-save" href="{href(act='savewl', screen='watchlists')}">save as watchlist</a></div>
+            <a target="_self" class="sc-builder-save" href="{href(act='savewl', screen='watchlists')}">save as watchlist</a></div>
         </div>
         """
     )
@@ -1103,7 +1103,7 @@ def watchlists_html() -> str:
                 block(
                     f"""
                     <div class="sc-match {'new' if is_new else ''}">
-                      <a class="sc-row-link" href="{href(screen='watchlists', drawer=oid)}"></a>
+                      <a target="_self" class="sc-row-link" href="{href(screen='watchlists', drawer=oid)}"></a>
                       <div class="sc-match-body">
                         <div class="sc-match-title">{esc(o.title)}{tag}</div>
                         <div class="sc-match-meta">{esc(meta_line(o, with_due=True))}</div>
@@ -1201,12 +1201,12 @@ def sources_html() -> str:
         )
     if len(health) > limit:
         src_rows.append(
-            f'<a class="sc-src-more" href="{href(screen="sources", allsrc="1")}">'
+            f'<a target="_self" class="sc-src-more" href="{href(screen="sources", allsrc="1")}">'
             f"… {len(health) - limit} more ▾</a>"
         )
     elif all_sources_open and len(health) > 8:
         src_rows.append(
-            f'<a class="sc-src-more" href="{href(screen="sources")}">collapse ▴</a>'
+            f'<a target="_self" class="sc-src-more" href="{href(screen="sources")}">collapse ▴</a>'
         )
     left = (
         "".join(attn_html)
@@ -1224,8 +1224,8 @@ def sources_html() -> str:
             continue
         queued = name in queued_names
         btn = (
-            '<a class="sc-add queued">QUEUED ✓</a>' if queued
-            else f'<a class="sc-add" href="{href(act="addsrc", name=name, screen="sources")}">+ ADD</a>'
+            '<a target="_self" class="sc-add queued">QUEUED ✓</a>' if queued
+            else f'<a target="_self" class="sc-add" href="{href(act="addsrc", name=name, screen="sources")}">+ ADD</a>'
         )
         gap_rows.append(f'<div class="sc-gap"><span>{esc(name)}</span>{btn}</div>')
 
@@ -1363,7 +1363,7 @@ def drawer_html(o: Opportunity) -> str:
     workroom_btn = ""
     if oid in state["tracked"]:
         workroom_btn = (
-            f'<a class="sc-btn sc-btn-primary" href="{href(screen="workroom", bid=oid)}">'
+            f'<a target="_self" class="sc-btn sc-btn-primary" href="{href(screen="workroom", bid=oid)}">'
             "OPEN WORKROOM →</a>"
         )
     portal_btn = (
@@ -1379,11 +1379,11 @@ def drawer_html(o: Opportunity) -> str:
 
     return block(
         f"""
-        <a class="sc-overlay" href="{href(**keep)}" aria-label="Close"></a>
+        <a target="_self" class="sc-overlay" href="{href(**keep)}" aria-label="Close"></a>
         <div class="sc-drawer">
           <div class="sc-drawer-top">
             <span class="sc-drawer-ref">{esc(o.external_id or o.source_name)}</span>
-            <a class="sc-x" href="{href(**keep)}">✕</a>
+            <a target="_self" class="sc-x" href="{href(**keep)}">✕</a>
           </div>
           <div class="sc-drawer-title">{esc(o.title)}</div>
           <div class="sc-drawer-meta">{esc(' · '.join(meta_bits))}</div>
@@ -1416,7 +1416,7 @@ def sidebar_html() -> str:
         badge = nav_badges.get(key)
         badge_html = f'<span class="sc-nav-badge">{badge}</span>' if badge else ""
         nav.append(
-            f'<a class="sc-nav-item {"active" if key == screen else ""}" '
+            f'<a target="_self" class="sc-nav-item {"active" if key == screen else ""}" '
             f'href="{href(screen=key)}"><span class="sc-nav-label">{esc(label)}</span>'
             f"{badge_html}</a>"
         )
@@ -1439,7 +1439,7 @@ def sidebar_html() -> str:
             <div class="sc-brand-name">SF Procurement Scout</div>
             <div class="sc-brand-sub">SOUTH FLORIDA BIDS</div>
           </div>
-          <a class="sc-fetch {fetch_cls}" href="{href(act='fetch', screen=screen)}">{fetch_label}</a>
+          <a target="_self" class="sc-fetch {fetch_cls}" href="{href(act='fetch', screen=screen)}">{fetch_label}</a>
           <div class="sc-side-label">SCREENS</div>
           <div class="sc-nav">{''.join(nav)}</div>
           <div class="sc-side-foot">
