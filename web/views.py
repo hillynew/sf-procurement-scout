@@ -1,6 +1,6 @@
 """Scout Classic rendering — pure functions from data to HTML.
 
-Every screen (Today · All bids · My Pipeline · Bid Workroom · Watchlists ·
+Every screen (Calendar · All bids · My Pipeline · Bid Workroom · Watchlists ·
 Sources) plus the detail drawer, rendered as classic-styled server-side HTML
 (tokens in web/styles.css). No framework templates: the design handoff was
 authored in HTML, so HTML-in-Python keeps it pixel-faithful and diffable.
@@ -31,12 +31,38 @@ COUNTY_LABELS = {
 }
 
 SCREENS = [
-    ("today", "Today"),
+    ("calendar", "Calendar"),
     ("all", "All bids"),
     ("pipeline", "My pipeline"),
     ("workroom", "Bid workroom"),
     ("watchlists", "Watchlists"),
     ("sources", "Sources"),
+]
+
+# Shared toolbar filters (county + work type) and sort orders.
+TYPE_FILTERS = [
+    ("construction", "CONSTRUCTION"),
+    ("services", "SERVICES"),
+    ("professional_services", "PROF. SERVICES"),
+    ("goods", "GOODS"),
+]
+SORT_OPTIONS = [
+    ("due", "DUE SOONEST"),
+    ("new", "NEWEST POSTED"),
+    ("value", "HIGHEST VALUE"),
+    ("title", "TITLE A–Z"),
+]
+SOURCE_SORTS = [
+    ("name", "NAME"),
+    ("deals", "MOST DEALS"),
+    ("speed", "FASTEST"),
+]
+SOURCE_STATUS_FILTERS = [
+    ("", "ALL"),
+    ("ok", "OK"),
+    ("empty", "NO LISTINGS"),
+    ("degraded", "DEGRADED"),
+    ("error", "ERROR"),
 ]
 
 STAGE_LABELS = {
@@ -191,13 +217,17 @@ def _status(h: SourceHealth) -> str:
 class ViewParams:
     """Everything the URL says about what to show."""
 
-    screen: str = "today"
+    screen: str = "calendar"
     drawer: Optional[str] = None
     bid: Optional[str] = None
     scope_open: bool = False
     all_sources: bool = False
     query: str = ""          # All-bids search
-    status: str = ""         # All-bids status filter
+    status: str = ""         # status filter (bid status; source status on Sources)
+    county: str = ""         # toolbar filter: miami-dade | broward | palm-beach
+    otype: str = ""          # toolbar filter: work type
+    sort: str = ""           # toolbar sort key (per-screen default when empty)
+    cal: str = ""            # calendar month, YYYY-MM
     fetched_now: bool = False
     fetch_count: int = 0
     detect_status: Optional[str] = None  # "ok" | "fail"
@@ -218,7 +248,7 @@ class Page:
 
     def __post_init__(self) -> None:
         if self.p.screen not in dict(SCREENS):
-            self.p.screen = "today"
+            self.p.screen = "calendar"
         self.by_id: Dict[str, Opportunity] = {o.opportunity_id: o for o in self.opps}
         self.open_opps = [o for o in self.opps if o.status in ("open", "upcoming")]
 
@@ -230,19 +260,10 @@ class Page:
         except ValueError:
             self.baseline_date = date.today() - timedelta(days=1)
 
-        skipped = self.state["skipped"]
-        self.closing_rows = by_due(
+        self.closing_soon = [
             o for o in self.open_opps
             if o.days_until_due is not None and 0 <= o.days_until_due <= 3
-            and o.opportunity_id not in skipped
-        )[:8]
-        closing_ids = {o.opportunity_id for o in self.closing_rows}
-        self.fresh_rows = by_due(
-            o for o in self.open_opps
-            if o.posted_date and o.posted_date >= self.baseline_date
-            and o.opportunity_id not in closing_ids
-            and o.opportunity_id not in skipped
-        )[:10]
+        ]
 
         self.tracked_ids = [i for i in self.state["tracked"] if i in self.by_id]
         self.active_tracked = [
@@ -266,7 +287,7 @@ class Page:
 
         wl_new_total = sum(len(new) for _, _, new in self._wl)
         self.nav_badges = {
-            "today": len(self.closing_rows) + len(self.fresh_rows) or None,
+            "calendar": len(self.closing_soon) or None,
             "all": len(self.opps) or None,
             "pipeline": len(self.tracked_ids) or None,
             "workroom": None,
@@ -352,6 +373,72 @@ class Page:
 
     # -- shared fragments ---------------------------------------------------
 
+    def keep(self, **over) -> Dict[str, str]:
+        """The current view's URL params, so links preserve filters and sort."""
+        base = {
+            "screen": self.p.screen,
+            "q": self.p.query or None,
+            "f": self.p.status or None,
+            "c": self.p.county or None,
+            "t": self.p.otype or None,
+            "sort": self.p.sort or None,
+            "cal": self.p.cal or None,
+            "bid": self.p.bid,
+            "allsrc": "1" if self.p.all_sources else None,
+        }
+        base.update(over)
+        return {k: v for k, v in base.items() if v}
+
+    def filter_opps(self, pool) -> List[Opportunity]:
+        out = list(pool)
+        if self.p.county:
+            out = [o for o in out if o.county == self.p.county]
+        if self.p.otype:
+            out = [o for o in out if offer_key(o) == self.p.otype]
+        return out
+
+    def sort_opps(self, pool, default: str = "due") -> List[Opportunity]:
+        s = self.p.sort or default
+        if s == "new":
+            return sorted(
+                pool,
+                key=lambda o: (o.posted_date or date.min, o.title.lower()),
+                reverse=True,
+            )
+        if s == "value":
+            return sorted(
+                pool,
+                key=lambda o: (-(budget_amount(o) or -1), o.title.lower()),
+            )
+        if s == "title":
+            return sorted(pool, key=lambda o: o.title.lower())
+        return by_due(pool)
+
+    def toolbar(self, *, sort: bool = True) -> str:
+        """County / work-type filter chips + sort chips, as one classic row."""
+        def chip(label: str, on: bool, **over) -> str:
+            return (
+                f'<a class="sc-chip {"on" if on else ""}" '
+                f'href="{href(**self.keep(drawer=None, **over))}">{esc(label)}</a>'
+            )
+
+        parts = ['<div class="sc-toolbar">']
+        parts.append('<span class="sc-toolbar-label">COUNTY</span>')
+        parts.append(chip("ALL", not self.p.county, c=None))
+        for key, label in COUNTY_LABELS.items():
+            parts.append(chip(label.upper(), self.p.county == key, c=key))
+        parts.append('<span class="sc-toolbar-label">TYPE</span>')
+        parts.append(chip("ALL", not self.p.otype, t=None))
+        for key, label in TYPE_FILTERS:
+            parts.append(chip(label, self.p.otype == key, t=key))
+        if sort:
+            parts.append('<span class="sc-toolbar-label">SORT</span>')
+            current = self.p.sort or "due"
+            for key, label in SORT_OPTIONS:
+                parts.append(chip(label, current == key, sort=key if key != "due" else None))
+        parts.append("</div>")
+        return "".join(parts)
+
     def scan_note(self) -> str:
         ts = self.snapshot_time
         if not ts:
@@ -379,79 +466,93 @@ class Page:
             " to explore the screens.</div></div>"
         )
 
-    # -- Today --------------------------------------------------------------
+    # -- Calendar -----------------------------------------------------------
 
-    def today_row(self, o: Opportunity, closing: bool) -> str:
-        oid = o.opportunity_id
-        if closing:
-            slot = (
-                f'<div class="sc-slot"><div class="sc-days">{o.days_until_due}d</div>'
-                f'<div class="sc-slot-date">{esc(mon_day(o.due_date.date()))}</div></div>'
-            )
-        else:
-            slot = '<div class="sc-slot"><span class="sc-new-dot"></span></div>'
-        return f"""
-        <div class="sc-row {'closing' if closing else ''}">
-          <a class="sc-row-link" href="{href(screen='today', drawer=oid)}" aria-label="{esc(o.title)}"></a>
-          {slot}
-          <div class="sc-row-body">
-            <div class="sc-row-title">{esc(o.title)}</div>
-            <div class="sc-row-meta">{esc(meta_line(o, with_due=not closing))}</div>
-          </div>
-          <div class="sc-row-actions">
-            {self.track_btn(oid, screen='today')}
-            <a class="sc-btn sc-btn-skip" href="{href(act='skip', id=oid, screen='today')}">SKIP</a>
-          </div>
-        </div>"""
+    def _cal_month(self):
+        try:
+            year, month = str(self.p.cal).split("-")
+            return int(year), int(month)
+        except (ValueError, AttributeError):
+            today = date.today()
+            return today.year, today.month
 
-    def today_html(self) -> str:
-        today_str = date.today().strftime("%A, %B ") + str(date.today().day)
+    def calendar_html(self) -> str:
+        year, month = self._cal_month()
+        first = date(year, month, 1)
+        # Sunday-start grid, 6 weeks.
+        grid_start = first - timedelta(days=(first.weekday() + 1) % 7)
+        days = [grid_start + timedelta(days=i) for i in range(42)]
+
+        pool = self.filter_opps(self.opps)
+        by_day: Dict[date, List[Opportunity]] = {}
+        for o in pool:
+            if o.due_date:
+                by_day.setdefault(o.due_date.date(), []).append(o)
+
+        month_n = sum(len(v) for d, v in by_day.items() if d.month == month and d.year == year)
+        prev_m = (first - timedelta(days=1)).replace(day=1)
+        next_m = (first + timedelta(days=31)).replace(day=1)
+        nav = (
+            f'<a class="sc-chip" href="{href(**self.keep(cal=f"{prev_m.year}-{prev_m.month:02d}"))}">‹ {prev_m.strftime("%b").upper()}</a>'
+            f'<span class="sc-cal-month">{first.strftime("%B %Y").upper()}</span>'
+            f'<a class="sc-chip" href="{href(**self.keep(cal=f"{next_m.year}-{next_m.month:02d}"))}">{next_m.strftime("%b").upper()} ›</a>'
+            f'<a class="sc-chip" href="{href(**self.keep(cal=None))}">TODAY</a>'
+        )
         head = f"""
         <div class="sc-head">
           <div>
-            <div class="sc-head-title">Today</div>
-            <div class="sc-head-sub">{esc(today_str)} · last scan {esc(self.scan_note())}</div>
+            <div class="sc-head-title">Calendar</div>
+            <div class="sc-head-sub">{month_n} bids due in {esc(first.strftime("%B %Y"))} · last scan {esc(self.scan_note())}</div>
           </div>
-          <div class="sc-head-chips">
-            <span class="sc-chip-outline">{len(self.fresh_rows)} NEW</span>
-            <span class="sc-chip-outline crimson">{len(self.closing_rows)} CLOSING SOON</span>
-          </div>
+          <div class="sc-cal-nav">{nav}</div>
         </div>"""
         if not self.opps:
             return head + self.empty_state("No opportunities loaded")
 
-        parts = [head]
-        if self.closing_rows:
-            parts.append('<div class="sc-label crimson">CLOSING WITHIN 3 DAYS</div>')
-            parts.append(
-                '<div class="sc-rows">'
-                + "".join(self.today_row(o, True) for o in self.closing_rows)
-                + "</div>"
-            )
-        parts.append('<div class="sc-label navy">NEW SINCE LAST VISIT</div>')
-        if self.fresh_rows:
-            parts.append(
-                '<div class="sc-rows last">'
-                + "".join(self.today_row(o, False) for o in self.fresh_rows)
-                + "</div>"
-            )
-        else:
-            parts.append(
-                '<div class="sc-rows last"><div class="sc-row"><div class="sc-row-body">'
-                '<div class="sc-row-meta">nothing new since your last visit — '
-                f'<a href="{href(screen="all")}">browse all {len(self.opps)} bids</a>'
-                "</div></div></div></div>"
-            )
-        skipped_n = len(self.state["skipped"])
-        skip_note = (
-            f"{skipped_n} skipped this session — undo" if skipped_n else "nothing skipped yet"
+        weekday_row = "".join(
+            f'<div class="sc-cal-weekday">{w}</div>'
+            for w in ("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT")
         )
-        parts.append(f"""
-        <div class="sc-today-foot">
-          <span>click a row for detail · <a href="{href(screen='all')}">all bids &amp; dates →</a></span>
-          <a class="sc-undo-link" href="{href(act='undoskips', screen='today')}">{esc(skip_note)}</a>
-        </div>""")
-        return "".join(parts)
+        cells = []
+        today = date.today()
+        for d in days:
+            classes = ["sc-cal-day"]
+            if d.month != month:
+                classes.append("other")
+            if d == today:
+                classes.append("today")
+            entries = []
+            todays = sorted(
+                by_day.get(d, []),
+                key=lambda o: (o.status not in ("open", "upcoming"), o.title.lower()),
+            )
+            for o in todays[:4]:
+                oid = o.opportunity_id
+                if o.status in ("open", "upcoming"):
+                    du = o.days_until_due
+                    cls = "urgent" if (du is not None and 0 <= du <= 3) else ""
+                else:
+                    cls = "past"
+                entries.append(
+                    f'<a class="sc-cal-entry {cls}" title="{esc(o.title)} — {esc(o.agency)}" '
+                    f'href="{href(**self.keep(drawer=oid))}">{esc(short_title(o, 22))}</a>'
+                )
+            if len(todays) > 4:
+                entries.append(
+                    f'<a class="sc-cal-more" href="{href(screen="all", c=self.p.county or None, t=self.p.otype or None)}">'
+                    f"+ {len(todays) - 4} more</a>"
+                )
+            cells.append(
+                f'<div class="{" ".join(classes)}">'
+                f'<div class="sc-cal-daynum">{d.day}</div>{"".join(entries)}</div>'
+            )
+        grid = (
+            f'<div class="sc-cal-grid">{weekday_row}{"".join(cells)}</div>'
+            '<div class="sc-cal-footnote">bids placed on their due date · '
+            '<span class="sc-cal-key urgent">closing ≤ 3 days</span> · '
+            '<span class="sc-cal-key past">closed</span> · click any bid for detail</div>'
+        )
+        return head + self.toolbar(sort=False) + grid
 
     # -- All bids -----------------------------------------------------------
 
@@ -478,7 +579,7 @@ class Page:
             tag = f'<span class="sc-status-tag">{esc(o.status.upper())}</span>'
         return f"""
         <div class="sc-row {'closing' if urgent else ''}">
-          <a class="sc-row-link" href="{href(screen='all', drawer=oid, q=self.p.query, f=self.p.status)}" aria-label="{esc(o.title)}"></a>
+          <a class="sc-row-link" href="{href(**self.keep(drawer=oid))}" aria-label="{esc(o.title)}"></a>
           <div class="sc-slot"><div class="sc-slot-day {'crimson' if urgent else ''}">{esc(date_top)}</div>
             <div class="sc-slot-date">{esc(date_sub)}</div></div>
           <div class="sc-row-body">
@@ -487,12 +588,12 @@ class Page:
           </div>
           <div class="sc-row-actions">
             {tag}
-            {self.track_btn(oid, screen='all', q=self.p.query, f=self.p.status)}
+            {self.track_btn(oid, **self.keep())}
           </div>
         </div>"""
 
     def allbids_html(self) -> str:
-        pool = list(self.opps)
+        pool = self.filter_opps(self.opps)
         if self.p.status:
             pool = [o for o in pool if o.status == self.p.status]
         q = self.p.query.strip().lower()
@@ -505,12 +606,7 @@ class Page:
                 or q in (o.description or "").lower()
             ]
 
-        dated = sorted(
-            (o for o in pool if o.due_date), key=lambda o: (o.due_date, o.title.lower())
-        )
-        undated = sorted((o for o in pool if not o.due_date), key=lambda o: o.title.lower())
-
-        dates = [o.due_date.date() for o in dated]
+        dates = [o.due_date.date() for o in pool if o.due_date]
         if dates:
             span = f"{mon_day(min(dates))} – {mon_day(max(dates))}, {max(dates).year}"
         else:
@@ -525,6 +621,9 @@ class Page:
           <form class="sc-search-form" method="get" action="/">
             <input type="hidden" name="screen" value="all">
             <input type="hidden" name="f" value="{esc(self.p.status)}">
+            <input type="hidden" name="c" value="{esc(self.p.county)}">
+            <input type="hidden" name="t" value="{esc(self.p.otype)}">
+            <input type="hidden" name="sort" value="{esc(self.p.sort)}">
             <input class="sc-search" type="text" name="q" value="{esc(self.p.query)}"
                    placeholder="search title, agency, ref…">
             <button class="sc-detect-btn" type="submit">SEARCH</button>
@@ -539,25 +638,41 @@ class Page:
             on = self.p.status == key
             chips.append(
                 f'<a class="sc-chip {"on" if on else ""}" '
-                f'href="{href(screen="all", f=key, q=self.p.query)}">{label} · {n}</a>'
+                f'href="{href(**self.keep(drawer=None, f=key or None))}">{label} · {n}</a>'
             )
-        filters = f'<div class="sc-chips sc-allbids-filters">{"".join(chips)}</div>'
-
-        groups: List[Tuple[str, List[Opportunity]]] = []
-        for o in dated:
-            label = o.due_date.strftime("%B %Y").upper()
-            if not groups or groups[-1][0] != label:
-                groups.append((label, []))
-            groups[-1][1].append(o)
-        if undated:
-            groups.append(("NO DUE DATE PUBLISHED", undated))
+        filters = (
+            f'<div class="sc-chips sc-allbids-filters">{"".join(chips)}</div>'
+            + self.toolbar()
+        )
 
         sections = []
+        if (self.p.sort or "due") == "due":
+            # Due-date order reads best as month groups.
+            dated = sorted(
+                (o for o in pool if o.due_date),
+                key=lambda o: (o.due_date, o.title.lower()),
+            )
+            undated = sorted(
+                (o for o in pool if not o.due_date), key=lambda o: o.title.lower()
+            )
+            groups: List[Tuple[str, List[Opportunity]]] = []
+            for o in dated:
+                label = o.due_date.strftime("%B %Y").upper()
+                if not groups or groups[-1][0] != label:
+                    groups.append((label, []))
+                groups[-1][1].append(o)
+            if undated:
+                groups.append(("NO DUE DATE PUBLISHED", undated))
+        else:
+            ordered = self.sort_opps(pool)
+            groups = [(f"{len(ordered)} BIDS", ordered)] if ordered else []
+
         for label, items in groups:
+            prefix = "DUE " if label[0].isalpha() and "NO DUE" not in label and "BIDS" not in label else ""
             sections.append(
-                f'<div class="sc-label sc-month-label">DUE {esc(label)} · {len(items)}</div>'
-                if label != "NO DUE DATE PUBLISHED" else
-                f'<div class="sc-label sc-month-label">{esc(label)} · {len(items)}</div>'
+                f'<div class="sc-label sc-month-label">{prefix}{esc(label)} · {len(items)}</div>'
+                if prefix else
+                f'<div class="sc-label sc-month-label">{esc(label)}</div>'
             )
             sections.append(
                 '<div class="sc-rows">' + "".join(self.allbids_row(o) for o in items) + "</div>"
@@ -663,7 +778,7 @@ class Page:
         if not self.tracked_ids:
             return head + self.empty_state(
                 "Nothing tracked yet",
-                f"Hit <b>TRACK</b> on any bid in <a href='{href(screen='today')}'>Today</a>"
+                f"Hit <b>TRACK</b> on any bid in <a href='{href(screen='all')}'>All bids</a>"
                 " to start a pipeline",
             )
 
@@ -698,9 +813,18 @@ class Page:
           <div class="sc-tl-axis">{axis}</div>
         </div>"""
 
+        filtered_ids = {
+            o.opportunity_id
+            for o in self.filter_opps(self.by_id[i] for i in self.active_tracked)
+        }
         cols = []
         for stage in ("watching", "preparing", "submitted", "result"):
-            ids = self.stage_ids(stage)
+            ids = [i for i in self.stage_ids(stage) if i in filtered_ids]
+            if self.p.sort and self.p.sort != "due":
+                ids = [
+                    o.opportunity_id
+                    for o in self.sort_opps([self.by_id[i] for i in ids])
+                ]
             cards = [self.kanban_card(i, stage) for i in ids]
             if stage == "result" and ids:
                 wins = sum(
@@ -714,7 +838,10 @@ class Page:
                 f'<div><div class="sc-col-head">{STAGE_LABELS[stage]} · {len(ids)}</div>'
                 f'<div class="sc-cards">{"".join(cards)}</div></div>'
             )
-        return head + timeline + f'<div class="sc-kanban">{"".join(cols)}</div>'
+        return (
+            head + self.toolbar() + timeline
+            + f'<div class="sc-kanban">{"".join(cols)}</div>'
+        )
 
     # -- Workroom -----------------------------------------------------------
 
@@ -726,7 +853,7 @@ class Page:
         if oid is None:
             return bare_head + self.empty_state(
                 "No bid on the bench",
-                f"Track a bid in <a href='{href(screen='today')}'>Today</a>, then open it"
+                f"Track a bid in <a href='{href(screen='all')}'>All bids</a>, then open it"
                 " from its drawer or the pipeline",
             )
         o = self.by_id[oid]
@@ -1017,6 +1144,7 @@ class Page:
         if current:
             wl, matches, new_ids = current
             wl_title = f"{wl['name'].upper()} — MATCHES"
+            matches = self.sort_opps(self.filter_opps(matches))
             for o in matches[:8]:
                 oid = o.opportunity_id
                 is_new = oid in new_ids
@@ -1044,7 +1172,7 @@ class Page:
           · email alert sends the same list</div>
         </div>"""
         left = f'<div class="sc-wl-col">{"".join(cards)}{builder}</div>'
-        return head + f'<div class="sc-wl-grid">{left}{right}</div>'
+        return head + self.toolbar() + f'<div class="sc-wl-grid">{left}{right}</div>'
 
     # -- Sources ------------------------------------------------------------
 
@@ -1086,12 +1214,44 @@ class Page:
                   <div class="sc-attn-note">{esc(note[:110])}</div>
                 </div>""")
 
-        limit = len(self.health) if self.p.all_sources else 8
+        pool = list(self.health)
+        if self.p.status in ("ok", "empty", "degraded", "error"):
+            pool = [h for h in pool if _status(h) == self.p.status]
+        sort_key = self.p.sort or ""
+        if sort_key == "name":
+            pool.sort(key=lambda h: h.name.lower())
+        elif sort_key == "deals":
+            pool.sort(key=lambda h: (-h.count, h.name.lower()))
+        elif sort_key == "speed":
+            pool.sort(key=lambda h: (h.elapsed_ms, h.name.lower()))
+
+        filter_chips = []
+        for key, label in SOURCE_STATUS_FILTERS:
+            n = len(self.health) if not key else sum(
+                1 for h in self.health if _status(h) == key
+            )
+            on = self.p.status == key
+            filter_chips.append(
+                f'<a class="sc-chip {"on" if on else ""}" '
+                f'href="{href(**self.keep(f=key or None))}">{label} · {n}</a>'
+            )
+        filter_chips.append('<span class="sc-toolbar-label">SORT</span>')
+        current_sort = sort_key or "config"
+        for key, label in SOURCE_SORTS:
+            on = current_sort == key
+            filter_chips.append(
+                f'<a class="sc-chip {"on" if on else ""}" '
+                f'href="{href(**self.keep(sort=None if on else key))}">{label}</a>'
+            )
+        src_toolbar = f'<div class="sc-toolbar">{"".join(filter_chips)}</div>'
+
+        limit = len(pool) if (self.p.all_sources or self.p.status or sort_key) else 8
         src_rows = []
-        for h in self.health[:limit]:
+        for h in pool[:limit]:
             status = _status(h)
             if status == "ok":
-                dot, stat = "", f"{h.count} deals · {h.elapsed_ms / 1000:.1f}s"
+                plural = "" if h.count == 1 else "s"
+                dot, stat = "", f"{h.count} deal{plural} · {h.elapsed_ms / 1000:.1f}s"
             elif status == "empty":
                 dot, stat = "empty", "no listings"
             else:
@@ -1101,18 +1261,21 @@ class Page:
               <span class="sc-src-name"><span class="sc-src-dot {dot}"></span>{esc(h.name)}</span>
               <span class="sc-src-stat">{esc(stat)}</span>
             </div>""")
-        if len(self.health) > limit:
+        if len(pool) > limit:
             src_rows.append(
-                f'<a class="sc-src-more" href="{href(screen="sources", allsrc="1")}">'
-                f"… {len(self.health) - limit} more ▾</a>"
+                f'<a class="sc-src-more" href="{href(**self.keep(allsrc="1"))}">'
+                f"… {len(pool) - limit} more ▾</a>"
             )
-        elif self.p.all_sources and len(self.health) > 8:
+        elif self.p.all_sources and len(pool) > 8:
             src_rows.append(
-                f'<a class="sc-src-more" href="{href(screen="sources")}">collapse ▴</a>'
+                f'<a class="sc-src-more" href="{href(**self.keep(allsrc=None))}">collapse ▴</a>'
             )
+        if not pool:
+            src_rows.append('<div class="sc-src-stat" style="padding:8px 0">no sources match this filter</div>')
         left = (
             "".join(attn_html)
             + '<div class="sc-label">ALL SOURCES</div>'
+            + src_toolbar
             + f'<div class="sc-srclist">{"".join(src_rows)}</div>'
         )
 
@@ -1171,13 +1334,7 @@ class Page:
 
     def drawer_html(self, o: Opportunity) -> str:
         oid = o.opportunity_id
-        keep = {"screen": self.p.screen}
-        if self.p.bid:
-            keep["bid"] = self.p.bid
-        if self.p.query:
-            keep["q"] = self.p.query
-        if self.p.status:
-            keep["f"] = self.p.status
+        keep = self.keep(drawer=None)
 
         tags = [f'<span class="sc-tag">{esc(sol_label(o))}</span>']
         if offer_word(o):
@@ -1350,7 +1507,7 @@ class Page:
 
     def render(self) -> str:
         renderers = {
-            "today": self.today_html,
+            "calendar": self.calendar_html,
             "all": self.allbids_html,
             "pipeline": self.pipeline_html,
             "workroom": self.workroom_html,

@@ -67,16 +67,17 @@ Disable either pass with `run_fetch(with_details=False)` or
 
 The dashboard (FastAPI + server-rendered HTML: `web/server.py` routes,
 `web/views.py` rendering, "Scout Classic" design system in `web/styles.css`)
-is organized as six screens plus a slide-in detail drawer:
+is organized as six screens plus a slide-in detail drawer, with a shared
+filter/sort toolbar (county · work type · sort order) on every list screen:
 
 | Screen | What it does |
 |--------|--------------|
-| **Today** | Triage inbox: bids closing within 3 days and bids new since your last visit, with one-tap **Track** / **Skip** |
+| **Calendar** | Month grid of bids on their due dates — ‹ › month navigation, urgent/closed color-coding, click-through to detail |
 | **All bids** | Every captured bid across all dates and statuses, grouped by due month, with search and status filters |
 | **My Pipeline** | Kanban of tracked bids (Watching → Preparing bid → Submitted → Result) with a 14-day deadline strip |
 | **Bid Workroom** | Deep read of one bid: scope, requirements as a checklist, documents, key dates, go/no-go scorecard and notes |
 | **Watchlists** | Saved niche searches with new-match badges, plus a chip builder for creating new ones |
-| **Sources** | Source-health KPIs, degraded-portal callouts, and self-serve "add a source" (suggested portals + CivicPlus URL detection) |
+| **Sources** | Source-health KPIs, degraded-portal callouts, status filter + sort, and self-serve "add a source" (suggested portals + CivicPlus URL detection) |
 
 Clicking any bid row or card opens the drawer with tags, facts, scope,
 requirements, documents and actions. Everything the user *does* — tracking,
