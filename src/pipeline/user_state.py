@@ -146,6 +146,30 @@ def stage_of(state: Dict[str, Any], opp_id: str) -> str | None:
     return state["stages"].get(opp_id, "watching")
 
 
+def set_stage(state: Dict[str, Any], opp_id: str, stage: str) -> None:
+    if stage not in STAGES:
+        raise ValueError(f"unknown stage {stage!r}")
+    if opp_id in state["tracked"]:
+        state["stages"][opp_id] = stage
+
+
+def move_stage(state: Dict[str, Any], opp_id: str, step: int) -> str | None:
+    """Shift a tracked bid one column left (-1) or right (+1). Returns the new stage."""
+    current = stage_of(state, opp_id)
+    if current is None:
+        return None
+    idx = STAGES.index(current) + step
+    if not 0 <= idx < len(STAGES):
+        return current
+    set_stage(state, opp_id, STAGES[idx])
+    return STAGES[idx]
+
+
+def set_result(state: Dict[str, Any], opp_id: str, outcome: str) -> None:
+    """Record a WON/LOST (or free-text) outcome for a bid in the Result column."""
+    state["results"][opp_id] = outcome
+
+
 def open_watchlist(state: Dict[str, Any], wl_id: str, now_iso: str) -> None:
     """Select a watchlist, remembering the previous open for "new" badges."""
     state["selected_watchlist"] = wl_id

@@ -78,6 +78,29 @@ def test_go_decision_promotes_stage(state):
         us.set_decision(state, "bid", "maybe")
 
 
+def test_stage_moves_walk_the_kanban(state):
+    us.toggle_tracked(state, "bid")
+    assert us.move_stage(state, "bid", 1) == "preparing"
+    assert us.move_stage(state, "bid", 1) == "submitted"
+    assert us.move_stage(state, "bid", 1) == "result"
+    assert us.move_stage(state, "bid", 1) == "result"  # clamped at the end
+    assert us.move_stage(state, "bid", -1) == "submitted"
+    assert us.move_stage(state, "untracked", 1) is None
+    with pytest.raises(ValueError):
+        us.set_stage(state, "bid", "limbo")
+
+
+def test_set_stage_ignores_untracked_bids(state):
+    us.set_stage(state, "ghost", "submitted")
+    assert state["stages"] == {}
+
+
+def test_set_result_records_outcome(state):
+    us.toggle_tracked(state, "bid")
+    us.set_result(state, "bid", "WON")
+    assert state["results"]["bid"] == "WON"
+
+
 def test_open_watchlist_tracks_previous_open(state):
     us.open_watchlist(state, "roofing-anywhere", "2026-08-01T10:00:00")
     us.open_watchlist(state, "roofing-anywhere", "2026-08-02T10:00:00")
