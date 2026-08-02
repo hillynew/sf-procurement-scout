@@ -1,38 +1,47 @@
-"""SF Procurement Scout — permanent left menu + pipeline UI."""
+"""SF Procurement Scout — the "Scout Classic" five-screen dashboard.
+
+Today (triage) · My Pipeline (kanban) · Bid Workroom · Watchlists · Sources,
+plus a slide-in detail drawer, per the Scout Classic design handoff.
+
+The whole page is rendered as classic-styled HTML (see web/styles.css).
+Interactions are plain links and GET forms carrying query params: view state
+lives in the URL (?screen=…&drawer=…), while everything the user *does* —
+track, skip, checklists, go/no-go, notes, watchlists, queued sources — is
+persisted server-side in data/user_state.json via src/pipeline/user_state.
+That makes every click safe across Streamlit session resets.
+"""
 
 from __future__ import annotations
 
 import html
-import json
-import os
+import re
 import sys
-from collections import Counter, defaultdict
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
-from urllib.parse import quote
+from typing import Dict, List, Optional, Sequence, Tuple
+from urllib.parse import urlencode, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-import pandas as pd
 import streamlit as st
 
-from src.models.opportunity import HealthStatus, Opportunity
+from src.models.opportunity import Opportunity
+from src.pipeline import user_state as us
 from src.pipeline.runner import run_fetch
 from src.pipeline.store import data_dir, load_latest, save_snapshot
-from src.summarize import apply_briefs, make_brief
+from src.sources.registry import load_source_config
 
 # ---------------------------------------------------------------------------
 # Page + CSS
 # ---------------------------------------------------------------------------
 
 st.set_page_config(
-    page_title="Procurement Pipeline · SF Scout",
+    page_title="SF Procurement Scout",
     page_icon="📋",
     layout="wide",
-    initial_sidebar_state="collapsed",  # native sidebar unused; permanent left menu instead
+    initial_sidebar_state="collapsed",
 )
 
 _CSS = (Path(__file__).parent / "styles.css").read_text(encoding="utf-8")
@@ -43,60 +52,46 @@ COUNTY_LABELS = {
     "broward": "Broward",
     "palm-beach": "Palm Beach",
 }
-STATUS_ORDER = ["open", "upcoming", "catalog", "closed", "cancelled"]
-STATUS_LABELS = {
-    "open": "Open",
-    "upcoming": "Upcoming",
-    "catalog": "Catalog",
-    "closed": "Closed",
-    "cancelled": "Cancelled",
-}
-_PROBLEM_STATUSES = {HealthStatus.DEGRADED.value, HealthStatus.ERROR.value}
-HEALTH_LABELS = {
-    HealthStatus.OK.value: "OK",
-    HealthStatus.EMPTY.value: "No listings",
-    HealthStatus.DEGRADED.value: "Degraded",
-    HealthStatus.ERROR.value: "Error",
-}
-OFFER_COLORS = {
-    "construction": "#085d80",
-    "professional_services": "#6b4c9a",
-    "services": "#04719e",
-    "goods": "#157f3d",
-    "mixed": "#9a6700",
-    "unknown": "#697586",
+
+SCREENS = [
+    ("today", "Today"),
+    ("pipeline", "My pipeline"),
+    ("workroom", "Bid workroom"),
+    ("watchlists", "Watchlists"),
+    ("sources", "Sources"),
+]
+
+STAGE_LABELS = {
+    "watching": "WATCHING",
+    "preparing": "PREPARING BID",
+    "submitted": "SUBMITTED",
+    "result": "RESULT",
 }
 
+# Chip ids double as watchlist filter keys — see wl_matches().
+CHIP_DEFS = [
+    ("construction", "construction"),
+    ("services", "services"),
+    ("max500k", "≤ $500k"),
+    ("broward", "Broward"),
+    ("nobond", "no bond req’d"),
+    ("recurring", "recurring only"),
+]
 
-def _init_state() -> None:
-    defaults = {
-        "stage_tab": "open",
-        "county_filter": "All",
-        "offer_filter": "All",
-        "category_filter": "All",
-        "agency_filter": "All",
-        "query": "",
-        "selected_id": None,
-        "view_mode": "list",
-        "include_catalog": False,
-        "board_group": "county",
-        "show_only_urgent": False,
-        "do_fetch": False,
-        "sort_by": "due_soon",
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-
-
-_init_state()
+# Known portals worth wiring next; anything already configured is hidden.
+SUGGESTED_SOURCES = [
+    "City of Fort Lauderdale",
+    "Palm Beach County VSS",
+    "Broward County Schools",
+    "City of Miami Beach",
+]
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Small helpers
 # ---------------------------------------------------------------------------
 
-def esc(s: Optional[str]) -> str:
+def esc(s) -> str:
     return html.escape(str(s) if s is not None else "")
 
 
@@ -110,961 +105,1302 @@ def block(markup: str) -> str:
     return " ".join(line.strip() for line in markup.strip().splitlines() if line.strip())
 
 
-def bar_row(label: str, value: int, peak: int) -> str:
-    pct = int(100 * value / peak) if peak else 0
-    return block(
-        f"""
-        <div class="ng-funnel-row">
-          <span>{esc(label)}</span>
-          <div class="ng-bar-track"><div class="ng-bar-fill" style="width:{pct}%"></div></div>
-          <span class="ng-bar-value">{value}</span>
-        </div>
-        """
-    )
+def href(**params) -> str:
+    """Build an internal link that survives Streamlit session resets."""
+    return "?" + urlencode({k: v for k, v in params.items() if v not in (None, "")})
 
 
-def sol_label(o: Opportunity) -> str:
-    s = o.solicitation_type
-    if hasattr(s, "value"):
-        s = s.value
-    s = str(s or "BID")
-    return "BID" if s == "UNKNOWN" else s
+def mon_day(d: Optional[date]) -> str:
+    return f"{d.strftime('%b')} {d.day}" if d else ""
+
+
+def clock(dt: datetime) -> str:
+    h = dt.hour % 12 or 12
+    return f"{h}:{dt.minute:02d}{'am' if dt.hour < 12 else 'pm'}"
+
+
+def due_full(dt: Optional[datetime]) -> str:
+    """"Aug 4, 2:00pm" — the workroom/drawer date format."""
+    if not dt:
+        return ""
+    return f"{mon_day(dt.date())}, {clock(dt)}"
+
+
+def budget_amount(o: Opportunity) -> Optional[int]:
+    if not o.budget:
+        return None
+    digits = re.sub(r"[^\d]", "", o.budget.split("-")[0].split("–")[0])
+    return int(digits) if digits else None
+
+
+def budget_short(o: Opportunity) -> Optional[str]:
+    n = budget_amount(o)
+    if n is None:
+        return None
+    if n >= 1_000_000:
+        v = n / 1_000_000
+        return f"${v:.1f}M".replace(".0M", "M")
+    if n >= 1_000:
+        return f"${round(n / 1_000)}k"
+    return f"${n}"
 
 
 def offer_key(o: Opportunity) -> str:
     s = o.offer_type
-    if hasattr(s, "value"):
-        s = s.value
-    return str(s or "unknown")
+    return str(s.value if hasattr(s, "value") else s or "unknown")
 
 
-def offer_label(o: Opportunity) -> str:
-    return offer_key(o).replace("_", " ").title()
+def sol_label(o: Opportunity) -> str:
+    s = o.solicitation_type
+    s = str(s.value if hasattr(s, "value") else s or "BID")
+    return "BID" if s == "UNKNOWN" else s
 
 
-def ensure_brief(o: Opportunity) -> str:
-    return make_brief(o)
+def offer_word(o: Opportunity) -> Optional[str]:
+    key = offer_key(o)
+    return None if key == "unknown" else key.replace("_", " ")
 
 
-def short_brief(o: Opportunity, n: int = 140) -> str:
-    b = " ".join(ensure_brief(o).split())
-    return b if len(b) <= n else b[: n - 1] + "…"
+def by_due(opps: Sequence[Opportunity]) -> List[Opportunity]:
+    return sorted(
+        opps,
+        key=lambda o: (
+            o.days_until_due if o.days_until_due is not None else 9_999,
+            o.title.lower(),
+        ),
+    )
 
 
-def fmt_due(o: Opportunity) -> str:
-    if not o.due_date:
-        return STATUS_LABELS.get(o.status, o.status).title()
-    d = o.due_date.strftime("%b %d, %Y")
-    days = o.days_until_due
-    if days is None:
-        return d
-    if days < 0:
-        return f"{d} · past due"
-    if days == 0:
-        return f"{d} · DUE TODAY"
-    if days == 1:
-        return f"{d} · tomorrow"
-    if days <= 7:
-        return f"{d} · {days} days left"
-    return f"{d} · {days}d left"
+def doc_kind_label(name: str, kind: str) -> str:
+    lowered = name.lower()
+    if kind == "addendum":
+        return "ADDENDUM"
+    if kind == "drawing" or "plan" in lowered:
+        return "PLANS"
+    if kind == "specification":
+        return "SPEC"
+    if "package" in lowered or "pkg" in lowered:
+        return "PKG"
+    if "form" in lowered:
+        return "FORM"
+    if "submission" in lowered:
+        return "OURS"
+    if "tab" in lowered:
+        return "TAB"
+    return "DOC"
 
 
-def urgency_badge(o: Opportunity) -> Tuple[str, str]:
-    days = o.days_until_due
-    if o.status in {"closed", "cancelled"}:
-        return "muted", o.status
-    if days is None:
-        return ("info", "upcoming") if o.status == "upcoming" else ("ok", "open")
-    if days < 0:
-        return "muted", "past due"
-    if days == 0:
-        return "danger", "DUE TODAY"
-    if days <= 3:
-        return "danger", f"{days}d left"
-    if days <= 7:
-        return "warn", f"{days}d left"
-    return "ok", f"{days}d left"
+def short_title(o: Opportunity, limit: int = 18) -> str:
+    head = re.split(r"[—,]", o.title)[0].strip()
+    return head if len(head) <= limit else head[: limit - 1].rstrip() + "…"
 
 
-def sort_opps(opps: List[Opportunity]) -> List[Opportunity]:
-    mode = st.session_state.sort_by
+def meta_line(o: Opportunity, *, with_due: bool = False) -> str:
+    parts = [o.agency]
+    if offer_word(o):
+        parts.append(offer_word(o))
+    if budget_short(o):
+        parts.append(f"{budget_short(o)} est")
+    if with_due and o.due_date:
+        parts.append(f"due {mon_day(o.due_date.date())}")
+    if o.prior_cycles:
+        parts.append(f"rebid · {o.prior_cycles}x before")
+    elif o.requirements:
+        parts.append(o.requirements[0].lower())
+    return " · ".join(parts)
 
-    def key(o: Opportunity):
-        days = o.days_until_due if o.days_until_due is not None else 9999
-        if mode == "due_soon":
-            return (0 if o.status in {"open", "upcoming"} else 1, days, o.title.lower())
-        if mode == "newest":
-            pd = o.posted_date.toordinal() if o.posted_date else 0
-            return (-pd, o.title.lower())
-        if mode == "agency":
-            return (o.agency.lower(), days, o.title.lower())
-        return (o.title.lower(),)
 
-    return sorted(opps, key=key)
-
+# ---------------------------------------------------------------------------
+# Data load (snapshot cache — invalidated whenever a fetch rewrites it)
+# ---------------------------------------------------------------------------
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _load_snapshot(_cache_key: int):
-    """Read the saved snapshot once per rerun cycle.
-
-    Briefs were being regenerated for every opportunity on every widget
-    interaction; the snapshot only changes when a fetch writes a new one.
-    """
-    opps, health = load_latest()
-    apply_briefs(opps)
-    return opps, health
+    return load_latest()
 
 
 def _snapshot_key() -> int:
-    """Mtime of latest.json, so the cache invalidates when a fetch rewrites it."""
-    path = data_dir() / "latest.json"
     try:
-        return path.stat().st_mtime_ns
+        return (data_dir() / "latest.json").stat().st_mtime_ns
     except OSError:
         return 0
 
 
-def load_data(force: bool = False):
-    if force:
+def _snapshot_time() -> Optional[datetime]:
+    try:
+        return datetime.fromtimestamp((data_dir() / "latest.json").stat().st_mtime)
+    except OSError:
+        return None
+
+
+def scan_note() -> str:
+    ts = _snapshot_time()
+    if not ts:
+        return "no data yet"
+    if ts.date() == date.today():
+        return f"today {clock(ts)}"
+    if ts.date() == date.today() - timedelta(days=1):
+        return f"yesterday {clock(ts)}"
+    return f"{mon_day(ts.date())} {clock(ts)}"
+
+
+# ---------------------------------------------------------------------------
+# Query params → view state, then apply any action
+# ---------------------------------------------------------------------------
+
+qp = st.query_params
+screen = qp.get("screen", "today")
+if screen not in dict(SCREENS):
+    screen = "today"
+drawer_id = qp.get("drawer") or None
+bid_param = qp.get("bid") or None
+scope_open = qp.get("scope") == "1"
+all_sources_open = qp.get("allsrc") == "1"
+act = qp.get("act") or None
+
+state = us.load_user_state()
+
+# Roll the "new since last visit" baseline once per calendar day.
+_today_iso = date.today().isoformat()
+if state.get("today_visit_date") != _today_iso:
+    state["last_today_visit"] = state.get("today_visit_date")
+    state["today_visit_date"] = _today_iso
+    us.save_user_state(state)
+
+fetched_now = False
+fetch_count = 0
+detect_url = ""
+detect_status: Optional[str] = None  # "ok" | "fail" for this render only
+
+if act:
+    arg = qp.get("id") or ""
+    if act == "fetch":
         with st.spinner("Fetching live portals from Miami-Dade, Broward & Palm Beach…"):
-            opps, health = run_fetch(
-                include_catalog=st.session_state.include_catalog,
-                open_only=False,
-                quiet=True,
-            )
-            apply_briefs(opps)
-            save_snapshot(opps, health, tag="dashboard")
+            opps_new, health_new = run_fetch(include_catalog=False, open_only=False, quiet=True)
+            save_snapshot(opps_new, health_new, tag="dashboard")
             _load_snapshot.clear()
-            return opps, health
-    return _load_snapshot(_snapshot_key())
+        fetched_now = True
+        fetch_count = len(health_new)
+    elif act == "demo":
+        from web.sample_data import load_sample
+
+        load_sample(state)
+        _load_snapshot.clear()
+    elif act == "track" and arg:
+        us.toggle_tracked(state, arg)
+    elif act == "skip" and arg:
+        us.skip(state, arg)
+    elif act == "undoskips":
+        us.undo_skips(state)
+    elif act == "check" and arg:
+        try:
+            us.toggle_check(state, arg, int(qp.get("i", "-1")))
+        except ValueError:
+            pass
+    elif act in ("go", "nogo") and arg:
+        us.set_decision(state, arg, act)
+    elif act == "cleardec" and arg:
+        us.set_decision(state, arg, None)
+    elif act == "notes" and arg:
+        state["notes"][arg] = qp.get("notes", "").strip()
+    elif act == "selwl" and qp.get("wl"):
+        us.open_watchlist(state, qp.get("wl"), datetime.now().isoformat(timespec="seconds"))
+    elif act == "chip" and arg:
+        state["builder_chips"][arg] = not state["builder_chips"].get(arg, False)
+    elif act == "savewl":
+        chips = {k: v for k, v in state["builder_chips"].items() if v}
+        labels = [label for key, label in CHIP_DEFS if key in chips]
+        n = len(state["watchlists"]) + 1
+        wl = {
+            "id": f"wl-{n}-{'-'.join(sorted(chips)) or 'all'}",
+            "name": " · ".join(labels) if labels else f"Watchlist {n}",
+            "filters": {"chips": sorted(chips)},
+            "email": "off",
+            "last_opened": None,
+            "prev_opened": None,
+        }
+        if not any(w["id"] == wl["id"] for w in state["watchlists"]):
+            state["watchlists"].append(wl)
+        state["selected_watchlist"] = wl["id"]
+    elif act == "addsrc" and qp.get("name"):
+        name = qp.get("name")
+        if not any(s.get("name") == name for s in state["queued_sources"]):
+            state["queued_sources"].append({"name": name, "url": "", "detected": "suggested"})
+    elif act == "detect":
+        detect_url = (qp.get("url") or "").strip()
+        lowered = detect_url.lower()
+        if "civicplus" in lowered or "bids.aspx" in lowered:
+            detect_status = "ok"
+            host = urlparse(detect_url).netloc or detect_url
+            if not any(s.get("url") == detect_url for s in state["queued_sources"]):
+                state["queued_sources"].append(
+                    {"name": host, "url": detect_url, "detected": "civicplus"}
+                )
+        else:
+            detect_status = "fail"
+    us.save_user_state(state)
+
+# Scrub the action out of the URL so a refresh can't replay it.
+_view_params = {"screen": screen}
+if drawer_id:
+    _view_params["drawer"] = drawer_id
+if bid_param:
+    _view_params["bid"] = bid_param
+if scope_open:
+    _view_params["scope"] = "1"
+if all_sources_open:
+    _view_params["allsrc"] = "1"
+if qp.to_dict() != _view_params:
+    qp.clear()
+    for k, v in _view_params.items():
+        qp[k] = v
 
 
-def apply_filters(
-    opps: List[Opportunity],
-    *,
-    stage: Optional[str] = None,
-    urgent_only: Optional[bool] = None,
-) -> List[Opportunity]:
-    """Filter by the sidebar selections.
+all_opps, health = _load_snapshot(_snapshot_key())
+by_id: Dict[str, Opportunity] = {o.opportunity_id: o for o in all_opps}
 
-    `stage` and `urgent_only` can be overridden so callers (tab counts, the
-    insights view) can ask "what would this look like?" without writing to
-    session state and triggering an extra Streamlit rerun.
-    """
-    county = st.session_state.county_filter
-    offer = st.session_state.offer_filter
-    cat = st.session_state.category_filter
-    agency = st.session_state.agency_filter
-    q = (st.session_state.query or "").strip().lower()
-    stage = st.session_state.stage_tab if stage is None else stage
-    if urgent_only is None:
-        urgent_only = st.session_state.show_only_urgent
+# ---------------------------------------------------------------------------
+# Derived collections
+# ---------------------------------------------------------------------------
 
-    out = list(opps)
-    if county != "All":
-        inv = {v: k for k, v in COUNTY_LABELS.items()}
-        key = inv.get(county, county.lower().replace(" ", "-"))
-        out = [o for o in out if o.county == key]
-    if offer != "All":
-        ot = offer.lower().replace(" ", "_")
-        out = [o for o in out if offer_key(o) == ot]
-    if cat != "All":
-        ck = cat.lower().replace(" ", "_")
-        out = [o for o in out if ck in [c.lower() for c in (o.categories or [])]]
-    if agency != "All":
-        out = [o for o in out if o.agency == agency]
-    if q:
-        out = [
-            o
-            for o in out
-            if q in (o.title or "").lower()
-            or q in (o.agency or "").lower()
-            or q in (o.brief or "").lower()
-            or q in (o.external_id or "").lower()
-            or q in (o.description or "").lower()
-        ]
-    if stage == "open":
-        out = [o for o in out if o.status in {"open", "upcoming"}]
-    elif stage != "all":
-        out = [o for o in out if o.status == stage]
-    if urgent_only:
-        out = [
-            o
-            for o in out
-            if o.days_until_due is not None and 0 <= o.days_until_due <= 7
-        ]
-    return sort_opps(out)
+open_opps = [o for o in all_opps if o.status in ("open", "upcoming")]
+
+_baseline = state.get("last_today_visit") or (date.today() - timedelta(days=1)).isoformat()
+try:
+    _baseline_date = date.fromisoformat(_baseline[:10])
+except ValueError:
+    _baseline_date = date.today() - timedelta(days=1)
+
+closing_rows = by_due(
+    o for o in open_opps
+    if o.days_until_due is not None and 0 <= o.days_until_due <= 3
+    and o.opportunity_id not in state["skipped"]
+)[:8]
+_closing_ids = {o.opportunity_id for o in closing_rows}
+fresh_rows = by_due(
+    o for o in open_opps
+    if o.posted_date and o.posted_date >= _baseline_date
+    and o.opportunity_id not in _closing_ids
+    and o.opportunity_id not in state["skipped"]
+)[:10]
+
+tracked_ids = [oid for oid in state["tracked"] if oid in by_id]
+active_tracked = [oid for oid in tracked_ids if state["decisions"].get(oid) != "nogo"]
 
 
-def card_html(o: Opportunity, selected: bool = False) -> str:
-    ucss, ulabel = urgency_badge(o)
-    color = OFFER_COLORS.get(offer_key(o), OFFER_COLORS["unknown"])
-    ref = esc(o.external_id) if o.external_id else ""
-    # Prefer the agency's own scope text over the generated brief — it says
-    # what the work actually is.
-    blurb = " ".join((o.scope or o.description or ensure_brief(o)).split())
-    blurb = blurb if len(blurb) <= 165 else blurb[:164] + "…"
+def stage_ids(stage: str) -> List[str]:
+    ids = [oid for oid in active_tracked if us.stage_of(state, oid) == stage]
+    today_iso = date.today().isoformat()
+    return sorted(
+        ids,
+        key=lambda oid: (
+            # Freshly tracked bids lead the Watching column ("tracked today").
+            0 if (stage == "watching" and state["tracked"].get(oid) == today_iso) else 1,
+            by_id[oid].days_until_due if by_id[oid].days_until_due is not None else 9_999,
+        ),
+    )
 
-    facts = []
-    if o.budget:
-        facts.append(f'<span class="deal-fact value">💲 {esc(o.budget)}</span>')
+
+def default_workroom_id() -> Optional[str]:
+    for pool in (stage_ids("preparing"), stage_ids("watching"), active_tracked):
+        live = [oid for oid in pool if by_id[oid].status in ("open", "upcoming")]
+        if live:
+            return live[0]
+        if pool:
+            return pool[0]
+    return None
+
+
+def unmet_items(oid: str) -> List[str]:
+    o = by_id[oid]
+    checks = state["checks"].get(oid, {})
+    return [r for i, r in enumerate(o.requirements) if not checks.get(str(i))]
+
+
+def wl_matches(wl: dict) -> List[Opportunity]:
+    f = dict(wl.get("filters") or {})
+    for chip in f.pop("chips", []):  # chip-built lists reuse the same keys
+        if chip == "construction":
+            f.setdefault("offers", []).append("construction")
+        elif chip == "services":
+            f.setdefault("offers", []).append("services")
+        elif chip == "max500k":
+            f["max_value"] = 500_000
+        elif chip == "broward":
+            f.setdefault("counties", []).append("broward")
+        elif chip == "nobond":
+            f["nobond"] = True
+        elif chip == "recurring":
+            f["recurring"] = True
+    out = []
+    for o in open_opps:
+        if f.get("counties") and o.county not in f["counties"]:
+            continue
+        if f.get("offers") and offer_key(o) not in f["offers"]:
+            continue
+        if f.get("max_value"):
+            n = budget_amount(o)
+            if n is not None and n > f["max_value"]:
+                continue
+        if f.get("nobond") and any("bond" in r.lower() for r in o.requirements):
+            continue
+        if f.get("recurring") and not o.prior_cycles:
+            continue
+        if f.get("keywords"):
+            text = " ".join(
+                [o.title, o.scope or "", o.description or ""] + (o.categories or [])
+            ).lower()
+            if not any(kw in text for kw in f["keywords"]):
+                continue
+        out.append(o)
+    return by_due(out)
+
+
+def wl_new_ids(wl: dict, matches: List[Opportunity]) -> set:
+    baseline = wl.get("prev_opened") or wl.get("last_opened") or _baseline
+    try:
+        base_date = date.fromisoformat(str(baseline)[:10])
+    except ValueError:
+        base_date = _baseline_date
+    return {o.opportunity_id for o in matches if o.posted_date and o.posted_date >= base_date}
+
+
+_wl_computed = []
+for _wl in state["watchlists"]:
+    _matches = wl_matches(_wl)
+    _wl_computed.append((_wl, _matches, wl_new_ids(_wl, _matches)))
+
+selected_wl_id = state.get("selected_watchlist")
+if not any(w["id"] == selected_wl_id for w, _, _ in _wl_computed) and _wl_computed:
+    selected_wl_id = _wl_computed[0][0]["id"]
+
+_status_of = lambda h: str(h.status.value if hasattr(h.status, "value") else h.status)
+attention = [h for h in health if _status_of(h) in ("degraded", "error")]
+ok_n = sum(1 for h in health if _status_of(h) == "ok")
+empty_n = sum(1 for h in health if _status_of(h) == "empty")
+degraded_n = sum(1 for h in health if _status_of(h) == "degraded")
+error_n = sum(1 for h in health if _status_of(h) == "error")
+
+try:
+    total_sources = len(load_source_config())
+except Exception:
+    total_sources = len(health)
+if health:
+    total_sources = max(total_sources, len(health))
+
+wl_new_total = sum(len(new) for _, _, new in _wl_computed)
+
+nav_badges = {
+    "today": len(closing_rows) + len(fresh_rows) or None,
+    "pipeline": len(tracked_ids) or None,
+    "workroom": None,
+    "watchlists": wl_new_total or None,
+    "sources": len(attention) or None,
+}
+
+
+def track_btn(oid: str, **keep) -> str:
+    on = oid in state["tracked"]
+    return (
+        f'<a class="sc-btn sc-btn-track {"on" if on else ""}" '
+        f'href="{href(act="track", id=oid, **keep)}">'
+        f'{"TRACKING ✓" if on else "TRACK"}</a>'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Screen renderers → HTML strings
+# ---------------------------------------------------------------------------
+
+def empty_state(title: str, note: str = "") -> str:
+    demo = href(act="demo", screen=screen)
+    return block(
+        f"""
+        <div class="sc-empty">
+          <div class="sc-empty-title">{esc(title)}</div>
+          <div class="sc-empty-sub">{note or 'Click <b>FETCH LIVE DATA</b> in the sidebar (30–90s across all portals)'}
+          <br>or <a href="{demo}">load sample data</a> to explore the screens.</div>
+        </div>
+        """
+    )
+
+
+def today_row(o: Opportunity, closing: bool) -> str:
+    oid = o.opportunity_id
+    if closing:
+        slot = (
+            f'<div class="sc-slot"><div class="sc-days">{o.days_until_due}d</div>'
+            f'<div class="sc-slot-date">{esc(mon_day(o.due_date.date()))}</div></div>'
+        )
+    else:
+        slot = '<div class="sc-slot"><span class="sc-new-dot"></span></div>'
+    return block(
+        f"""
+        <div class="sc-row {'closing' if closing else ''}">
+          <a class="sc-row-link" href="{href(screen='today', drawer=oid)}" aria-label="{esc(o.title)}"></a>
+          {slot}
+          <div class="sc-row-body">
+            <div class="sc-row-title">{esc(o.title)}</div>
+            <div class="sc-row-meta">{esc(meta_line(o, with_due=not closing))}</div>
+          </div>
+          <div class="sc-row-actions">
+            {track_btn(oid, screen='today')}
+            <a class="sc-btn sc-btn-skip" href="{href(act='skip', id=oid, screen='today')}">SKIP</a>
+          </div>
+        </div>
+        """
+    )
+
+
+def today_html() -> str:
+    today_str = date.today().strftime("%A, %B ") + str(date.today().day)
+    head = block(
+        f"""
+        <div class="sc-head">
+          <div>
+            <div class="sc-head-title">Today</div>
+            <div class="sc-head-sub">{esc(today_str)} · last scan {esc(scan_note())}</div>
+          </div>
+          <div class="sc-head-chips">
+            <span class="sc-chip-outline">{len(fresh_rows)} NEW</span>
+            <span class="sc-chip-outline crimson">{len(closing_rows)} CLOSING SOON</span>
+          </div>
+        </div>
+        """
+    )
+    if not all_opps:
+        return head + empty_state("No opportunities loaded")
+
+    parts = [head]
+    if closing_rows:
+        parts.append('<div class="sc-label crimson">CLOSING WITHIN 3 DAYS</div>')
+        parts.append(
+            '<div class="sc-rows">' + "".join(today_row(o, True) for o in closing_rows) + "</div>"
+        )
+    parts.append('<div class="sc-label navy">NEW SINCE LAST VISIT</div>')
+    if fresh_rows:
+        parts.append(
+            '<div class="sc-rows last">' + "".join(today_row(o, False) for o in fresh_rows) + "</div>"
+        )
+    else:
+        parts.append(
+            '<div class="sc-rows last"><div class="sc-row"><div class="sc-row-body">'
+            '<div class="sc-row-meta">nothing new since your last visit — '
+            f'{len(open_opps)} open bids overall</div></div></div></div>'
+        )
+    skipped_n = len(state["skipped"])
+    skip_note = (
+        f"{skipped_n} skipped this session — undo" if skipped_n else "nothing skipped yet"
+    )
+    parts.append(
+        block(
+            f"""
+            <div class="sc-today-foot">
+              <span>click a row for detail · TRACK to add it to your pipeline</span>
+              <a class="sc-undo-link" href="{href(act='undoskips', screen='today')}">{esc(skip_note)}</a>
+            </div>
+            """
+        )
+    )
+    return "".join(parts)
+
+
+def kanban_card(oid: str, stage: str) -> str:
+    o = by_id[oid]
+    days = o.days_until_due
+    cls, subs = "", []
+    target = href(screen="pipeline", drawer=oid)
+    if stage == "preparing" and days is not None and 0 <= days <= 3:
+        cls = "urgent"
+        target = href(screen="workroom", bid=oid)
+        plural = "" if days == 1 else "S"
+        label = "DUE TODAY" if days == 0 else f"DUE IN {days} DAY{plural}"
+        subs.append(f'<div class="sc-card-sub crimson">{label}</div>')
+        nxt = unmet_items(oid)
+        if nxt:
+            subs.append(
+                f'<div class="sc-card-sub tight">next: {esc(nxt[0].lower())} → workroom</div>'
+            )
+    elif stage == "watching" and state["tracked"].get(oid) == date.today().isoformat():
+        cls = "navy"
+        subs.append('<div class="sc-card-sub navy">tracked today</div>')
+    elif stage == "submitted":
+        note = f"opens {o.bid_opening}" if o.bid_opening else "awaiting award"
+        subs.append(f'<div class="sc-card-sub">{esc(note)}</div>')
+    elif stage == "result":
+        outcome = state["results"].get(oid, "closed")
+        won = outcome.upper().startswith("WON")
+        cls = "won" if won else ""
+        subs.append(f'<div class="sc-card-sub {"green" if won else ""}">{esc(outcome)}</div>')
+    if not subs:
+        bits = []
+        if o.due_date:
+            bits.append(f"due {mon_day(o.due_date.date())}")
+        if stage == "preparing" and o.pre_bid_meeting:
+            bits.append(f"pre-bid {o.pre_bid_meeting}")
+        elif budget_short(o):
+            bits.append(budget_short(o))
+        else:
+            bits.append(o.agency)
+        subs.append(f'<div class="sc-card-sub">{esc(" · ".join(bits))}</div>')
+    return block(
+        f"""
+        <div class="sc-card {cls}">
+          <a class="sc-row-link" href="{target}" aria-label="{esc(o.title)}"></a>
+          <div class="sc-card-title">{esc(o.title)}</div>
+          {''.join(subs)}
+        </div>
+        """
+    )
+
+
+def pipeline_html() -> str:
+    due_week = sum(
+        1 for oid in active_tracked
+        if by_id[oid].days_until_due is not None and 0 <= by_id[oid].days_until_due <= 7
+    )
+    head = block(
+        f"""
+        <div class="sc-head">
+          <div class="sc-head-title">My Pipeline</div>
+          <div class="sc-head-note">{len(tracked_ids)} tracked · {due_week} due this week</div>
+        </div>
+        """
+    )
+    if not all_opps:
+        return head + empty_state("No opportunities loaded")
+    if not tracked_ids:
+        return head + empty_state(
+            "Nothing tracked yet",
+            "Hit <b>TRACK</b> on any bid in <a href='?screen=today'>Today</a> to start a pipeline",
+        )
+
+    events = []
+    for oid in active_tracked:
+        o = by_id[oid]
+        d = o.days_until_due
+        if d is not None and 0 <= d <= 14:
+            events.append((d, f"{short_title(o)} · {mon_day(o.due_date.date())}", d <= 2))
+    events.sort()
+    placed = []
+    last_left = -100.0
+    for d, label, urgent in events[:4]:
+        left = max(2 + d * 6, last_left + 17)  # keep clustered chips readable
+        left = min(left, 80)
+        placed.append((left, label, urgent))
+        last_left = left
+    chips = "".join(
+        f'<div class="sc-tl-chip {"urgent" if urgent else ""}" style="left:{left:g}%">'
+        f"<span>{esc(label)}</span></div>"
+        for left, label, urgent in placed
+    )
+    axis = (
+        f"<span>{mon_day(date.today())}</span>"
+        f"<span>{mon_day(date.today() + timedelta(days=7))}</span>"
+        f"<span>{mon_day(date.today() + timedelta(days=14))}</span>"
+    )
+    timeline = block(
+        f"""
+        <div class="sc-panel">
+          <div class="sc-label">NEXT 14 DAYS</div>
+          <div class="sc-timeline">{chips or '<div class="sc-tl-chip" style="left:2%"><span>no deadlines in window</span></div>'}</div>
+          <div class="sc-tl-axis">{axis}</div>
+        </div>
+        """
+    )
+
+    cols = []
+    for stage in ("watching", "preparing", "submitted", "result"):
+        ids = stage_ids(stage)
+        cards = [kanban_card(oid, stage) for oid in ids]
+        if stage == "result":
+            wins = sum(
+                1 for oid in ids if state["results"].get(oid, "").upper().startswith("WON")
+            )
+            opened = len(ids)
+            if opened:
+                cards.append(
+                    f'<div class="sc-foot-card">win rate this year: {wins} of {opened} opened</div>'
+                )
+        cols.append(
+            f'<div><div class="sc-col-head">{STAGE_LABELS[stage]} · {len(ids)}</div>'
+            f'<div class="sc-cards">{"".join(cards)}</div></div>'
+        )
+    return head + timeline + f'<div class="sc-kanban">{"".join(cols)}</div>'
+
+
+def workroom_html() -> str:
+    oid = bid_param if bid_param in by_id else default_workroom_id()
+    if not all_opps:
+        return (
+            '<div class="sc-head workroom"><div class="sc-head-title">Bid workroom</div></div>'
+            + empty_state("No opportunities loaded")
+        )
+    if oid is None:
+        return (
+            '<div class="sc-head workroom"><div class="sc-head-title">Bid workroom</div></div>'
+            + empty_state(
+                "No bid on the bench",
+                "Track a bid in <a href='?screen=today'>Today</a>, then open it from its"
+                " drawer or the pipeline",
+            )
+        )
+    o = by_id[oid]
+    dec = state["decisions"].get(oid)
+    stage = us.stage_of(state, oid)
+    checks = state["checks"].get(oid, {})
+
+    meta_bits = [o.agency]
+    if budget_short(o):
+        meta_bits.append(f"{o.budget} est")
     if o.duration_days:
-        facts.append(f'<span class="deal-fact">⏱ {o.duration_days} days</span>')
+        meta_bits.append(f"{o.duration_days} calendar days")
+    if o.liquidated_damages:
+        meta_bits.append(f"LD {o.liquidated_damages}")
+    meta_bits.append(f"detail {o.detail_score}%")
+
+    if dec == "nogo":
+        stage_html = '<div class="sc-stage-badge archived">ARCHIVED</div>'
+    elif stage:
+        stage_html = f'<div class="sc-stage-badge">{STAGE_LABELS[stage]}</div>'
+    else:
+        stage_html = '<div class="sc-stage-badge archived">NOT TRACKED</div>'
+    crumb_txt = f"← My Pipeline · {sol_label(o)}"
+    if offer_word(o):
+        crumb_txt += f" · {offer_word(o).upper()}"
+    if o.external_id:
+        crumb_txt += f" · {o.external_id}"
+    head = block(
+        f"""
+        <div class="sc-head workroom">
+          <div>
+            <a class="sc-crumb" href="{href(screen='pipeline')}">{esc(crumb_txt)}</a>
+            <div class="sc-wr-title">{esc(o.title)}</div>
+            <div class="sc-wr-meta">{esc(' · '.join(meta_bits))}</div>
+          </div>
+          <div class="sc-wr-right">
+            <div class="sc-wr-due">{'Due ' + esc(due_full(o.due_date)) if o.due_date else esc(o.status)}</div>
+            {stage_html}
+          </div>
+        </div>
+        """
+    )
+
+    banner = ""
+    if dec:
+        if dec == "go":
+            nxt = unmet_items(oid)
+            detail = f"next: {nxt[0].lower()}" if nxt else "checklist is ready"
+            if o.due_date:
+                detail += f"; bid due {due_full(o.due_date)}"
+            text = f"MARKED GO — {detail}"
+        else:
+            text = "MARKED NO-GO — archived; removed from the pipeline board"
+        banner = block(
+            f"""
+            <div class="sc-banner {'nogo' if dec == 'nogo' else ''}">
+              <span class="sc-banner-text">{esc(text)}</span>
+              <a class="sc-undo-link" href="{href(act='cleardec', id=oid, screen='workroom', bid=oid)}">undo</a>
+            </div>
+            """
+        )
+
+    scope_text = " ".join((o.scope or o.description or "").split())
+    if scope_text:
+        cut = scope_text.rfind(". ", 0, 440)
+        cut = cut + 1 if cut > 120 else min(len(scope_text), 440)
+        lead, rest = scope_text[:cut].strip(), scope_text[cut:].strip()
+        more = (
+            f'<div class="sc-scope-more">{esc(rest)}</div>' if (rest and scope_open) else ""
+        )
+        if rest:
+            toggle_label = (
+                "collapse ▴" if scope_open
+                else f"full text, {len(scope_text):,} characters — expand ▾"
+            )
+            toggle = (
+                f'<a class="sc-scope-toggle" href="'
+                f'{href(screen="workroom", bid=oid, scope=None if scope_open else "1")}'
+                f'">{toggle_label}</a>'
+            )
+        else:
+            toggle = ""
+        scope_card = f'<div class="sc-scope-card">{esc(lead)}{more}{toggle}</div>'
+    else:
+        scope_card = (
+            '<div class="sc-scope-card">No scope text extracted — open the official'
+            " portal for the full package.</div>"
+        )
+
+    if o.requirements:
+        rows = []
+        for i, req in enumerate(o.requirements):
+            done = bool(checks.get(str(i)))
+            urgent = ("site visit" in req.lower() or "mandatory" in req.lower()) and not done
+            note = "— NOT SCHEDULED" if urgent else ""
+            rows.append(
+                block(
+                    f"""
+                    <a class="sc-check" href="{href(act='check', id=oid, i=i, screen='workroom', bid=oid)}">
+                      <span class="sc-checkbox {'on' if done else ''}">{'✓' if done else ''}</span>
+                      <span class="sc-check-label {'done' if done else ''}">{esc(req)}</span>
+                      <span class="sc-check-note {'urgent' if urgent else ''}">{note}</span>
+                    </a>
+                    """
+                )
+            )
+        done_n = sum(1 for i in range(len(o.requirements)) if checks.get(str(i)))
+        check_block = block(
+            f"""
+            <div class="sc-check-head">
+              <div class="sc-label">REQUIREMENTS → CHECKLIST</div>
+              <div class="sc-check-count">{done_n} OF {len(o.requirements)} READY</div>
+            </div>
+            """
+        ) + f'<div class="sc-checklist">{"".join(rows)}</div>'
+    else:
+        check_block = (
+            '<div class="sc-label">REQUIREMENTS → CHECKLIST</div>'
+            '<div class="sc-checklist"><span class="sc-check-note">no structured'
+            " requirements extracted — check the bid documents</span></div>"
+        )
+
+    addenda = sum(1 for d in o.documents if d.kind == "addendum")
+    doc_rows = []
+    for d in o.documents[:4]:
+        kind = doc_kind_label(d.name, d.kind)
+        add = d.kind == "addendum"
+        url = esc(d.url) if d.url and d.url != "#" else ""
+        name = (
+            f'<a class="sc-doc-name" href="{url}" target="_blank" rel="noopener">{esc(d.name)}</a>'
+            if url else f'<span class="sc-doc-name">{esc(d.name)}</span>'
+        )
+        doc_rows.append(
+            f'<div class="sc-doc {"addendum" if add else ""}">{name}'
+            f'<span class="sc-doc-kind {"crimson" if add else ""}">{kind}</span></div>'
+        )
+    if len(o.documents) > 4:
+        doc_rows.append(
+            f'<div class="sc-doc-more">+ {len(o.documents) - 4} more on the portal</div>'
+        )
+    if not o.documents:
+        doc_rows.append('<div class="sc-doc-more">no documents published yet</div>')
+    doc_title = f"BID DOCUMENTS ({len(o.documents)}" + (
+        f" · {addenda} ADDENDUM)" if addenda else ")"
+    )
+    docs_block = (
+        f'<div class="sc-label">{doc_title}</div>'
+        f'<div class="sc-docs">{"".join(doc_rows)}</div>'
+    )
+
+    date_rows = []
+    if o.posted_date:
+        date_rows.append((o.posted_date, "posted", False))
+    if o.questions_due:
+        date_rows.append((o.questions_due.date(), "questions closed", False))
+    dates_html = []
+    for d, label, _ in date_rows:
+        dates_html.append(
+            f'<div class="sc-date-row"><span class="sc-date-dot"></span>'
+            f"<div><b>{mon_day(d)}</b> — {esc(label)}</div></div>"
+        )
+    if o.pre_bid_meeting:
+        dates_html.append(
+            '<div class="sc-date-row"><span class="sc-date-dot"></span>'
+            f"<div><b>pre-bid</b> — {esc(o.pre_bid_meeting)}</div></div>"
+        )
+    if o.due_date:
+        where = f", {o.submittal_info}" if o.submittal_info else ""
+        dates_html.append(
+            '<div class="sc-date-row"><span class="sc-date-dot due"></span>'
+            f'<div><b class="due-text">{esc(due_full(o.due_date))}</b> — bids due{esc(where)}</div></div>'
+        )
+    dates_block = (
+        '<div class="sc-label">KEY DATES</div>'
+        f'<div class="sc-dates">{"".join(dates_html) or "<span class=sc-doc-more>no dates published</span>"}</div>'
+    )
+
+    month = date.today().strftime("%B")
+    meters = [("Fit for our crews", 80), (f"Capacity in {month}", 45), ("Expected margin", 65)]
+    meter_html = "".join(
+        f'<div class="sc-meter-label">{esc(label)}</div>'
+        f'<div class="sc-meter {"last" if i == len(meters) - 1 else ""}">'
+        f'<div style="width:{pct}%"></div></div>'
+        for i, (label, pct) in enumerate(meters)
+    )
+    gonogo_block = block(
+        f"""
+        <div class="sc-label">GO / NO-GO</div>
+        <div class="sc-gonogo">
+          {meter_html}
+          <div class="sc-gonogo-btns">
+            <a class="sc-btn-go {'chosen' if dec == 'go' else ''}"
+               href="{href(act='go', id=oid, screen='workroom', bid=oid)}">GO — BID IT</a>
+            <a class="sc-btn-nogo {'chosen' if dec == 'nogo' else ''}"
+               href="{href(act='nogo', id=oid, screen='workroom', bid=oid)}">NO-GO</a>
+          </div>
+        </div>
+        """
+    )
+
+    note_val = esc(state["notes"].get(oid, "")).replace("\n", "&#10;")
+    notes_block = block(
+        f"""
+        <div class="sc-label">MY NOTES</div>
+        <form class="sc-notes-form" method="get">
+          <input type="hidden" name="screen" value="workroom">
+          <input type="hidden" name="bid" value="{esc(oid)}">
+          <input type="hidden" name="act" value="notes">
+          <input type="hidden" name="id" value="{esc(oid)}">
+          <textarea class="sc-notes" name="notes"
+            placeholder="call Ray re: crane access on the west apron…">{note_val}</textarea>
+          <button class="sc-notes-save" type="submit">SAVE NOTES</button>
+        </form>
+        """
+    )
+
+    left = scope_card and (
+        '<div class="sc-label">SCOPE OF WORK</div>' + scope_card + check_block + docs_block
+    )
+    right = dates_block + gonogo_block + notes_block
+    return head + banner + f'<div class="sc-wr-grid"><div>{left}</div><div>{right}</div></div>'
+
+
+def watchlists_html() -> str:
+    head = block(
+        f"""
+        <div class="sc-head">
+          <div class="sc-head-title">Watchlists</div>
+          <a class="sc-btn sc-btn-ink" style="padding:5px 12px"
+             href="{href(act='savewl', screen='watchlists')}">+ NEW WATCHLIST</a>
+        </div>
+        """
+    )
+    if not all_opps:
+        return head + empty_state("No opportunities loaded")
+
+    cards = []
+    current = _wl_computed[0] if _wl_computed else None
+    for wl, matches, new_ids in _wl_computed:
+        active = wl["id"] == selected_wl_id
+        if active:
+            current = (wl, matches, new_ids)
+        n_new = len(new_ids)
+        email = wl.get("email", "off")
+        f = wl.get("filters") or {}
+        counties = f.get("counties") or [c for c in ["broward"] if "broward" in f.get("chips", [])]
+        where = (
+            " + ".join(COUNTY_LABELS.get(c, c) for c in counties) if counties else "all counties"
+        )
+        cards.append(
+            block(
+                f"""
+                <div class="sc-wl-card {'active' if active else ''}">
+                  <a class="sc-row-link" href="{href(act='selwl', wl=wl['id'], screen='watchlists')}"></a>
+                  <div class="sc-wl-head">
+                    <span class="sc-wl-name">{esc(wl['name'])}</span>
+                    <span class="sc-wl-new {'zero' if not n_new else ''}">{f'{n_new} NEW' if n_new else '0 new'}</span>
+                  </div>
+                  <div class="sc-wl-meta">{esc(where)} · {len(matches)} matches · email: {esc(email)}</div>
+                </div>
+                """
+            )
+        )
+
+    chips = []
+    for key, label in CHIP_DEFS:
+        on = state["builder_chips"].get(key, False)
+        chips.append(
+            f'<a class="sc-chip {"on" if on else ""}" '
+            f'href="{href(act="chip", id=key, screen="watchlists")}">{esc(label)}</a>'
+        )
+    n_chips = sum(1 for k, _ in CHIP_DEFS if state["builder_chips"].get(k))
+    builder = block(
+        f"""
+        <div class="sc-builder">
+          <div class="sc-label">BUILD FROM CHIPS</div>
+          <div class="sc-chips">{''.join(chips)}</div>
+          <div class="sc-builder-note">{n_chips} filters selected ·
+            <a class="sc-builder-save" href="{href(act='savewl', screen='watchlists')}">save as watchlist</a></div>
+        </div>
+        """
+    )
+
+    match_rows = []
+    wl_title = "MATCHES"
+    if current:
+        wl, matches, new_ids = current
+        wl_title = f"{wl['name'].upper()} — MATCHES"
+        for o in matches[:8]:
+            oid = o.opportunity_id
+            is_new = oid in new_ids
+            tag = ' <span class="sc-match-tag">NEW</span>' if is_new else ""
+            match_rows.append(
+                block(
+                    f"""
+                    <div class="sc-match {'new' if is_new else ''}">
+                      <a class="sc-row-link" href="{href(screen='watchlists', drawer=oid)}"></a>
+                      <div class="sc-match-body">
+                        <div class="sc-match-title">{esc(o.title)}{tag}</div>
+                        <div class="sc-match-meta">{esc(meta_line(o, with_due=True))}</div>
+                      </div>
+                      <span class="sc-look">LOOK ›</span>
+                    </div>
+                    """
+                )
+            )
+        if not matches:
+            match_rows.append(
+                '<div class="sc-match"><div class="sc-match-meta">no open bids match'
+                " this watchlist right now</div></div>"
+            )
+
+    right = block(
+        f"""
+        <div>
+          <div class="sc-label">{esc(wl_title)}</div>
+          <div class="sc-wl-col">{''.join(match_rows)}</div>
+          <div class="sc-wl-footnote">"new" = posted since this watchlist was last opened
+          · email alert sends the same list</div>
+        </div>
+        """
+    )
+    left = f'<div class="sc-wl-col">{"".join(cards)}{builder}</div>'
+    return head + f'<div class="sc-wl-grid">{left}{right}</div>'
+
+
+def sources_html() -> str:
+    fetch_note = (
+        f"fetched just now ({fetch_count} sources)" if fetched_now
+        else f"last scan {scan_note()}"
+    )
+    head = block(
+        f"""
+        <div class="sc-head">
+          <div class="sc-head-title">Sources</div>
+          <div class="sc-head-note">{total_sources} sources · {len(COUNTY_LABELS)} counties · {esc(fetch_note)}</div>
+        </div>
+        """
+    )
+    if not health:
+        return head + empty_state(
+            "No source health yet",
+            "Health is recorded on every fetch — run one from the sidebar",
+        )
+
+    kpis = block(
+        f"""
+        <div class="sc-kpis">
+          <div class="sc-kpi"><div class="sc-kpi-num green">{ok_n}</div><div class="sc-kpi-label">OK</div></div>
+          <div class="sc-kpi"><div class="sc-kpi-num">{empty_n}</div><div class="sc-kpi-label">NO LISTINGS</div></div>
+          <div class="sc-kpi {'alert' if degraded_n else ''}"><div class="sc-kpi-num {'crimson' if degraded_n else ''}">{degraded_n}</div><div class="sc-kpi-label">DEGRADED</div></div>
+          <div class="sc-kpi {'alert' if error_n else ''}"><div class="sc-kpi-num {'crimson' if error_n else ''}">{error_n}</div><div class="sc-kpi-label">ERROR</div></div>
+        </div>
+        """
+    )
+
+    attn_html = []
+    if attention:
+        attn_html.append('<div class="sc-label crimson">NEEDS ATTENTION</div>')
+        for i, h in enumerate(attention[:6]):
+            note = h.note or h.error or "degraded"
+            attn_html.append(
+                block(
+                    f"""
+                    <div class="sc-attn {'last' if i == min(len(attention), 6) - 1 else ''}">
+                      <div class="sc-attn-name">{esc(h.name)}</div>
+                      <div class="sc-attn-note">{esc(note[:110])}</div>
+                    </div>
+                    """
+                )
+            )
+
+    limit = len(health) if all_sources_open else 8
+    src_rows = []
+    for h in health[:limit]:
+        status = _status_of(h)
+        if status == "ok":
+            dot, stat = "", f"{h.count} deals · {h.elapsed_ms / 1000:.1f}s"
+        elif status == "empty":
+            dot, stat = "empty", "no listings"
+        else:
+            dot, stat = "bad", status
+        src_rows.append(
+            block(
+                f"""
+                <div class="sc-src">
+                  <span class="sc-src-name"><span class="sc-src-dot {dot}"></span>{esc(h.name)}</span>
+                  <span class="sc-src-stat">{esc(stat)}</span>
+                </div>
+                """
+            )
+        )
+    if len(health) > limit:
+        src_rows.append(
+            f'<a class="sc-src-more" href="{href(screen="sources", allsrc="1")}">'
+            f"… {len(health) - limit} more ▾</a>"
+        )
+    elif all_sources_open and len(health) > 8:
+        src_rows.append(
+            f'<a class="sc-src-more" href="{href(screen="sources")}">collapse ▴</a>'
+        )
+    left = (
+        "".join(attn_html)
+        + '<div class="sc-label">ALL SOURCES</div>'
+        + f'<div class="sc-srclist">{"".join(src_rows)}</div>'
+    )
+
+    configured = " ".join(
+        str(cfg.get("name", "")).lower() for cfg in (load_source_config() or [])
+    )
+    queued_names = {s.get("name") for s in state["queued_sources"]}
+    gap_rows = []
+    for name in SUGGESTED_SOURCES:
+        if name.lower() in configured:
+            continue
+        queued = name in queued_names
+        btn = (
+            '<a class="sc-add queued">QUEUED ✓</a>' if queued
+            else f'<a class="sc-add" href="{href(act="addsrc", name=name, screen="sources")}">+ ADD</a>'
+        )
+        gap_rows.append(f'<div class="sc-gap"><span>{esc(name)}</span>{btn}</div>')
+
+    if detect_status == "ok":
+        note_cls, note = "ok", "Detected: CivicPlus Bids module — queued as a config entry ✓"
+    elif detect_status == "fail":
+        note_cls, note = "fail", "no known bid-board module at that URL — CivicPlus (…/bids.aspx) auto-detects"
+    else:
+        note_cls, note = "", "CivicPlus boards auto-detect → a config entry, no code"
+    n_queued = len(state["queued_sources"])
+    queued_note = (
+        f'<div class="sc-detect-note">{n_queued} queued for config/sources.yaml</div>'
+        if n_queued else ""
+    )
+    right = block(
+        f"""
+        <div>
+          <div class="sc-label">COVERAGE GAPS — ADD A SOURCE</div>
+          <div class="sc-gaps">
+            <div class="sc-gaps-title">Suggested next <span>(known portals, not wired up)</span></div>
+            <div class="sc-gap-rows">{''.join(gap_rows) or '<span class="sc-detect-note">all suggested portals are configured</span>'}</div>
+          </div>
+          <div class="sc-detect-box">
+            <div class="sc-detect-label">or paste any bid-board URL:</div>
+            <form class="sc-detect-form" method="get">
+              <input type="hidden" name="screen" value="sources">
+              <input type="hidden" name="act" value="detect">
+              <input class="sc-detect-input" type="text" name="url"
+                     value="{esc(detect_url)}" placeholder="https://…/bids.aspx">
+              <button class="sc-detect-btn" type="submit">DETECT</button>
+            </form>
+            <div class="sc-detect-note {note_cls}">{esc(note)}</div>
+            {queued_note}
+          </div>
+        </div>
+        """
+    )
+    return head + kpis + f'<div class="sc-src-grid"><div>{left}</div>{right}</div>'
+
+
+# ---------------------------------------------------------------------------
+# Detail drawer
+# ---------------------------------------------------------------------------
+
+def drawer_html(o: Opportunity) -> str:
+    oid = o.opportunity_id
+    keep = {"screen": screen}
+    if bid_param:
+        keep["bid"] = bid_param
+
+    tags = [f'<span class="sc-tag">{esc(sol_label(o))}</span>']
+    if offer_word(o):
+        tags.append(f'<span class="sc-tag">{esc(offer_word(o).upper())}</span>')
+    d = o.days_until_due
+    if o.status in ("open", "upcoming") and d is not None and 0 <= d <= 3:
+        label = "DUE TODAY" if d == 0 else f"DUE IN {d} DAY{'' if d == 1 else 'S'}"
+        tags.append(f'<span class="sc-tag crimson">{label}</span>')
+    elif o.posted_date == date.today():
+        tags.append('<span class="sc-tag">NEW TODAY</span>')
+    if us.stage_of(state, oid) == "submitted":
+        tags.append('<span class="sc-tag green">SUBMITTED</span>')
     if o.prior_cycles:
-        facts.append(f'<span class="deal-fact recur">🔁 bid {o.prior_cycles}x before</span>')
+        tags.append(
+            f'<span class="sc-tag green">REBID · {o.prior_cycles}X BEFORE</span>'
+        )
+
+    facts: List[Tuple[str, str]] = []
+    if o.budget:
+        facts.append(("ESTIMATED VALUE", o.budget))
+    if o.due_date:
+        facts.append(("BIDS DUE", due_full(o.due_date)))
+    if o.duration_days:
+        facts.append(("DURATION", f"{o.duration_days} calendar days"))
+    if o.liquidated_damages:
+        facts.append(("LIQ. DAMAGES", o.liquidated_damages))
+    if o.licenses:
+        facts.append(("LICENCE", o.licenses))
+    if o.pre_bid_meeting:
+        facts.append(("PRE-BID", o.pre_bid_meeting))
+    if o.questions_due:
+        facts.append(("QUESTIONS DUE", mon_day(o.questions_due.date())))
+    if o.project_location:
+        facts.append(("LOCATION", o.project_location))
+    if o.contact:
+        contact = o.contact + (f" · {o.contact_phone}" if o.contact_phone else "")
+        facts.append(("CONTACT", contact))
+    if o.prior_cycles and o.last_cycle_closed:
+        facts.append(("LAST CYCLE", f"closed {mon_day(o.last_cycle_closed)} {o.last_cycle_closed.year}"))
+    facts_html = "".join(
+        f'<div><div class="sc-fact-label">{esc(k)}</div>'
+        f'<div class="sc-fact-value">{esc(v)}</div></div>'
+        for k, v in facts[:8]
+    )
+
+    scope = " ".join((o.scope or o.description or "").split())
+    if len(scope) > 420:
+        scope = scope[:419].rstrip() + "…"
+    scope_html = (
+        f'<div class="sc-label">SCOPE</div><div class="sc-drawer-scope">{esc(scope)}</div>'
+        if scope else ""
+    )
+
+    reqs_html = ""
+    if o.requirements:
+        chips = "".join(
+            f'<span class="sc-req-chip">{esc(r)}</span>' for r in o.requirements[:6]
+        )
+        reqs_html = (
+            f'<div class="sc-label">REQUIREMENTS TO BID</div>'
+            f'<div class="sc-req-chips">{chips}</div>'
+        )
+
+    docs_html = ""
     if o.documents:
-        addenda = sum(1 for d in o.documents if d.kind == "addendum")
-        label = f"{len(o.documents)} doc" + ("s" if len(o.documents) != 1 else "")
-        if addenda:
-            label += f" · {addenda} addendum" + ("s" if addenda != 1 else "")
-        facts.append(f'<span class="deal-fact">📎 {esc(label)}</span>')
-    for req in o.requirements[:2]:
-        facts.append(f'<span class="deal-fact req">{esc(req)}</span>')
-    if len(o.requirements) > 2:
-        facts.append(f'<span class="deal-fact req">+{len(o.requirements) - 2}</span>')
+        rows = []
+        for doc in o.documents[:5]:
+            add = doc.kind == "addendum"
+            kind = doc_kind_label(doc.name, doc.kind)
+            url = esc(doc.url) if doc.url and doc.url != "#" else ""
+            name = (
+                f'<a class="sc-doc-name" href="{url}" target="_blank" rel="noopener">{esc(doc.name)}</a>'
+                if url else f'<span class="sc-doc-name">{esc(doc.name)}</span>'
+            )
+            rows.append(
+                f'<div class="sc-doc">{name}'
+                f'<span class="sc-doc-kind {"crimson" if add else ""}">{kind}</span></div>'
+            )
+        if len(o.documents) > 5:
+            rows.append(f'<div class="sc-doc-more">+ {len(o.documents) - 5} more on the portal</div>')
+        docs_html = (
+            f'<div class="sc-label">DOCUMENTS</div>'
+            f'<div class="sc-drawer-docs">{"".join(rows)}</div>'
+        )
+
+    workroom_btn = ""
+    if oid in state["tracked"]:
+        workroom_btn = (
+            f'<a class="sc-btn sc-btn-primary" href="{href(screen="workroom", bid=oid)}">'
+            "OPEN WORKROOM →</a>"
+        )
+    portal_btn = (
+        f'<a class="sc-btn sc-btn-ink" href="{esc(o.url)}" target="_blank" rel="noopener">'
+        "OFFICIAL PORTAL ↗</a>"
+        if o.url and not o.url.startswith("https://example.com") else ""
+    )
+
+    meta_bits = [o.agency]
+    if offer_word(o):
+        meta_bits.append(offer_word(o))
+    meta_bits.append(f"detail {o.detail_score}%")
 
     return block(
         f"""
-    <div class="deal-card {'selected' if selected else ''}" style="--accent-bar:{color}">
-      <div class="deal-card-top">
-        <span class="deal-type">{esc(sol_label(o))}</span>
-        <span class="deal-urgency {ucss}">{esc(ulabel)}</span>
-      </div>
-      <div class="deal-title">{esc(o.title)}</div>
-      <div class="deal-agency">{esc(o.agency)}
-        · {esc(COUNTY_LABELS.get(o.county, o.county))}
-        · {esc(offer_label(o))}
-      </div>
-      <div class="deal-brief">{esc(blurb)}</div>
-      {f'<div class="deal-facts">{"".join(facts)}</div>' if facts else ''}
-      <div class="deal-foot">
-        <span class="deal-due">📅 {esc(fmt_due(o))}</span>
-        {f'<span class="deal-ref">{ref}</span>' if ref else ''}
-      </div>
-    </div>
-    """
-    )
-
-
-def render_deal_actions(o: Opportunity, key: str) -> None:
-    c1, c2 = st.columns(2)
-    with c1:
-        st.link_button("🔗 Open portal", o.url or "#", width="stretch")
-    with c2:
-        is_sel = st.session_state.selected_id == o.opportunity_id
-        if st.button(
-            "✓ Selected" if is_sel else "📄 Summary",
-            key=key,
-            width="stretch",
-            type="primary" if is_sel else "secondary",
-        ):
-            st.session_state.selected_id = None if is_sel else o.opportunity_id
-            if st.session_state.view_mode == "board" and not is_sel:
-                st.session_state.view_mode = "list"
-            st.rerun()
-
-
-def _fact_rows(o: Opportunity) -> str:
-    """The at-a-glance grid: only fields that actually have a value."""
-    rows = [
-        ("Reference", o.external_id),
-        ("Agency", o.agency),
-        ("Department", o.department),
-        ("County", COUNTY_LABELS.get(o.county, o.county)),
-        ("Solicitation", sol_label(o)),
-        # "Unknown" work type is an absence, not a fact worth a grid cell.
-        ("Work type", offer_label(o) if offer_key(o) != "unknown" else None),
-        ("Estimated value", o.budget),
-        ("Project duration", f"{o.duration_days} calendar days" if o.duration_days else None),
-        ("Liquidated damages", o.liquidated_damages),
-        ("Licence required", o.licenses),
-        ("Location", o.project_location),
-        (
-            "Previously bid",
-            f"{o.prior_cycles}x by this agency"
-            + (f", last closed {o.last_cycle_closed.isoformat()}" if o.last_cycle_closed else "")
-            if o.prior_cycles
-            else None,
-        ),
-        ("Bids due", fmt_due(o)),
-        ("Questions due", _fmt_dt(o.questions_due)),
-        ("Posted", o.posted_date.isoformat() if o.posted_date else None),
-        ("Pre-bid meeting", o.pre_bid_meeting),
-        ("Bid opening", o.bid_opening),
-        ("Submit to", o.submittal_info),
-        ("Contact", o.contact),
-        ("Email", o.contact_email),
-        ("Phone", o.contact_phone),
-        ("Categories", ", ".join(c.replace("_", " ") for c in (o.categories or [])) or None),
-        ("Source", o.source_name),
-    ]
-    cells = [
-        f'<div class="fact"><div class="fact-label">{esc(label)}</div>'
-        f'<div class="fact-value">{esc(value)}</div></div>'
-        for label, value in rows
-        if value
-    ]
-    return f'<div class="fact-grid">{"".join(cells)}</div>'
-
-
-def _fmt_dt(value) -> Optional[str]:
-    return value.strftime("%b %d, %Y %H:%M") if value else None
-
-
-def render_summary_panel(o: Opportunity) -> None:
-    ucss, ulabel = urgency_badge(o)
-    score = o.detail_score
-
-    tags = [
-        f'<span class="ng-card-tag">{esc(sol_label(o))}</span>',
-        f'<span class="ng-card-tag">{esc(offer_label(o))}</span>',
-        f'<span class="ng-card-tag {ucss}">{esc(ulabel)}</span>',
-        f'<span class="ng-card-tag">{esc(STATUS_LABELS.get(o.status, o.status))}</span>',
-    ]
-    if o.external_id:
-        tags.append(f'<span class="ng-card-tag">{esc(o.external_id)}</span>')
-
-    st.markdown(
-        block(
-            f"""
-        <div class="summary-panel">
-          <div class="summary-head">
-            <div class="summary-eyebrow">Opportunity detail</div>
-            <div class="detail-meter" title="How much is known about this bid">
-              <span class="detail-meter-label">{score}% detail</span>
-              <span class="detail-meter-track">
-                <span class="detail-meter-fill" style="width:{score}%"></span>
-              </span>
-            </div>
+        <a class="sc-overlay" href="{href(**keep)}" aria-label="Close"></a>
+        <div class="sc-drawer">
+          <div class="sc-drawer-top">
+            <span class="sc-drawer-ref">{esc(o.external_id or o.source_name)}</span>
+            <a class="sc-x" href="{href(**keep)}">✕</a>
           </div>
-          <h2>{esc(o.title)}</h2>
-          <div class="summary-tags">{"".join(tags)}</div>
-          {_fact_rows(o)}
-        </div>
-        """
-        ),
-        unsafe_allow_html=True,
-    )
-
-    if o.requirements:
-        chips = "".join(
-            f'<span class="req-chip">{esc(r)}</span>' for r in o.requirements
-        )
-        st.markdown(
-            block(
-                f"""
-            <div class="detail-section">
-              <div class="detail-section-title">Requirements to bid</div>
-              <div class="req-chips">{chips}</div>
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
-        )
-
-    if o.scope:
-        scope = " ".join(o.scope.split())
-        preview, rest = scope[:900], scope[900:]
-        st.markdown(
-            block(
-                f"""
-            <div class="detail-section">
-              <div class="detail-section-title">Scope of work</div>
-              <div class="scope-text">{esc(preview)}{'…' if rest else ''}</div>
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
-        )
-        if rest:
-            with st.expander(f"Read the full scope ({len(scope):,} characters)"):
-                st.write(scope)
-    elif o.description:
-        st.markdown(
-            block(
-                f"""
-            <div class="detail-section">
-              <div class="detail-section-title">Description</div>
-              <div class="scope-text">{esc(o.description)}</div>
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
-        )
-
-    if o.documents:
-        links = "".join(
-            f'<a class="doc-link {esc(d.kind)}" href="{esc(d.url)}" target="_blank" '
-            f'rel="noopener">{esc(d.name)}<span class="doc-kind">{esc(d.kind)}</span></a>'
-            for d in o.documents[:25]
-        )
-        more = (
-            f'<div class="doc-more">+ {len(o.documents) - 25} more on the portal</div>'
-            if len(o.documents) > 25
-            else ""
-        )
-        st.markdown(
-            block(
-                f"""
-            <div class="detail-section">
-              <div class="detail-section-title">Bid documents ({len(o.documents)})</div>
-              <div class="doc-list">{links}</div>
-              {more}
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
-        )
-
-    if not o.detail_fetched and o.status in {"open", "upcoming"}:
-        st.caption(
-            "This portal does not publish a machine-readable detail page — "
-            "open the official listing for the full package."
-        )
-
-    a1, a2, a3 = st.columns(3)
-    with a1:
-        st.link_button("Open official portal ↗", o.url or "#", width="stretch", type="primary")
-    with a2:
-        subject = quote(f"Bid opportunity: {o.title[:80]}")
-        body = quote(f"{ensure_brief(o)}\n\nPortal: {o.url}")
-        st.link_button("Share via email", f"mailto:?subject={subject}&body={body}", width="stretch")
-    with a3:
-        if st.button("Close detail", width="stretch", key=f"close_{o.opportunity_id}"):
-            st.session_state.selected_id = None
-            st.rerun()
-
-
-def render_export(opps: List[Opportunity]) -> None:
-    """Let the user take the *filtered* view away as CSV or JSON."""
-    if not opps:
-        return
-    with st.expander(f"Export these {len(opps)} deals", expanded=False):
-        rows = [o.to_row() for o in opps]
-        csv = pd.DataFrame(rows).to_csv(index=False).encode("utf-8")
-        payload = json.dumps(
-            {"count": len(opps), "opportunities": rows}, indent=2, default=str
-        ).encode("utf-8")
-        stamp = datetime.now().strftime("%Y%m%d")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.download_button(
-                "⬇️  CSV",
-                csv,
-                file_name=f"sf-procurement-{stamp}.csv",
-                mime="text/csv",
-                width="stretch",
-            )
-        with c2:
-            st.download_button(
-                "⬇️  JSON",
-                payload,
-                file_name=f"sf-procurement-{stamp}.json",
-                mime="application/json",
-                width="stretch",
-            )
-
-
-def render_left_menu(all_opps: List[Opportunity], health) -> None:
-    """Always-visible left navigation (main layout column — not Streamlit sidebar)."""
-    st.markdown(
-        block(
-            """
-        <div class="left-menu-brand">
-          <div class="ng-brand-mark">SF</div>
-          <div>
-            <div class="ng-brand-name">SF Procure Scout</div>
-            <div class="ng-brand-sub">South Florida bids</div>
+          <div class="sc-drawer-title">{esc(o.title)}</div>
+          <div class="sc-drawer-meta">{esc(' · '.join(meta_bits))}</div>
+          <div class="sc-tags">{''.join(tags)}</div>
+          <div class="sc-facts">{facts_html}</div>
+          {scope_html}
+          {reqs_html}
+          {docs_html}
+          <div class="sc-drawer-foot">
+            {track_btn(oid, **keep, drawer=oid)}
+            {workroom_btn}
+            {portal_btn}
           </div>
         </div>
         """
-        ),
-        unsafe_allow_html=True,
     )
 
-    st.markdown('<p class="left-menu-label">Actions</p>', unsafe_allow_html=True)
-    if st.button("🔄  Fetch live data", type="primary", width="stretch", key="fetch_btn"):
-        st.session_state.do_fetch = True
-        st.rerun()
 
-    st.checkbox(
-        "Include catalog portals",
-        key="include_catalog",
-        help="DemandStar / Bidnet / VSS registration entries",
-    )
-    st.checkbox("Urgent only (≤ 7 days)", key="show_only_urgent")
+# ---------------------------------------------------------------------------
+# Shell
+# ---------------------------------------------------------------------------
 
-    st.markdown('<p class="left-menu-label">Filters</p>', unsafe_allow_html=True)
-
-    county_opts = ["All"] + list(COUNTY_LABELS.values())
-    if st.session_state.county_filter not in county_opts:
-        st.session_state.county_filter = "All"
-    st.selectbox("County", county_opts, key="county_filter")
-
-    if all_opps:
-        offer_opts = ["All"] + sorted(
-            {offer_key(o).replace("_", " ").title() for o in all_opps if offer_key(o) != "unknown"}
-        )
-        cat_opts = ["All"] + sorted(
-            {
-                c.replace("_", " ").title()
-                for o in all_opps
-                for c in (o.categories or [])
-                if c != "portal_directory"
-            }
-        )
-        agency_opts = ["All"] + sorted({o.agency for o in all_opps if o.agency})
+def sidebar_html() -> str:
+    if fetched_now:
+        fetch_cls, fetch_label = "done", "FETCHED ✓"
     else:
-        offer_opts, cat_opts, agency_opts = ["All"], ["All"], ["All"]
-
-    for key, opts in (
-        ("offer_filter", offer_opts),
-        ("category_filter", cat_opts),
-        ("agency_filter", agency_opts),
-    ):
-        if st.session_state.get(key) not in opts:
-            st.session_state[key] = "All"
-
-    st.selectbox("Offer type", offer_opts, key="offer_filter")
-    st.selectbox("Category", cat_opts, key="category_filter")
-    st.selectbox("Agency", agency_opts, key="agency_filter")
-    st.selectbox(
-        "Sort by",
-        ["due_soon", "newest", "agency", "title"],
-        format_func=lambda x: {
-            "due_soon": "Due soonest",
-            "newest": "Newest posted",
-            "agency": "Agency A–Z",
-            "title": "Title A–Z",
-        }[x],
-        key="sort_by",
-    )
-    st.selectbox(
-        "Board columns",
-        ["county", "status", "offer_type"],
-        format_func=lambda x: {
-            "county": "By county",
-            "status": "By status",
-            "offer_type": "By offer type",
-        }[x],
-        key="board_group",
-    )
-
-    if st.button("Clear all filters", width="stretch", key="clear_filters"):
-        st.session_state.county_filter = "All"
-        st.session_state.offer_filter = "All"
-        st.session_state.category_filter = "All"
-        st.session_state.agency_filter = "All"
-        st.session_state.query = ""
-        st.session_state.stage_tab = "open"
-        st.session_state.show_only_urgent = False
-        st.session_state.selected_id = None
-        st.rerun()
-
-    st.markdown('<p class="left-menu-label">Layout</p>', unsafe_allow_html=True)
-    st.radio(
-        "Layout",
-        ["list", "board", "insights"],
-        format_func=lambda x: {
-            "list": "📋  List + detail",
-            "board": "🗂  Board",
-            "insights": "📊  Insights",
-        }[x],
-        key="view_mode",
-        label_visibility="collapsed",
-    )
-
-    st.markdown('<p class="left-menu-label">Quick county</p>', unsafe_allow_html=True)
-    if st.button("All counties", width="stretch", key="qc_all"):
-        st.session_state.county_filter = "All"
-        st.rerun()
-    for ck, label in COUNTY_LABELS.items():
-        n = sum(1 for o in all_opps if o.county == ck) if all_opps else 0
-        active = st.session_state.county_filter == label
-        if st.button(
-            f"{'● ' if active else ''}{label}  ({n})",
-            width="stretch",
-            key=f"qc_{ck}",
-            type="primary" if active else "secondary",
-        ):
-            st.session_state.county_filter = label
-            st.rerun()
-
-    if health:
-        ok = sum(1 for h in health if h.status == HealthStatus.OK.value)
-        st.caption(f"Sources: {ok}/{len(health)} reporting · {len(all_opps)} deals")
-        broken = [h for h in health if h.status in _PROBLEM_STATUSES]
-        if broken:
-            st.warning(
-                f"{len(broken)} source(s) need attention: "
-                + ", ".join(h.name.split("(")[0].strip() for h in broken[:3]),
-                icon="⚠️",
-            )
-    if os.environ.get("RENDER"):
-        st.caption("Hosted on Render")
-
-
-# ---------------------------------------------------------------------------
-# Data load
-# ---------------------------------------------------------------------------
-
-if st.session_state.do_fetch:
-    all_opps, health = load_data(force=True)
-    st.session_state.do_fetch = False
-    st.session_state.selected_id = None
-else:
-    all_opps, health = load_data(force=False)
-
-# ---------------------------------------------------------------------------
-# Layout: permanent left menu | main
-# ---------------------------------------------------------------------------
-
-menu_col, main_col = st.columns([1, 3.15], gap="large")
-
-with menu_col:
-    render_left_menu(all_opps, health)
-
-with main_col:
-    if not all_opps:
-        st.markdown(
-            block(
-                """
-            <div class="ng-hero">
-              <h1>Procurement Pipeline</h1>
-              <p>Live government bids across Miami-Dade, Broward &amp; Palm Beach</p>
-            </div>
-            <div class="ng-empty">
-              <div class="ng-empty-icon">📥</div>
-              <div class="ng-empty-title">No opportunities loaded</div>
-              <div>Click <strong>Fetch live data</strong> in the <strong>left menu</strong>.</div>
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
+        fetch_cls, fetch_label = "", "FETCH LIVE DATA"
+    nav = []
+    for key, label in SCREENS:
+        badge = nav_badges.get(key)
+        badge_html = f'<span class="sc-nav-badge">{badge}</span>' if badge else ""
+        nav.append(
+            f'<a class="sc-nav-item {"active" if key == screen else ""}" '
+            f'href="{href(screen=key)}"><span class="sc-nav-label">{esc(label)}</span>'
+            f"{badge_html}</a>"
         )
+    if fetched_now:
+        foot_note = f"fetched just now ({fetch_count} sources)"
+    elif _snapshot_time():
+        foot_note = f"fetched {scan_note()}"
     else:
-        visible = apply_filters(all_opps)
-        open_pool = [o for o in all_opps if o.status in {"open", "upcoming"}]
-        open_vis = [o for o in visible if o.status in {"open", "upcoming"}]
-        urgent = [
-            o for o in open_vis if o.days_until_due is not None and 0 <= o.days_until_due <= 7
-        ]
-        due_today = [
-            o for o in open_vis if o.days_until_due is not None and o.days_until_due == 0
-        ]
-        by_id: Dict[str, Opportunity] = {o.opportunity_id: o for o in all_opps}
-        selected = by_id.get(st.session_state.selected_id) if st.session_state.selected_id else None
-        view = st.session_state.view_mode
+        foot_note = "no snapshot yet"
+    attn_html = (
+        f'<div class="crimson">{len(attention)} need attention</div>' if attention else ""
+    )
+    counts = (
+        f"{total_sources} sources · {ok_n} ok" if health else f"{total_sources} sources configured"
+    )
+    return block(
+        f"""
+        <div class="sc-side">
+          <div class="sc-brand">
+            <div class="sc-brand-name">SF Procurement Scout</div>
+            <div class="sc-brand-sub">SOUTH FLORIDA BIDS</div>
+          </div>
+          <a class="sc-fetch {fetch_cls}" href="{href(act='fetch', screen=screen)}">{fetch_label}</a>
+          <div class="sc-side-label">SCREENS</div>
+          <div class="sc-nav">{''.join(nav)}</div>
+          <div class="sc-side-foot">
+            <div>{counts}</div>
+            {attn_html}
+            <div>{esc(foot_note)}</div>
+          </div>
+        </div>
+        """
+    )
 
-        st.markdown(
-            block(
-                f"""
-            <div class="ng-hero">
-              <div class="ng-hero-row">
-                <div>
-                  <h1>Procurement Pipeline</h1>
-                  <p>Miami-Dade · Broward · Palm Beach &nbsp;·&nbsp;
-                     <strong>{len(open_vis)}</strong> open in view &nbsp;·&nbsp;
-                     <strong>{len(visible)}</strong> matching filters</p>
-                </div>
-              </div>
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
-        )
 
-        st.markdown(
-            block(
-                f"""
-            <div class="ng-kpi-grid">
-              <div class="ng-kpi">
-                <div class="ng-kpi-label">Open in view</div>
-                <div class="ng-kpi-value">{len(open_vis)}</div>
-                <div class="ng-kpi-sub">{len(open_pool)} open system-wide</div>
-              </div>
-              <div class="ng-kpi {'urgent' if urgent else ''}">
-                <div class="ng-kpi-label">Due within 7 days</div>
-                <div class="ng-kpi-value">{len(urgent)}</div>
-                <div class="ng-kpi-sub">priority response window</div>
-              </div>
-              <div class="ng-kpi {'urgent' if due_today else ''}">
-                <div class="ng-kpi-label">Due today</div>
-                <div class="ng-kpi-value">{len(due_today)}</div>
-                <div class="ng-kpi-sub">closes end of day</div>
-              </div>
-              <div class="ng-kpi">
-                <div class="ng-kpi-label">Matching filters</div>
-                <div class="ng-kpi-value">{len(visible)}</div>
-                <div class="ng-kpi-sub">{len(all_opps)} total loaded</div>
-              </div>
-            </div>
-            """
-            ),
-            unsafe_allow_html=True,
-        )
+RENDERERS = {
+    "today": today_html,
+    "pipeline": pipeline_html,
+    "workroom": workroom_html,
+    "watchlists": watchlists_html,
+    "sources": sources_html,
+}
 
-        s1, s2 = st.columns([3, 1])
-        with s1:
-            q = st.text_input(
-                "Search deals",
-                value=st.session_state.query,
-                placeholder="Search title, agency, ref #, or summary…",
-                label_visibility="collapsed",
-                key="search_input",
-            )
-            if q != st.session_state.query:
-                st.session_state.query = q
-                st.rerun()
-        with s2:
-            st.markdown(
-                f'<div class="ng-result-pill">{len(visible)} results</div>',
-                unsafe_allow_html=True,
-            )
+main_html = RENDERERS[screen]()
+drawer = drawer_html(by_id[drawer_id]) if drawer_id and drawer_id in by_id else ""
 
-        tab_keys = ["open", "upcoming", "closed", "catalog", "all"]
-        tab_labels = {
-            "open": "All open",
-            "upcoming": "Upcoming",
-            "closed": "Closed",
-            "catalog": "Catalog",
-            "all": "Everything",
-        }
-        tcols = st.columns(len(tab_keys))
-        for i, key in enumerate(tab_keys):
-            n = len(apply_filters(all_opps, stage=key))
-            with tcols[i]:
-                active = st.session_state.stage_tab == key
-                if st.button(
-                    f"{tab_labels[key]} ({n})",
-                    key=f"stage_{key}",
-                    width="stretch",
-                    type="primary" if active else "secondary",
-                ):
-                    st.session_state.stage_tab = key
-                    st.rerun()
-
-        chips = []
-        if st.session_state.county_filter != "All":
-            chips.append(st.session_state.county_filter)
-        if st.session_state.offer_filter != "All":
-            chips.append(st.session_state.offer_filter)
-        if st.session_state.category_filter != "All":
-            chips.append(st.session_state.category_filter)
-        if st.session_state.agency_filter != "All":
-            chips.append(st.session_state.agency_filter[:36])
-        if st.session_state.show_only_urgent:
-            chips.append("Urgent ≤7d")
-        if chips:
-            st.markdown(
-                '<div class="ng-chips">'
-                + "".join(f'<span class="ng-chip active">{esc(c)}</span>' for c in chips)
-                + "</div>",
-                unsafe_allow_html=True,
-            )
-
-        # ----- Views -----
-        if not visible:
-            st.markdown(
-                block(
-                    """
-                <div class="ng-empty">
-                  <div class="ng-empty-icon">🔎</div>
-                  <div class="ng-empty-title">No deals match these filters</div>
-                  <div>Clear filters in the <strong>left menu</strong> or switch stage tabs.</div>
-                </div>
-                """
-                ),
-                unsafe_allow_html=True,
-            )
-        elif view == "insights":
-            # Insights always describe the whole pipeline, not the active tab.
-            all_filtered = apply_filters(all_opps, stage="all", urgent_only=False)
-
-            left, right = st.columns(2)
-            with left:
-                stages = ["open", "upcoming", "catalog", "closed"]
-                rows = []
-                max_n = 1
-                for sk in stages:
-                    n = sum(1 for o in all_filtered if o.status == sk)
-                    max_n = max(max_n, n)
-                    rows.append((STATUS_LABELS[sk], n))
-                html_rows = [bar_row(label, n, max_n) for label, n in rows]
-                st.markdown(
-                    block(
-                        f"""
-                    <div class="ng-panel">
-                      <div class="ng-panel-head">
-                        <div class="ng-panel-title">Status funnel</div>
-                        <div class="ng-panel-sub">{len(all_filtered)} filtered</div>
-                      </div>
-                      {''.join(html_rows)}
-                    </div>
-                    """
-                    ),
-                    unsafe_allow_html=True,
-                )
-                cat_c: Counter = Counter()
-                for o in all_filtered:
-                    for c in o.categories or ["general"]:
-                        if c != "portal_directory":
-                            cat_c[c] += 1
-                top_cats = cat_c.most_common(8)
-                max_c = top_cats[0][1] if top_cats else 1
-                crow = [bar_row(c.replace("_", " "), n, max_c) for c, n in top_cats]
-                st.markdown(
-                    block(
-                        f"""
-                    <div class="ng-panel" style="margin-top:12px">
-                      <div class="ng-panel-head"><div class="ng-panel-title">Top categories</div></div>
-                      {''.join(crow) if crow else '<div class="ng-empty-title">No categories</div>'}
-                    </div>
-                    """
-                    ),
-                    unsafe_allow_html=True,
-                )
-            with right:
-                hot = sort_opps(
-                    [
-                        o
-                        for o in all_filtered
-                        if o.status in {"open", "upcoming"}
-                        and o.days_until_due is not None
-                        and 0 <= o.days_until_due <= 14
-                    ]
-                )[:10]
-                st.markdown(
-                    block(
-                        f"""
-                    <div class="ng-panel">
-                      <div class="ng-panel-head">
-                        <div class="ng-panel-title">Hot pipeline (next 14 days)</div>
-                        <div class="ng-panel-sub">{len(hot)} deals</div>
-                      </div>
-                    </div>
-                    """
-                    ),
-                    unsafe_allow_html=True,
-                )
-                if not hot:
-                    st.info("No open deals due in the next 14 days with current filters.")
-                for o in hot:
-                    st.markdown(card_html(o), unsafe_allow_html=True)
-                    render_deal_actions(o, key=f"ins_{o.opportunity_id}")
-
-        elif view == "board":
-            group = st.session_state.board_group
-            buckets: Dict[str, List[Opportunity]] = defaultdict(list)
-            for o in visible:
-                if group == "county":
-                    k = COUNTY_LABELS.get(o.county, o.county)
-                elif group == "offer_type":
-                    k = offer_label(o)
-                else:
-                    k = STATUS_LABELS.get(o.status, o.status)
-                buckets[k].append(o)
-
-            if group == "status":
-                order = [STATUS_LABELS[s] for s in STATUS_ORDER if STATUS_LABELS[s] in buckets]
-                for k in buckets:
-                    if k not in order:
-                        order.append(k)
-            elif group == "county":
-                order = [COUNTY_LABELS[k] for k in COUNTY_LABELS if COUNTY_LABELS[k] in buckets]
-                for k in buckets:
-                    if k not in order:
-                        order.append(k)
-            else:
-                order = sorted(buckets.keys(), key=lambda x: (-len(buckets[x]), x))
-
-            n = min(len(order), 4)
-            if n == 0:
-                st.info("No columns to show.")
-            else:
-                cols = st.columns(n)
-                for i, name in enumerate(order[:n]):
-                    items = sort_opps(buckets[name])
-                    with cols[i]:
-                        st.markdown(
-                            block(
-                                f"""
-                            <div class="board-col-head">
-                              <span>{esc(name)}</span>
-                              <span class="board-count">{len(items)}</span>
-                            </div>
-                            """
-                            ),
-                            unsafe_allow_html=True,
-                        )
-                        for o in items[:15]:
-                            sel = st.session_state.selected_id == o.opportunity_id
-                            st.markdown(card_html(o, selected=sel), unsafe_allow_html=True)
-                            render_deal_actions(o, key=f"bd_{i}_{o.opportunity_id}")
-                        if len(items) > 15:
-                            st.caption(f"+ {len(items) - 15} more")
-            if selected:
-                st.markdown("---")
-                render_summary_panel(selected)
-
-        else:  # list + detail (default)
-            list_col, detail_col = st.columns([1.15, 1], gap="large")
-            with list_col:
-                st.markdown(
-                    f'<div class="list-head">Deals <span class="board-count">{len(visible)}</span></div>',
-                    unsafe_allow_html=True,
-                )
-                for o in visible[:80]:
-                    sel = st.session_state.selected_id == o.opportunity_id
-                    st.markdown(card_html(o, selected=sel), unsafe_allow_html=True)
-                    render_deal_actions(o, key=f"ls_{o.opportunity_id}")
-                if len(visible) > 80:
-                    st.caption(f"Showing 80 of {len(visible)}")
-
-            with detail_col:
-                st.markdown('<div class="list-head">Deal summary</div>', unsafe_allow_html=True)
-                if selected:
-                    render_summary_panel(selected)
-                else:
-                    preview = urgent or open_vis or visible
-                    if preview:
-                        st.caption("Auto-preview of top match — click Summary on any card to pin it.")
-                        render_summary_panel(preview[0])
-                    else:
-                        st.markdown(
-                            block(
-                                """
-                            <div class="ng-empty">
-                              <div class="ng-empty-title">Select a deal</div>
-                              <div>Click <strong>Summary</strong> on any card.</div>
-                            </div>
-                            """
-                            ),
-                            unsafe_allow_html=True,
-                        )
-
-        render_export(visible)
-
-        if health:
-            problems = sum(1 for h in health if h.status in _PROBLEM_STATUSES)
-            label = "Source health" + (f" — {problems} need attention" if problems else "")
-            with st.expander(label, expanded=bool(problems)):
-                st.dataframe(
-                    [
-                        {
-                            "Source": h.name,
-                            "Status": HEALTH_LABELS.get(h.status, h.status),
-                            "Deals": h.count,
-                            "ms": h.elapsed_ms,
-                            "Detail": (h.error or h.note or "")[:90],
-                        }
-                        for h in health
-                    ],
-                    width="stretch",
-                    hide_index=True,
-                )
-                st.caption(
-                    "**Degraded** means the portal blocked us or its layout changed — "
-                    "check that agency directly. **No listings** means the portal is "
-                    "genuinely empty right now."
-                )
+st.markdown(
+    f'<div class="sc-app">{sidebar_html()}'
+    f'<div class="sc-main">{main_html}</div></div>{drawer}',
+    unsafe_allow_html=True,
+)

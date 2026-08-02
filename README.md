@@ -63,6 +63,27 @@ blurb they do publish.
 Disable either pass with `run_fetch(with_details=False)` or
 `run_fetch(with_packages=False)`.
 
+## Dashboard screens
+
+The Streamlit dashboard (`web/app.py`, "Scout Classic" design system in
+`web/styles.css`) is organized as five screens plus a slide-in detail drawer:
+
+| Screen | What it does |
+|--------|--------------|
+| **Today** | Triage inbox: bids closing within 3 days and bids new since your last visit, with one-tap **Track** / **Skip** |
+| **My Pipeline** | Kanban of tracked bids (Watching → Preparing bid → Submitted → Result) with a 14-day deadline strip |
+| **Bid Workroom** | Deep read of one bid: scope, requirements as a checklist, documents, key dates, go/no-go scorecard and notes |
+| **Watchlists** | Saved niche searches with new-match badges, plus a chip builder for creating new ones |
+| **Sources** | Source-health KPIs, degraded-portal callouts, and self-serve "add a source" (suggested portals + CivicPlus URL detection) |
+
+Clicking any bid row or card opens the drawer with tags, facts, scope,
+requirements, documents and actions. Everything the user *does* — tracking,
+skipping, checklists, decisions, notes, watchlists, queued sources — persists
+in `data/user_state.json` (see `src/pipeline/user_state.py`); view state lives
+in the URL, so links are shareable and refresh-safe. An empty first run offers
+**load sample data** (`web/sample_data.py`) to explore the screens before the
+first live fetch.
+
 ## Bid history and recurrence
 
 Knowing a contract is open today is worth less than knowing the agency rebids
@@ -333,8 +354,11 @@ src/dates.py            # shared date parsing (Eastern wall clock)
 src/http_util.py        # session, retries, blocked-portal detection
 src/summarize.py        # deal briefs
 src/pipeline/           # concurrent fetch, dedupe, store
+src/pipeline/user_state.py  # tracked bids, checklists, notes, watchlists
 src/cli.py              # Typer CLI
-web/app.py              # Streamlit UI (Render entrypoint)
+web/app.py              # Streamlit UI — five Scout Classic screens (Render entrypoint)
+web/styles.css          # Scout Classic design system
+web/sample_data.py      # demo snapshot for exploring the screens offline
 tests/                  # offline test suite + portal fixtures
 data/                   # latest.json / latest.csv snapshots (last 10 kept)
 ```
