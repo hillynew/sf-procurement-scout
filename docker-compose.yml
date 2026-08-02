@@ -1,0 +1,28 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      # Snapshots (data/latest.json) and user workflow state
+      # (data/user_state.json) survive container restarts.
+      - ./data:/app/data
+    environment:
+      # Optional integrations — see README. Inert when unset.
+      - SF_SCOUT_IMAP_HOST
+      - SF_SCOUT_IMAP_USER
+      - SF_SCOUT_IMAP_PASSWORD
+      - SF_SCOUT_IMAP_FOLDER
+      - SF_SCOUT_IMAP_DAYS
+      - SF_SCOUT_BONFIRE_COOKIE
+    restart: unless-stopped
+
+  # Optional: refresh the snapshot every 4 hours without clicking the button.
+  # Shares ./data with the web service, so the dashboard sees every fetch.
+  fetch:
+    build: .
+    profiles: ["fetch"]
+    volumes:
+      - ./data:/app/data
+    entrypoint: ["sh", "-c", "while true; do python run.py fetch --no-briefs; sleep 14400; done"]
+    restart: unless-stopped

@@ -7,7 +7,8 @@ unhealthy," this file is for you.
 
 ## Project at a glance
 
-- A Streamlit dashboard (`web/app.py`) and a Typer CLI (`run.py`) over one
+- A FastAPI dashboard (`web/server.py` + `web/views.py`, served by uvicorn)
+  and a Typer CLI (`run.py`) over one
   Python codebase — no separate backend, no database.
 - State is files, not a DB: snapshots in `data/latest.json` / `data/latest.csv`,
   a recurrence archive in `data/history.json`, and a PDF text cache in
@@ -22,9 +23,9 @@ unhealthy," this file is for you.
    `healthCheckPath` haven't been locally edited away from what's committed.
 2. Render Dashboard → **New** → **Blueprint** → connect this repo → **Apply**.
    Render provisions one web service straight from `render.yaml`:
-   - Build: `pip install -r requirements.txt`
-   - Start: `streamlit run web/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true`
-   - Health check: `/_stcore/health`
+   - Build: the repo's `Dockerfile` (runtime: docker)
+   - Start: `uvicorn web.server:app --host 0.0.0.0 --port $PORT` (the image CMD)
+   - Health check: `/healthz`
 3. First boot shows an **empty dashboard** — "No opportunities loaded." That is
    the correct first-run state, not a failed deploy. Open the service URL and
    click **Fetch live data**, or see "Keeping data fresh" for a headless way
@@ -97,7 +98,7 @@ Two ways to repopulate:
 ## Verifying a deploy
 
 ```bash
-curl -sS https://<service>.onrender.com/_stcore/health
+curl -sS https://<service>.onrender.com/healthz
 # expect: ok
 ```
 

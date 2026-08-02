@@ -29,27 +29,16 @@
   --mono: "IBM Plex Mono", monospace;
 }
 
-/* ---- Streamlit chrome: full-bleed canvas, no default UI ---- */
+/* ---- Base ---- */
 
-html, body, .stApp {
-  font-family: var(--serif) !important;
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--serif);
   color: var(--ink);
+  background: var(--paper);
 }
-.stApp { background: var(--paper) !important; }
-#MainMenu, footer { visibility: hidden; }
-header[data-testid="stHeader"] { display: none !important; }
-section[data-testid="stSidebar"],
-div[data-testid="stSidebarCollapsedControl"],
-button[kind="header"] { display: none !important; }
-div[data-testid="stAppViewBlockContainer"],
-.block-container {
-  padding: 0 !important;
-  max-width: 100% !important;
-}
-div[data-testid="stMarkdownContainer"] { margin: 0; }
-div[data-testid="stMarkdownContainer"] > * { margin: 0; }
-div[data-testid="stVerticalBlock"] { gap: 0 !important; }
-div[data-testid="element-container"] { margin: 0 !important; }
 
 a { color: var(--navy); }
 a:hover { color: var(--crimson); }
@@ -259,6 +248,39 @@ a.sc-row-link { position: absolute; inset: 0; z-index: 1; }
 }
 a.sc-undo-link { color: var(--muted); cursor: pointer; text-decoration: underline; }
 a.sc-undo-link:hover { color: var(--ink); }
+
+/* ---- All bids ---- */
+
+.sc-search-form { display: flex; gap: 8px; margin: 0; align-self: center; }
+.sc-search {
+  width: 260px;
+  background: var(--card);
+  border: 1px solid var(--faint);
+  border-radius: 2px;
+  padding: 6px 10px;
+  font: 400 12px var(--mono);
+  color: var(--ink);
+}
+.sc-search::placeholder { color: var(--faint); }
+.sc-search:focus { outline: 1px solid var(--navy); }
+.sc-allbids-filters { margin-bottom: 18px; }
+.sc-month-label {
+  border-bottom: 1px solid var(--ink);
+  padding-bottom: 5px;
+  margin-top: 4px;
+}
+.sc-slot-day { font-size: 14px; font-weight: 700; }
+.sc-slot-day.crimson { color: var(--crimson); }
+.sc-status-tag {
+  font: 600 10px var(--mono);
+  border: 1px solid var(--faint);
+  color: var(--muted);
+  padding: 2px 8px;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.sc-status-tag.navy { border-color: var(--navy); color: var(--navy); }
+.sc-status-tag.crimson { border-color: var(--crimson); color: var(--crimson); }
 
 /* ---- Pipeline ---- */
 
