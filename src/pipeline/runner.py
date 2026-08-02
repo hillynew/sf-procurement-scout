@@ -6,7 +6,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from rich.console import Console
 from rich.table import Table
@@ -309,6 +309,7 @@ def run_fetch(
     with_packages: bool = True,
     package_limit: int = MAX_PACKAGE_PARSES,
     with_history: bool = True,
+    on_progress: Optional[Callable[[dict], None]] = None,
 ) -> Tuple[List[Opportunity], List[SourceHealth]]:
     adapters = get_adapters(
         only=only,
@@ -317,6 +318,16 @@ def run_fetch(
     )
     all_opps: List[Opportunity] = []
     health: List[SourceHealth] = []
+
+    def progress(event: dict) -> None:
+        if on_progress is None:
+            return
+        try:
+            on_progress(event)
+        except Exception:  # noqa: BLE001 — a UI callback must never kill a fetch
+            pass
+
+    progress({"event": "start", "total": len(adapters)})
 
     workers = max(1, min(max_workers, len(adapters))) if adapters else 1
     with ThreadPoolExecutor(max_workers=workers) as pool:
@@ -327,6 +338,8 @@ def run_fetch(
             health.append(h)
             if not quiet:
                 console.print(_health_line(h))
+            progress({"event": "source", "source": h.model_dump(mode="json"),
+                      "done": len(health), "total": len(adapters)})
 
     # Preserve config order so output is stable across runs.
     order = {a.source_id: i for i, a in enumerate(adapters)}
@@ -337,14 +350,17 @@ def run_fetch(
     # Detail runs after dedupe so we never spend a request on a row that is
     # about to be merged away.
     if with_details:
+        progress({"event": "phase", "phase": "details"})
         fetch_details(
             all_opps, adapters, max_workers=max_workers, limit=detail_limit, quiet=quiet
         )
         # Packages are discovered by the detail pass, so this must follow it.
         if with_packages:
+            progress({"event": "phase", "phase": "packages"})
             parse_packages(
                 all_opps, max_workers=max_workers, limit=package_limit, quiet=quiet
             )
+    progress({"event": "phase", "phase": "finalize"})
     derive_fields(all_opps)
     # Recurrence comes from a separately-refreshed archive (run.py history),
     # so a missing file simply leaves prior_cycles at zero.

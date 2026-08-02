@@ -10,13 +10,15 @@ Live aggregator for government procurement opportunities across **Miami-Dade**, 
 |--|--|
 | **A. Capture** | Live titles, refs, due dates, and links from public county/city portals |
 | **B. Organize** | County, agency, solicitation type, goods/services/construction, topic categories |
-| **C. Deal briefs** | One-paragraph summary with urgency and link for scanning |
+| **C. AI deal briefs** | Claude reads the scope + bid-package PDF and writes a plain-English brief with red flags (optional API key; rule-based fallback) |
 | **D. Dedupe** | One record per solicitation, even when portals overlap or repeat announcements |
 | **E. Detail** | Scope of work, pricing, bid requirements, documents and contacts, read from each bid's own page |
 | **F. Source health** | Every portal reports `ok` / `no listings` / `degraded` / `error` so silent breakage is visible |
+| **G. Pipeline** | Drag-and-drop kanban from Watching to Result, with win/loss dollars and an archive |
+| **H. Alerts** | In-app notification center + optional email digests for watchlist matches and deadlines |
 
-Sources are fetched concurrently, so a full refresh takes a few seconds rather
-than a minute.
+Sources are fetched concurrently in the background with live per-source
+progress — the UI never blocks on a refresh.
 
 ## What is captured per opportunity
 
@@ -63,29 +65,41 @@ blurb they do publish.
 Disable either pass with `run_fetch(with_details=False)` or
 `run_fetch(with_packages=False)`.
 
-## Dashboard screens
+## The app
 
-The dashboard (FastAPI + server-rendered HTML: `web/server.py` routes,
-`web/views.py` rendering, "Scout Classic" design system in `web/styles.css`)
-is organized as six screens plus a slide-in detail drawer, with a shared
-filter/sort toolbar (county · work type · sort order) on every list screen:
+A React single-page app (Vite + TypeScript + Tailwind, `frontend/`) served by
+a FastAPI JSON API (`web/server.py`, routers in `web/api/`). Fully responsive
+— a sidebar on desktop, a bottom tab bar on the phone.
 
 | Screen | What it does |
 |--------|--------------|
-| **Calendar** | Month grid of bids on their due dates — ‹ › month navigation, urgent/closed color-coding, click-through to detail |
-| **All bids** | Every captured bid across all dates and statuses, grouped by due month, with search and status filters |
-| **My Pipeline** | Kanban of tracked bids (Watching → Preparing bid → Submitted → Result) with a 14-day deadline strip |
-| **Bid Workroom** | Deep read of one bid: scope, requirements as a checklist, documents, key dates, go/no-go scorecard and notes |
-| **Watchlists** | Saved niche searches with new-match badges, plus a chip builder for creating new ones |
-| **Sources** | Source-health KPIs, degraded-portal callouts, status filter + sort, and self-serve "add a source" (suggested portals + CivicPlus URL detection) |
+| **Dashboard** | Stat tiles (open bids, open value, due-soon, win rate) plus charts: bids by county, value by work type, 8-week deadline load, won revenue by month, top sources |
+| **All bids** | Instant search-as-you-type, county/type/status filter chips, sortable list with value and detail-score on every row |
+| **Calendar** | Month grid of bids on their due dates with county dots and values; an agenda list on mobile |
+| **Pipeline** | Drag-and-drop kanban (Watching → Preparing → Submitted → Result) with per-column dollar totals, a win/loss dialog that records real amounts, and an archive |
+| **Workroom** | Deep read of one bid: AI deal brief, scope, requirements checklist, documents, key dates, commercial terms, go/no-go, autosaving notes |
+| **Watchlists** | Real rule builder (keywords, counties, types, value range, no-bond, recurring) with live match preview, rename/delete, and genuinely-correct NEW badges |
+| **Sources** | Health KPIs and per-portal status, plus a working "add a source" flow: paste a URL, CivicPlus portals are detected, added, and test-fetched on the spot |
+| **Settings** | Auto-fetch schedule, notification prefs, email digest, AI model choice, and data management (export CSV, purges, demo data) |
 
-Clicking any bid row or card opens the drawer with tags, facts, scope,
-requirements, documents and actions. Everything the user *does* — tracking,
-skipping, checklists, decisions, notes, watchlists, queued sources — persists
-in `data/user_state.json` (see `src/pipeline/user_state.py`); view state lives
-in the URL, so links are shareable and refresh-safe. An empty first run offers
-**load sample data** (`web/sample_data.py`) to explore the screens before the
+Clicking any bid opens a slide-in drawer with facts, requirements, documents
+and actions; a bell in the top bar collects notifications (new watchlist
+matches, deadlines approaching, fetch results). Everything you *do* — tracking,
+checklists, decisions, notes, results, watchlists — persists in the database
+(Postgres on Render, SQLite locally), so restarts lose nothing. An empty first
+run offers **load sample data** (`web/sample_data.py`) to explore before the
 first live fetch.
+
+### AI deal briefs
+
+With `SF_SCOUT_ANTHROPIC_KEY` (or `ANTHROPIC_API_KEY`) set, Scout sends each
+bid's scraped fields + extracted PDF text to the Claude API and caches a
+structured brief: what the work is, key dates, money terms, requirements in
+plain English, red flags, and a fit hint. Tracked bids are summarized
+automatically after each fetch; any other bid has a **Summarize with AI**
+button. Default model is `claude-haiku-4-5` (roughly a cent per 50 bids);
+switch to `claude-sonnet-5` in Settings for harder documents. No key → the
+rule-based brief (`src/summarize.py`) is shown instead and nothing breaks.
 
 ## Bid history and recurrence
 
@@ -193,11 +207,13 @@ surfaces it in the left menu and the **Source health** panel.
 1. Push this repo to GitHub (already at `hillynew/sf-procurement-scout`).
 2. Open [Render Dashboard](https://dashboard.render.com/) → **New** → **Blueprint**.
 3. Connect the `sf-procurement-scout` repo.
-4. Render reads `render.yaml` and creates the web service. It also declares
-   the optional integration variables below with `sync: false`, so Render's
-   dashboard prompts for each one without ever storing a value in git — leave
-   them blank to keep those integrations inactive.
-5. After deploy, open the service URL and click **Fetch live data now**.
+4. Render reads `render.yaml` and creates the web service **plus a free
+   Postgres database** wired in via `DATABASE_URL`, so tracked bids, notes,
+   results, and snapshots survive restarts. The optional integration
+   variables below are declared with `sync: false`, so Render's dashboard
+   prompts for each one without ever storing a value in git — leave them
+   blank to keep those integrations inactive.
+5. After deploy, open the service URL and click **Fetch live data**.
 
 ### Option B — Manual Web Service
 
@@ -215,7 +231,11 @@ Render injects `$PORT`; the Dockerfile's start command honors it.
 ### Notes for free tier
 
 - Service sleeps after idle; first request may take ~30–60s to wake.
-- Disk is ephemeral — re-click **Fetch live data now** after restarts.
+- Data lives in Postgres, so restarts lose nothing — but a fresh fetch still
+  runs in the background (with live progress) whenever you want newer bids.
+- The in-app auto-fetch scheduler only ticks while the service is awake; an
+  external uptime pinger (or a cron `curl -X POST …/api/fetch`) keeps data
+  fresh around the clock if you need that.
 - Scraping public sites takes 30–90s per full refresh.
 
 ## Local development
@@ -236,11 +256,17 @@ python run.py auth-status
 python run.py check-mailbox
 python run.py subscribe-links
 python run.py list-sources
+python run.py import-legacy-state   # one-shot: old data/user_state.json → DB
 
-# Web UI
-python run.py dashboard
-# or: uvicorn web.server:app --host 0.0.0.0 --port 8000
+# API + built SPA on :8000 (needs `cd frontend && npm run build` once)
+uvicorn web.server:app --host 0.0.0.0 --port 8000
+
+# Frontend dev server with hot reload (proxies /api to :8000)
+cd frontend && npm install && npm run dev
 ```
+
+Without `DATABASE_URL` the backend uses SQLite at `data/scout.db` — no setup.
+Set `DATABASE_URL=postgres://…` to run against Postgres like production.
 
 ### Docker
 
@@ -350,14 +376,16 @@ dashboard unless **Include catalog portals** is ticked.
 ## Project layout
 
 ```
-render.yaml             # Render Blueprint (Docker runtime)
-Dockerfile              # FastAPI + uvicorn image
+render.yaml             # Render Blueprint (Docker web service + free Postgres)
+Dockerfile              # multi-stage: node builds the SPA, python serves it
 docker-compose.yml      # local: web + optional 4-hourly fetch sidecar
-Procfile                # alternate start command
 runtime.txt             # Python version hint
 config/sources.yaml     # portal registry
+frontend/               # React SPA (Vite + TypeScript + Tailwind)
+frontend/src/screens/   # Dashboard, AllBids, Calendar, Pipeline, Workroom, …
+frontend/src/api/       # typed client + TanStack Query hooks
 src/models/             # Opportunity + SourceHealth models
-src/sources/            # per-portal adapters
+src/sources/            # per-portal adapters (+ DB-stored custom sources)
 src/classify.py         # categories + offer type
 src/requirements.py     # bid terms, pricing and deadlines from scope prose
 src/pdf_extract.py      # commercial terms from the bid package PDF
@@ -365,16 +393,17 @@ src/pipeline/history.py # closed-solicitation archive + recurrence matching
 src/auth.py             # optional vendor-session credentials (env only)
 src/dates.py            # shared date parsing (Eastern wall clock)
 src/http_util.py        # session, retries, blocked-portal detection
-src/summarize.py        # deal briefs
+src/summarize.py        # rule-based deal briefs (no-key fallback)
+src/ai/summarizer.py    # Claude-powered deal briefs with caching
 src/pipeline/           # concurrent fetch, dedupe, store
-src/pipeline/user_state.py  # tracked bids, checklists, notes, watchlists
+src/db/                 # SQLAlchemy models + store (Postgres or SQLite)
 src/cli.py              # Typer CLI
-web/server.py           # FastAPI routes + actions (deploy entrypoint)
-web/views.py            # Scout Classic screens — server-rendered HTML
-web/styles.css          # Scout Classic design system
+web/server.py           # FastAPI app: JSON API + SPA hosting (deploy entrypoint)
+web/api/                # REST routers (bids, watchlists, sources, fetch, …)
+web/services/           # background fetch job, scheduler, matching, digest
 web/sample_data.py      # demo snapshot for exploring the screens offline
 tests/                  # offline test suite + portal fixtures
-data/                   # latest.json / latest.csv snapshots (last 10 kept)
+data/                   # SQLite DB (local) + CSV/JSON snapshots from the CLI
 ```
 
 ## Always verify on the official portal

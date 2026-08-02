@@ -11,3 +11,6 @@ data/*.csv
 data/pdf_cache
 .env
 .github
+frontend/node_modules
+frontend/dist
+data/*.db

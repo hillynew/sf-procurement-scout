@@ -12,7 +12,6 @@ from datetime import date, datetime, time, timedelta
 from typing import Dict, List, Tuple
 
 from src.models.opportunity import Document, HealthStatus, Opportunity, SourceHealth
-from src.pipeline.store import save_snapshot
 from src.sources.registry import load_source_config
 
 _ROOF_SCOPE_LEAD = (
@@ -337,26 +336,34 @@ def _sample_health() -> List[SourceHealth]:
     return health
 
 
-def load_sample(state: dict) -> None:
-    """Write the sample snapshot and seed the user's pipeline to match."""
-    bids, health = build_sample()
-    save_snapshot(list(bids.values()), health, tag="sample")
+def load_sample() -> dict:
+    """Write the sample snapshot to the database and seed a matching pipeline."""
+    from src.db import store as db
 
-    if state["tracked"]:
-        return  # never clobber a real pipeline
-    today = date.today().isoformat()
-    earlier = (date.today() - timedelta(days=3)).isoformat()
+    bids, health = build_sample()
+    db.bootstrap()
+    result = db.save_snapshot(list(bids.values()), health)
+
+    if db.workflow_state():
+        return {"count": result.count, "seeded_pipeline": False}
+
     seed_stages = {
         "r3": "watching", "r6": "watching", "w3": "watching", "w4": "watching",
         "r1": "preparing", "r2": "preparing",
-        "p1": "submitted", "p2": "submitted", "p3": "submitted",
-        "b1": "result",
+        "p1": "submitted", "p2": "submitted",
+        "p3": "result", "b1": "result",
     }
     for key, stage in seed_stages.items():
         oid = bids[key].opportunity_id
-        state["tracked"][oid] = earlier
-        state["stages"][oid] = stage
-    state["results"][bids["b1"].opportunity_id] = "WON · $92,400"
-    state["checks"][bids["r1"].opportunity_id] = {"0": True}
-    state["last_today_visit"] = earlier
-    state["today_visit_date"] = today
+        db.set_tracked(oid, True)
+        if stage != "watching":
+            db.update_tracked(oid, stage=stage)
+    # Two decided bids so win rate and revenue demo well on the Dashboard.
+    db.set_result(bids["b1"].opportunity_id, "won", amount_cents=9_240_000,
+                  notes="Beat two other bidders on price.",
+                  decided_on=date.today() - timedelta(days=18))
+    db.set_result(bids["p3"].opportunity_id, "lost",
+                  notes="Lost on bonding capacity.",
+                  decided_on=date.today() - timedelta(days=41))
+    db.update_tracked(bids["r1"].opportunity_id, checks={"0": True})
+    return {"count": result.count, "seeded_pipeline": True}

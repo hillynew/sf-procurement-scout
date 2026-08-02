@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ *  Scout design tokens — "clean, friendly, lively"
+ *  Soft cool paper, white cards, one cheerful violet accent,
+ *  county-coded teal/green/amber, money always green.
+ * ------------------------------------------------------------------ */
+
+@theme {
+  --font-sans: "Plus Jakarta Sans Variable", system-ui, -apple-system, sans-serif;
+
+  --color-bg: #f7f8fb;
+  --color-surface: #ffffff;
+  --color-ink: #1b2437;
+  --color-ink-soft: #5a6478;
+  --color-ink-faint: #8a93a6;
+  --color-line: #e6e9f2;
+
+  --color-accent: #6e56f8;
+  --color-accent-deep: #5a43e0;
+  --color-accent-soft: #eeebfe;
+
+  --color-miami: #0e9bb5;
+  --color-miami-soft: #e3f5f8;
+  --color-broward: #2aa463;
+  --color-broward-soft: #e4f5eb;
+  --color-palmbeach: #e08a00;
+  --color-palmbeach-soft: #fbf0dc;
+
+  --color-open: #2aa463;
+  --color-open-soft: #e4f5eb;
+  --color-upcoming: #3b82f6;
+  --color-upcoming-soft: #e7effe;
+  --color-closed: #8a93a6;
+  --color-closed-soft: #eef0f5;
+  --color-danger: #d64545;
+  --color-danger-soft: #fbe9e9;
+  --color-warn: #e08a00;
+  --color-warn-soft: #fbf0dc;
+
+  --color-money: #0f7b5f;
+  --color-money-soft: #e2f3ee;
+
+  --radius-card: 14px;
+  --radius-input: 10px;
+
+  --shadow-card: 0 1px 2px rgb(20 24 40 / 0.05), 0 4px 16px rgb(20 24 40 / 0.06);
+  --shadow-pop: 0 4px 12px rgb(20 24 40 / 0.10), 0 12px 40px rgb(20 24 40 / 0.14);
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+body { margin: 0; }
+
+/* Money is always green, semibold, tabular. */
+.money {
+  color: var(--color-money);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+/* Gentle motion, killed for reduced-motion users. */
+.fade-up { animation: fade-up 200ms ease-out; }
+.drawer-in { animation: drawer-in 190ms ease-out; }
+.sheet-in { animation: sheet-in 190ms ease-out; }
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes drawer-in {
+  from { transform: translateX(28px); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes sheet-in {
+  from { transform: translateY(32px); opacity: 0.4; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, .drawer-in, .sheet-in { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}

@@ -4,11 +4,16 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Snapshots (data/latest.json) and user workflow state
-      # (data/user_state.json) survive container restarts.
+      # SQLite database (data/scout.db) and CLI snapshots survive restarts.
+      # Set DATABASE_URL below to use Postgres instead.
       - ./data:/app/data
     environment:
       # Optional integrations — see README. Inert when unset.
+      - DATABASE_URL
+      - SF_SCOUT_ANTHROPIC_KEY
+      - RESEND_API_KEY
+      - SF_SCOUT_DIGEST_TO
+      - SF_SCOUT_DIGEST_FROM
       - SF_SCOUT_IMAP_HOST
       - SF_SCOUT_IMAP_USER
       - SF_SCOUT_IMAP_PASSWORD
@@ -18,7 +23,9 @@ services:
     restart: unless-stopped
 
   # Optional: refresh the snapshot every 4 hours without clicking the button.
-  # Shares ./data with the web service, so the dashboard sees every fetch.
+  # Shares ./data (the SQLite DB) with the web service, so the dashboard sees
+  # every fetch. Prefer the in-app scheduler (Settings → Auto-fetch) unless
+  # you want fetches while the app itself is idle.
   fetch:
     build: .
     profiles: ["fetch"]

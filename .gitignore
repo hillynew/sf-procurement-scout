@@ -11,3 +11,6 @@ data/*.csv
 data/pdf_cache/
 
 .env
+data/*.db
+node_modules/
+frontend/dist/

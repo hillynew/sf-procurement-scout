@@ -63,6 +63,7 @@ def get_adapters(
     Pass ``strict=True`` (used by the tests) to surface config errors instead.
     """
     configs = load_source_config(config_path)
+    configs = configs + _custom_source_configs({c.get("id") for c in configs if isinstance(c, dict)})
     adapters: List[SourceAdapter] = []
     for cfg in configs:
         if not isinstance(cfg, dict):
@@ -91,6 +92,32 @@ def get_adapters(
             if sid not in found:
                 _reject(strict, f"No configured source with id '{sid}'")
     return adapters
+
+
+def _custom_source_configs(known_ids: set) -> List[Dict[str, Any]]:
+    """User-added portals stored in the database, merged after the yaml list.
+
+    Best-effort: a missing or unreachable database simply contributes nothing,
+    so the CLI and tests keep working with yaml alone.
+    """
+    try:
+        from ..db.store import list_custom_sources
+
+        return [
+            {
+                "id": s["id"],
+                "name": s["name"],
+                "county": s["county"],
+                "agency": s["agency"],
+                "adapter": s["adapter"],
+                "portal_url": s["portal_url"],
+                "live_fetch": True,
+            }
+            for s in list_custom_sources()
+            if s["id"] not in known_ids
+        ]
+    except Exception:  # noqa: BLE001
+        return []
 
 
 def _reject(strict: bool, message: str) -> None:
