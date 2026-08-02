@@ -77,19 +77,27 @@ def _view_url(p: ViewParams) -> str:
         allsrc="1" if p.all_sources else None,
         q=p.query,
         f=p.status,
+        c=p.county,
+        t=p.otype,
+        sort=p.sort,
+        cal=p.cal,
     )
 
 
 def _parse_params(request: Request) -> ViewParams:
     q = request.query_params
     return ViewParams(
-        screen=q.get("screen", "today"),
+        screen=q.get("screen", "calendar"),
         drawer=q.get("drawer") or None,
         bid=q.get("bid") or None,
         scope_open=q.get("scope") == "1",
         all_sources=q.get("allsrc") == "1",
         query=q.get("q", ""),
         status=q.get("f", ""),
+        county=q.get("c", ""),
+        otype=q.get("t", ""),
+        sort=q.get("sort", ""),
+        cal=q.get("cal", ""),
     )
 
 
@@ -108,10 +116,6 @@ def _apply_action(act: str, request: Request, state: dict, p: ViewParams) -> Non
         _load_snapshot.cache_clear()
     elif act == "track" and arg:
         us.toggle_tracked(state, arg)
-    elif act == "skip" and arg:
-        us.skip(state, arg)
-    elif act == "undoskips":
-        us.undo_skips(state)
     elif act == "check" and arg:
         try:
             us.toggle_check(state, arg, int(q.get("i", "-1")))
@@ -196,7 +200,7 @@ def styles():
 def index(request: Request):
     p = _parse_params(request)
     if p.screen not in dict(SCREENS):
-        p.screen = "today"
+        p.screen = "calendar"
     act = request.query_params.get("act")
 
     with _state_lock:
