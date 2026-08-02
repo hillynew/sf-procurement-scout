@@ -327,6 +327,64 @@ def dashboard(port: int = 8000):
     )
 
 
+@app.command("import-legacy-state")
+def import_legacy_state():
+    """One-shot: migrate data/user_state.json (pre-database) into the database."""
+    import json
+
+    from .db import store as db
+    from .pipeline.store import data_dir
+
+    path = data_dir() / "user_state.json"
+    if not path.exists():
+        console.print("[yellow]No data/user_state.json found — nothing to import.[/yellow]")
+        raise typer.Exit(0)
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    db.bootstrap()
+
+    imported = 0
+    for oid in (raw.get("tracked") or {}):
+        db.set_tracked(oid, True)
+        stage = (raw.get("stages") or {}).get(oid)
+        fields = {}
+        if stage in db.STAGES:
+            fields["stage"] = stage
+        decision = (raw.get("decisions") or {}).get(oid)
+        if decision in ("go", "nogo"):
+            fields["decision"] = decision
+        notes = (raw.get("notes") or {}).get(oid)
+        if notes:
+            fields["notes"] = notes
+        checks = (raw.get("checks") or {}).get(oid)
+        if checks:
+            fields["checks"] = {str(k): bool(v) for k, v in checks.items()}
+        if fields:
+            db.update_tracked(oid, **fields)
+        outcome_line = (raw.get("results") or {}).get(oid, "")
+        if outcome_line:
+            outcome = "won" if "won" in outcome_line.lower() else "lost"
+            digits = "".join(ch for ch in outcome_line if ch.isdigit())
+            cents = int(digits) * 100 if digits else None
+            db.set_result(oid, outcome, amount_cents=cents)
+        imported += 1
+
+    for wl in raw.get("watchlists") or []:
+        filters = wl.get("filters") or {}
+        rules = {}
+        if filters.get("keywords"):
+            rules["keywords"] = filters["keywords"]
+        if filters.get("counties"):
+            rules["counties"] = filters["counties"]
+        if filters.get("offers"):
+            rules["offers"] = filters["offers"]
+        if filters.get("max_value"):
+            rules["max_value"] = filters["max_value"]
+        if rules and not any(w["rules"] == rules for w in db.list_watchlists()):
+            db.create_watchlist(wl.get("name") or "Imported watchlist", rules)
+
+    console.print(f"[green]Imported {imported} tracked bid(s) into the database.[/green]")
+
+
 def main():
     app()
 
