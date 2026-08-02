@@ -135,10 +135,26 @@ def save_history(records: List[Opportunity]) -> Path:
     }
     with open(path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2, default=str)
+    # Mirror into the database so recurrence survives ephemeral-disk restarts.
+    try:
+        from ..db.store import save_history_records
+
+        save_history_records(records)
+    except Exception:  # noqa: BLE001 — the file remains the fallback
+        pass
     return path
 
 
 def load_history() -> BidHistory:
+    # Database first (survives restarts), file as fallback.
+    try:
+        from ..db.store import load_history_records
+
+        records = load_history_records()
+        if records:
+            return BidHistory(records)
+    except Exception:  # noqa: BLE001
+        pass
     path = history_path()
     if not path.exists():
         return BidHistory()

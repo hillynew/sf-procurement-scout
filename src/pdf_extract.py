@@ -73,6 +73,25 @@ def cache_dir() -> Path:
     return d
 
 
+def _db_cache_get(key: str):
+    """Second cache tier: the database survives ephemeral-disk restarts."""
+    try:
+        from .db.store import get_pdf_text
+
+        return get_pdf_text(key)
+    except Exception:  # noqa: BLE001 — cache misses must never fail a fetch
+        return None
+
+
+def _db_cache_put(key: str, text: str) -> None:
+    try:
+        from .db.store import put_pdf_text
+
+        put_pdf_text(key, text)
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def fetch_text(url: str, *, use_cache: bool = True) -> str:
     """Download a PDF and return its leading text. '' when unusable."""
     key = hashlib.sha1(url.encode("utf-8")).hexdigest()[:20]
@@ -82,6 +101,14 @@ def fetch_text(url: str, *, use_cache: bool = True) -> str:
             return cached.read_text(encoding="utf-8")
         except OSError:
             pass
+    if use_cache:
+        from_db = _db_cache_get(key)
+        if from_db:
+            try:
+                cached.write_text(from_db, encoding="utf-8")
+            except OSError:
+                pass
+            return from_db
 
     try:
         resp = get(url, timeout=FETCH_TIMEOUT, retries=1)
@@ -98,6 +125,7 @@ def fetch_text(url: str, *, use_cache: bool = True) -> str:
             cached.write_text(text, encoding="utf-8")
         except OSError:
             pass
+        _db_cache_put(key, text)
     return text
 
 

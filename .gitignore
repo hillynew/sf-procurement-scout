@@ -11,3 +11,4 @@ data/*.csv
 data/pdf_cache/
 
 .env
+data/*.db

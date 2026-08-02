@@ -7,6 +7,7 @@ from enum import Enum
 from typing import List, Optional
 from pydantic import BaseModel, Field, computed_field
 import hashlib
+import re
 
 
 class SolicitationType(str, Enum):
@@ -120,6 +121,18 @@ class Opportunity(BaseModel):
         """Stable id across refreshes for the same source + external key/title."""
         key = f"{self.source_id}|{self.external_id or ''}|{self.title}|{self.url}"
         return hashlib.sha1(key.encode("utf-8")).hexdigest()[:16]
+
+    @computed_field
+    @property
+    def budget_amount(self) -> Optional[int]:
+        """Numeric dollars parsed from the free-text budget, for sorting and totals.
+
+        Ranges ("$100,000 - $250,000") count their low end.
+        """
+        if not self.budget:
+            return None
+        digits = re.sub(r"[^\d]", "", self.budget.split("-")[0].split("–")[0])
+        return int(digits) if digits else None
 
     @computed_field
     @property

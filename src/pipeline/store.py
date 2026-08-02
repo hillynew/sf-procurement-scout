@@ -84,6 +84,16 @@ def save_snapshot(
     df.to_csv(latest_csv, index=False)
 
     prune_snapshots(keep)
+
+    # Mirror into the database (best-effort) so a CLI fetch feeds the web app
+    # and the snapshot survives ephemeral-disk restarts.
+    try:
+        from ..db import store as db_store
+
+        db_store.bootstrap()
+        db_store.save_snapshot(opportunities, health)
+    except Exception:  # noqa: BLE001 — files remain the CLI's source of truth
+        pass
     return json_path, csv_path, latest_json
 
 

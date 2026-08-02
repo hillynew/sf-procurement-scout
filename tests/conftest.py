@@ -15,6 +15,17 @@ if str(ROOT) not in sys.path:
 from src.models.opportunity import Opportunity  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _isolated_database(tmp_path, monkeypatch):
+    """Point every test at a throwaway SQLite file, never the repo's data/."""
+    from src.db import engine as db_engine
+
+    monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'scout-test.db'}")
+    db_engine.reset_engine()
+    yield
+    db_engine.reset_engine()
+
+
 def make_opp(**overrides) -> Opportunity:
     base = dict(
         source_id="test_src",
