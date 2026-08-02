@@ -30,6 +30,8 @@ services:
       # never fill these in directly in this file. See AGENTS.md.
       - key: SF_SCOUT_ANTHROPIC_KEY   # enables AI deal briefs (Claude API)
         sync: false
+      - key: SF_SCOUT_SAM_KEY         # enables federal bids via SAM.gov
+        sync: false
       - key: RESEND_API_KEY           # enables email digests
         sync: false
       - key: SF_SCOUT_DIGEST_TO       # default digest recipient

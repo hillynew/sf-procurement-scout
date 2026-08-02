@@ -17,6 +17,7 @@ from .miami_dade_construction import MiamiDadeConstructionAdapter, MiamiDadeFutu
 from .mdc_college import MdcCollegeAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
+from .sam_gov import SamGovAdapter
 from .catalog import CatalogAdapter
 
 ADAPTERS: Dict[str, Type[SourceAdapter]] = {
@@ -27,6 +28,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "mdc_college": MdcCollegeAdapter,
     "west_palm_beach": WestPalmBeachAdapter,
     "palm_beach_schools": PalmBeachSchoolsAdapter,
+    "sam_gov": SamGovAdapter,
     "civicplus": CivicPlusAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,

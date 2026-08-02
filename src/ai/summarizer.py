@@ -14,12 +14,15 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 from typing import Dict, List, Optional
 
 from src.db import store as db
 from src.models.opportunity import Opportunity
 
-PROMPT_VERSION = 1
+# v2: strict tool use + output normalization (v1 briefs could carry
+# stringified lists from non-strict tool calls).
+PROMPT_VERSION = 2
 
 DEFAULT_MODEL = "claude-haiku-4-5"
 ALLOWED_MODELS = ("claude-haiku-4-5", "claude-sonnet-5")
@@ -37,6 +40,8 @@ SYSTEM_PROMPT = (
     "omit anything the text does not support."
 )
 
+# Strict-mode compatible: additionalProperties: false on every object so the
+# API validates the tool input exactly (no stringified lists slipping through).
 BRIEF_SCHEMA = {
     "type": "object",
     "properties": {
@@ -54,6 +59,7 @@ BRIEF_SCHEMA = {
                     "note": {"type": "string"},
                 },
                 "required": ["label", "date"],
+                "additionalProperties": False,
             },
         },
         "money": {
@@ -63,6 +69,7 @@ BRIEF_SCHEMA = {
                 "bonding": {"type": "string"},
                 "payment_terms": {"type": "string"},
             },
+            "additionalProperties": False,
         },
         "requirements": {
             "type": "array",
@@ -79,7 +86,61 @@ BRIEF_SCHEMA = {
         },
     },
     "required": ["what_the_work_is", "requirements", "red_flags", "fit_hint"],
+    "additionalProperties": False,
 }
+
+_ITEM_RE = re.compile(r"<item>\s*(.*?)\s*</item>", re.DOTALL)
+_TAG_RE = re.compile(r"</?[a-zA-Z][^>]*>")
+
+
+def _string_list(value) -> List[str]:
+    """Coerce a model-emitted list field into a clean list of strings.
+
+    Defense in depth for non-strict responses: models occasionally emit a
+    whole list as one XML-ish string ("<item>a</item><item>b</item>") or a
+    newline-joined blob. Strict tool use should prevent this, but a cached
+    or fallback response must still render sanely.
+    """
+    if isinstance(value, str):
+        chunks = _ITEM_RE.findall(value)
+        if not chunks:
+            chunks = value.splitlines()
+        value = chunks
+    if not isinstance(value, list):
+        return []
+    out: List[str] = []
+    for item in value:
+        text = _TAG_RE.sub("", str(item)).strip()
+        if text:
+            out.append(text)
+    return out
+
+
+def _normalize_brief(raw: dict) -> dict:
+    """Coerce a model result into the shape the UI renders."""
+    brief: dict = {}
+    brief["what_the_work_is"] = str(raw.get("what_the_work_is") or "").strip()
+    brief["requirements"] = _string_list(raw.get("requirements"))
+    brief["red_flags"] = _string_list(raw.get("red_flags"))
+    brief["fit_hint"] = str(raw.get("fit_hint") or "").strip()
+
+    dates = []
+    for entry in raw.get("key_dates") or []:
+        if isinstance(entry, dict) and entry.get("label"):
+            dates.append({
+                "label": str(entry["label"]).strip(),
+                "date": str(entry.get("date") or "").strip(),
+                "note": str(entry.get("note") or "").strip(),
+            })
+    brief["key_dates"] = dates
+
+    money = raw.get("money")
+    brief["money"] = {
+        k: str(money[k]).strip()
+        for k in ("estimated_value", "bonding", "payment_terms")
+        if isinstance(money, dict) and isinstance(money.get(k), str) and money[k].strip()
+    }
+    return brief
 
 
 def api_key() -> Optional[str]:
@@ -166,6 +227,7 @@ def _call_claude(model: str, text: str) -> Dict:
         tools=[{
             "name": "record_deal_brief",
             "description": "Record the structured deal brief for this solicitation.",
+            "strict": True,  # API-side guarantee the input matches the schema
             "input_schema": BRIEF_SCHEMA,
         }],
         tool_choice={"type": "tool", "name": "record_deal_brief"},
@@ -196,7 +258,7 @@ def summarize(
         if cached is not None:
             return {"summary": cached, "model": model, "cached": True}
 
-    summary = _call_claude(model, text)
+    summary = _normalize_brief(_call_claude(model, text))
     db.put_summary(opp.opportunity_id, digest, model, PROMPT_VERSION,
                    summary, input_chars=len(text))
     return {"summary": summary, "model": model, "cached": False}

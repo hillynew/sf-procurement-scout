@@ -111,3 +111,59 @@ def test_input_truncation(opp):
     opp.scope = "x" * 100_000
     text = summarizer.build_input(opp)
     assert len(text) <= summarizer.MAX_INPUT_CHARS
+
+
+def test_normalize_brief_fixes_stringified_lists():
+    """The exact production failure: lists emitted as one <item> markup string."""
+    from src.ai.summarizer import _normalize_brief
+
+    raw = {
+        "what_the_work_is": "Flood mitigation work.",
+        "requirements": (
+            "\n<item>Primary license: General Building Contractor</item>"
+            "\n<item>Worker's Compensation Insurance</item>"
+            "\n<item>Commercial General Liability: $300,000</item>"
+        ),
+        "red_flags": "<item>LDs $500/day</item><item>Tight 120-day window</item>",
+        "fit_hint": "Suits licensed drainage contractors.",
+        "key_dates": [
+            {"label": "Due", "date": "2026-08-20"},
+            {"bogus": "no label"},
+            "not-a-dict",
+        ],
+        "money": {"estimated_value": "$150,000", "bonding": "", "extra": 42},
+    }
+    brief = _normalize_brief(raw)
+    assert brief["requirements"] == [
+        "Primary license: General Building Contractor",
+        "Worker's Compensation Insurance",
+        "Commercial General Liability: $300,000",
+    ]
+    assert brief["red_flags"] == ["LDs $500/day", "Tight 120-day window"]
+    assert brief["key_dates"] == [{"label": "Due", "date": "2026-08-20", "note": ""}]
+    assert brief["money"] == {"estimated_value": "$150,000"}
+
+
+def test_normalize_brief_passthrough_and_newline_split():
+    from src.ai.summarizer import _normalize_brief
+
+    good = _normalize_brief(dict(BRIEF))
+    assert good["requirements"] == BRIEF["requirements"]
+    assert good["red_flags"] == BRIEF["red_flags"]
+    assert good["what_the_work_is"] == BRIEF["what_the_work_is"]
+
+    newline = _normalize_brief({
+        "what_the_work_is": "x", "fit_hint": "y",
+        "requirements": "Bid bond 5%\nE-Verify\n\n",
+        "red_flags": [],
+    })
+    assert newline["requirements"] == ["Bid bond 5%", "E-Verify"]
+
+
+def test_strict_tool_schema_shape():
+    """Strict tool use requires additionalProperties: false on every object."""
+    from src.ai.summarizer import BRIEF_SCHEMA
+
+    assert BRIEF_SCHEMA["additionalProperties"] is False
+    assert BRIEF_SCHEMA["properties"]["money"]["additionalProperties"] is False
+    assert BRIEF_SCHEMA["properties"]["key_dates"]["items"]["additionalProperties"] is False

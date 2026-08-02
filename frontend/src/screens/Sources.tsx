@@ -2,9 +2,49 @@ import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { useSourceMutation, useSources } from "../api/hooks";
-import type { DetectResponse } from "../api/types";
+import type { DetectResponse, SourceInfo } from "../api/types";
+import SortControl from "../components/SortControl";
 import { Button, FilterChip, Spinner, StatCard } from "../components/ui";
 import { COUNTY_LABEL, fmtRelative } from "../lib/format";
+import { useSortPref, type SortKeyDef } from "../lib/sort";
+
+const SOURCE_SORT_KEYS: SortKeyDef[] = [
+  { value: "deals", label: "Deals found", defaultDir: "desc" },
+  { value: "speed", label: "Fastest", defaultDir: "asc" },
+  { value: "name", label: "Name", defaultDir: "asc" },
+  { value: "status", label: "Status", defaultDir: "asc" },
+];
+
+const STATUS_ORDER: Record<string, number> = { error: 0, degraded: 1, empty: 2, ok: 3 };
+
+function sortSources(list: SourceInfo[], key: string, dir: "asc" | "desc"): SourceInfo[] {
+  const sign = dir === "desc" ? -1 : 1;
+  return [...list].sort((a, b) => {
+    let cmp: number;
+    switch (key) {
+      case "speed": {
+        const av = a.health?.elapsed_ms;
+        const bv = b.health?.elapsed_ms;
+        if (av == null && bv == null) cmp = 0;
+        else if (av == null) return 1;
+        else if (bv == null) return -1;
+        else cmp = av - bv;
+        break;
+      }
+      case "name":
+        cmp = a.name.localeCompare(b.name);
+        break;
+      case "status":
+        cmp = (STATUS_ORDER[a.health?.status ?? ""] ?? 9) -
+              (STATUS_ORDER[b.health?.status ?? ""] ?? 9);
+        break;
+      default:
+        cmp = (a.health?.count ?? -1) - (b.health?.count ?? -1);
+    }
+    if (cmp === 0) return a.name.localeCompare(b.name);
+    return cmp * sign;
+  });
+}
 
 const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
   ok: { label: "OK", color: "var(--color-open)", icon: "●" },
@@ -32,14 +72,16 @@ export default function Sources() {
     return c;
   }, [sources]);
 
+  const [sort, setSort] = useSortPref("sources", { key: "deals", dir: "desc" });
+
   const visible = useMemo(() => {
     let pool = sources;
     if (filter === "attention")
       pool = pool.filter((s) => s.health && ["degraded", "error"].includes(s.health.status));
     else if (filter === "custom") pool = pool.filter((s) => s.custom);
     else if (filter) pool = pool.filter((s) => s.health?.status === filter);
-    return [...pool].sort((a, b) => (b.health?.count ?? -1) - (a.health?.count ?? -1));
-  }, [sources, filter]);
+    return sortSources(pool, sort.key, sort.dir);
+  }, [sources, filter, sort]);
 
   const runDetect = () => {
     if (!url.trim()) return;
@@ -92,15 +134,20 @@ export default function Sources() {
         </div>
       )}
 
-      <div className="scrollbar-none mb-3 flex gap-2 overflow-x-auto pb-1">
-        {[
-          ["", "All"], ["attention", "Needs attention"], ["ok", "OK"],
-          ["empty", "No listings"], ["custom", "My additions"],
-        ].map(([key, label]) => (
-          <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)}>
-            {label}
-          </FilterChip>
-        ))}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
+          {[
+            ["", "All"], ["attention", "Needs attention"], ["ok", "OK"],
+            ["empty", "No listings"], ["custom", "My additions"],
+          ].map(([key, label]) => (
+            <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)}>
+              {label}
+            </FilterChip>
+          ))}
+        </div>
+        <div className="ml-auto">
+          <SortControl keys={SOURCE_SORT_KEYS} pref={sort} onChange={setSort} />
+        </div>
       </div>
 
       <div className="card mb-6 divide-y divide-line overflow-hidden">

@@ -4,15 +4,10 @@ import { Search } from "lucide-react";
 import { useLoadDemo, useOpportunities } from "../api/hooks";
 import type { Opportunity } from "../api/types";
 import BidRow from "../components/BidRow";
+import SortControl from "../components/SortControl";
 import { Button, EmptyState, FilterChip, Spinner } from "../components/ui";
 import { COUNTY_LABEL, OFFER_LABEL } from "../lib/format";
-
-const SORTS = [
-  { value: "due", label: "Due soonest" },
-  { value: "new", label: "Newest" },
-  { value: "value", label: "Highest value" },
-  { value: "title", label: "A–Z" },
-] as const;
+import { BID_SORT_KEYS, sortOpportunities, useSortPref } from "../lib/sort";
 
 const STATUS_TABS = ["all", "open", "upcoming", "closed"] as const;
 
@@ -32,7 +27,7 @@ export default function AllBids() {
   const status = params.get("f") ?? "open";
   const county = params.get("c") ?? "";
   const otype = params.get("t") ?? "";
-  const sort = params.get("sort") ?? "due";
+  const [sort, setSort] = useSortPref("bids", { key: "due", dir: "asc" });
 
   const setParam = (key: string, value: string) => {
     if (value) params.set(key, value);
@@ -75,24 +70,7 @@ export default function AllBids() {
     else if (status === "upcoming") pool = pool.filter((o) => o.status === "upcoming");
     else if (status === "closed")
       pool = pool.filter((o) => ["closed", "cancelled"].includes(o.status));
-    const sorted = [...pool];
-    switch (sort) {
-      case "new":
-        sorted.sort((a, b) => (b.posted_date ?? "").localeCompare(a.posted_date ?? ""));
-        break;
-      case "value":
-        sorted.sort((a, b) => (b.budget_amount ?? -1) - (a.budget_amount ?? -1));
-        break;
-      case "title":
-        sorted.sort((a, b) => a.title.localeCompare(b.title));
-        break;
-      default:
-        sorted.sort(
-          (a, b) => (a.days_until_due ?? 9999) - (b.days_until_due ?? 9999) ||
-            a.title.localeCompare(b.title),
-        );
-    }
-    return sorted;
+    return sortOpportunities(pool, sort.key, sort.dir);
   }, [counts.pool, status, sort]);
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
@@ -118,13 +96,7 @@ export default function AllBids() {
           <h1 className="text-xl font-extrabold">All bids</h1>
           <p className="text-sm text-ink-soft">{visible.length} shown · {all.length} captured</p>
         </div>
-        <select
-          value={sort}
-          onChange={(e) => setParam("sort", e.target.value)}
-          className="rounded-[10px] border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink-soft"
-        >
-          {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-        </select>
+        <SortControl keys={BID_SORT_KEYS} pref={sort} onChange={setSort} />
       </div>
 
       <div className="relative mb-3">

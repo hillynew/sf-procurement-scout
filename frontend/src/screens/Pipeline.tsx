@@ -24,6 +24,7 @@ import {
   Spinner,
   ValueTag,
 } from "../components/ui";
+import SortControl from "../components/SortControl";
 import {
   fmtMoney,
   fmtMoneyCents,
@@ -31,6 +32,7 @@ import {
   STAGE_LABEL,
   STAGES,
 } from "../lib/format";
+import { PIPELINE_SORT_KEYS, sortOpportunities, useSortPref } from "../lib/sort";
 
 function unmetCount(o: Opportunity): number {
   return o.requirements.filter((_, i) => !o.checks[String(i)]).length;
@@ -180,15 +182,15 @@ export default function Pipeline() {
     [data],
   );
 
+  const [sort, setSort] = useSortPref("pipeline", { key: "due", dir: "asc" });
+
   const byStage = useMemo(() => {
     const map: Record<string, Opportunity[]> = {};
     for (const s of STAGES) map[s] = [];
     for (const o of tracked) map[o.stage ?? "watching"]?.push(o);
-    for (const s of STAGES) {
-      map[s].sort((a, b) => (a.days_until_due ?? 9999) - (b.days_until_due ?? 9999));
-    }
+    for (const s of STAGES) map[s] = sortOpportunities(map[s], sort.key, sort.dir);
     return map;
-  }, [tracked]);
+  }, [tracked, sort]);
 
   const decided = [...tracked, ...archived].filter((o) => o.result);
   const won = decided.filter((o) => o.result?.outcome === "won");
@@ -237,6 +239,7 @@ export default function Pipeline() {
             {tracked.length} active · drag cards between stages
           </p>
         </div>
+        <SortControl keys={PIPELINE_SORT_KEYS} pref={sort} onChange={setSort} />
         {decided.length > 0 && (
           <div className="card flex items-center gap-4 px-4 py-2 text-sm">
             <span className="flex items-center gap-1.5 font-bold text-open">
