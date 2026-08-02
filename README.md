@@ -65,12 +65,14 @@ Disable either pass with `run_fetch(with_details=False)` or
 
 ## Dashboard screens
 
-The Streamlit dashboard (`web/app.py`, "Scout Classic" design system in
-`web/styles.css`) is organized as five screens plus a slide-in detail drawer:
+The dashboard (FastAPI + server-rendered HTML: `web/server.py` routes,
+`web/views.py` rendering, "Scout Classic" design system in `web/styles.css`)
+is organized as six screens plus a slide-in detail drawer:
 
 | Screen | What it does |
 |--------|--------------|
 | **Today** | Triage inbox: bids closing within 3 days and bids new since your last visit, with one-tap **Track** / **Skip** |
+| **All bids** | Every captured bid across all dates and statuses, grouped by due month, with search and status filters |
 | **My Pipeline** | Kanban of tracked bids (Watching → Preparing bid → Submitted → Result) with a 14-day deadline strip |
 | **Bid Workroom** | Deep read of one bid: scope, requirements as a checklist, documents, key dates, go/no-go scorecard and notes |
 | **Watchlists** | Saved niche searches with new-match badges, plus a chip builder for creating new ones |
@@ -203,17 +205,11 @@ surfaces it in the left menu and the **Source health** panel.
 
 | Setting | Value |
 |---------|--------|
-| Runtime | Python 3 |
-| Build command | `pip install -r requirements.txt` |
-| Start command | `streamlit run web/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true` |
-| Health check path | `/_stcore/health` |
+| Runtime | Docker |
+| Dockerfile path | `./Dockerfile` |
+| Health check path | `/healthz` |
 
-3. Env vars (optional):
-
-```
-PYTHON_VERSION=3.11.11
-STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-```
+Render injects `$PORT`; the Dockerfile's start command honors it.
 
 ### Notes for free tier
 
@@ -242,7 +238,22 @@ python run.py list-sources
 
 # Web UI
 python run.py dashboard
-# or: streamlit run web/app.py
+# or: uvicorn web.server:app --host 0.0.0.0 --port 8000
+```
+
+### Docker
+
+```bash
+docker compose up --build          # dashboard on http://localhost:8000
+docker compose --profile fetch up  # + a sidecar that re-fetches every 4h
+```
+
+The `./data` volume keeps snapshots and your workflow state across container
+restarts. Or without compose:
+
+```bash
+docker build -t sf-procurement-scout .
+docker run -p 8000:8000 -v "$PWD/data:/app/data" sf-procurement-scout
 ```
 
 ### Tests
@@ -338,10 +349,11 @@ dashboard unless **Include catalog portals** is ticked.
 ## Project layout
 
 ```
-render.yaml             # Render Blueprint
+render.yaml             # Render Blueprint (Docker runtime)
+Dockerfile              # FastAPI + uvicorn image
+docker-compose.yml      # local: web + optional 4-hourly fetch sidecar
 Procfile                # alternate start command
 runtime.txt             # Python version hint
-.streamlit/config.toml  # Streamlit production config
 config/sources.yaml     # portal registry
 src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-portal adapters
@@ -356,7 +368,8 @@ src/summarize.py        # deal briefs
 src/pipeline/           # concurrent fetch, dedupe, store
 src/pipeline/user_state.py  # tracked bids, checklists, notes, watchlists
 src/cli.py              # Typer CLI
-web/app.py              # Streamlit UI — five Scout Classic screens (Render entrypoint)
+web/server.py           # FastAPI routes + actions (deploy entrypoint)
+web/views.py            # Scout Classic screens — server-rendered HTML
 web/styles.css          # Scout Classic design system
 web/sample_data.py      # demo snapshot for exploring the screens offline
 tests/                  # offline test suite + portal fixtures

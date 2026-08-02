@@ -1,23 +1,19 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
 # Deploy: Dashboard → New → Blueprint → connect this repo
+#
+# The service builds from the repo's Dockerfile (FastAPI + uvicorn). Render
+# injects $PORT; the Dockerfile's CMD honors it.
 
 services:
   - type: web
     name: sf-procurement-scout
-    runtime: python
+    runtime: docker
     plan: free
     region: oregon
     branch: main
-    buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run web/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
-    healthCheckPath: /_stcore/health
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11.11"
-      - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
-        value: "false"
-      - key: STREAMLIT_SERVER_HEADLESS
-        value: "true"
       # Optional integrations, all inert until set. `sync: false` means Render
       # prompts for a real value in its dashboard and never stores one here —
       # never fill these in directly in this file. See AGENTS.md.

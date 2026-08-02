@@ -315,14 +315,16 @@ def show(
 
 
 @app.command()
-def dashboard():
-    """Launch Streamlit dashboard (requires streamlit)."""
+def dashboard(port: int = 8000):
+    """Launch the web dashboard (uvicorn)."""
     import subprocess
     import sys
-    from .sources.registry import project_root
 
-    app_path = project_root() / "web" / "app.py"
-    subprocess.run([sys.executable, "-m", "streamlit", "run", str(app_path)], check=False)
+    subprocess.run(
+        [sys.executable, "-m", "uvicorn", "web.server:app",
+         "--host", "0.0.0.0", "--port", str(port)],
+        check=False,
+    )
 
 
 def main():
