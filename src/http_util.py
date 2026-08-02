@@ -101,3 +101,58 @@ def get_json(url: str, **kwargs):
 
 def _sleep_backoff(attempt: int) -> None:
     time.sleep(DEFAULT_BACKOFF**attempt + random.uniform(0, 0.25))
+
+
+def get_h2(
+    url: str,
+    *,
+    timeout: int = 40,
+    headers: Optional[dict] = None,
+    retries: int = 3,
+):
+    """Fetch over HTTP/2 via httpx, for WAF-fronted sites.
+
+    Some portals (e.g. Akamai on wpb.org) 403 every plain HTTP/1.1 library
+    client but serve HTTP/2 requests carrying browser-like headers. Denials
+    are intermittent, so retry a few times before giving up. Returns an
+    httpx.Response (requests-compatible ``.text`` / ``.json()``); raises
+    SourceBlocked when every attempt was refused.
+    """
+    import httpx
+
+    hdrs = {
+        "User-Agent": DEFAULT_UA,
+        "Accept": (
+            "text/html,application/xhtml+xml,application/xml;q=0.9,"
+            "image/avif,image/webp,image/apng,*/*;q=0.8"
+        ),
+        "Accept-Language": "en-US,en;q=0.9",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+    if headers:
+        hdrs.update(headers)
+
+    last_err: Optional[Exception] = None
+    for attempt in range(retries):
+        try:
+            with httpx.Client(
+                http2=True, headers=hdrs, follow_redirects=True, timeout=timeout
+            ) as c:
+                resp = c.get(url)
+            denied = resp.status_code in (401, 403) or (
+                "Access Denied" in resp.text[:2000]
+            )
+            if not denied:
+                resp.raise_for_status()
+                return resp
+            last_err = SourceBlocked(f"WAF denial (status {resp.status_code}): {url}")
+        except SourceBlocked:
+            raise
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+        _sleep_backoff(attempt)
+    raise last_err if last_err else SourceBlocked(f"get_h2 exhausted retries: {url}")
