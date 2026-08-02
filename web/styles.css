@@ -329,6 +329,38 @@ a.sc-undo-link:hover { color: var(--ink); }
 .sc-card-sub.crimson { font-weight: 600; color: var(--crimson); }
 .sc-card-sub.green { font-weight: 600; color: var(--green); }
 .sc-card-sub.tight { margin-top: 2px; }
+.sc-card-moves {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  display: none;
+  gap: 4px;
+  z-index: 2;
+}
+.sc-card:hover .sc-card-moves { display: flex; }
+a.sc-move {
+  font: 600 11px var(--mono);
+  border: 1px solid var(--faint);
+  color: var(--muted);
+  background: var(--card);
+  padding: 0 5px;
+  border-radius: 2px;
+  line-height: 15px;
+  text-decoration: none;
+}
+a.sc-move:hover { border-color: var(--ink); color: var(--ink); }
+.sc-outcome { position: relative; z-index: 2; }
+a.sc-outcome-btn {
+  font: 600 10px var(--mono);
+  border: 1px solid var(--faint);
+  color: var(--muted);
+  padding: 1px 7px;
+  border-radius: 2px;
+  text-decoration: none;
+}
+a.sc-outcome-btn:hover { border-color: var(--ink); color: var(--ink); }
+a.sc-outcome-btn.won { border-color: var(--green); color: var(--green); }
+a.sc-outcome-btn.won:hover { background: var(--green-soft); }
 .sc-foot-card {
   border: 1px solid var(--recessed-border);
   border-radius: 2px;
@@ -364,6 +396,14 @@ a.sc-crumb:hover { color: var(--ink); }
   margin-top: 5px;
 }
 .sc-stage-badge.archived { background: var(--muted); }
+a.sc-stage-next {
+  display: inline-block;
+  font: 400 10.5px var(--mono);
+  color: var(--muted);
+  margin-top: 4px;
+  text-decoration: none;
+}
+a.sc-stage-next:hover { color: var(--ink); text-decoration: underline; }
 .sc-banner {
   border: 1px solid var(--green);
   background: var(--green-soft);

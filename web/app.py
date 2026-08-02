@@ -29,6 +29,7 @@ import streamlit as st
 
 from src.models.opportunity import Opportunity
 from src.pipeline import user_state as us
+from src.scoring import go_no_go
 from src.pipeline.runner import run_fetch
 from src.pipeline.store import data_dir, load_latest, save_snapshot
 from src.sources.registry import load_source_config
@@ -299,6 +300,16 @@ if act:
             pass
     elif act in ("go", "nogo") and arg:
         us.set_decision(state, arg, act)
+    elif act == "stage" and arg:
+        to = qp.get("to", "")
+        if to in ("prev", "next"):
+            us.move_stage(state, arg, -1 if to == "prev" else 1)
+        elif to in us.STAGES:
+            us.set_stage(state, arg, to)
+    elif act == "result" and arg:
+        outcome = qp.get("val", "").upper()
+        if outcome in ("WON", "LOST"):
+            us.set_result(state, arg, outcome)
     elif act == "cleardec" and arg:
         us.set_decision(state, arg, None)
     elif act == "notes" and arg:
@@ -628,10 +639,21 @@ def kanban_card(oid: str, stage: str) -> str:
         note = f"opens {o.bid_opening}" if o.bid_opening else "awaiting award"
         subs.append(f'<div class="sc-card-sub">{esc(note)}</div>')
     elif stage == "result":
-        outcome = state["results"].get(oid, "closed")
-        won = outcome.upper().startswith("WON")
-        cls = "won" if won else ""
-        subs.append(f'<div class="sc-card-sub {"green" if won else ""}">{esc(outcome)}</div>')
+        outcome = state["results"].get(oid)
+        if outcome:
+            won = outcome.upper().startswith("WON")
+            cls = "won" if won else ""
+            label = esc(outcome)
+            if won and budget_short(o) and "·" not in outcome:
+                label = f"{esc(outcome)} · {esc(budget_short(o))}"
+            subs.append(f'<div class="sc-card-sub {"green" if won else "crimson"}">{label}</div>')
+        else:
+            subs.append(
+                '<div class="sc-card-sub sc-outcome">record result: '
+                f'<a class="sc-outcome-btn won" href="{href(act="result", id=oid, val="won", screen="pipeline")}">WON</a> '
+                f'<a class="sc-outcome-btn" href="{href(act="result", id=oid, val="lost", screen="pipeline")}">LOST</a>'
+                "</div>"
+            )
     if not subs:
         bits = []
         if o.due_date:
@@ -643,10 +665,25 @@ def kanban_card(oid: str, stage: str) -> str:
         else:
             bits.append(o.agency)
         subs.append(f'<div class="sc-card-sub">{esc(" · ".join(bits))}</div>')
+    idx = us.STAGES.index(stage)
+    moves = []
+    if idx > 0:
+        prev_label = STAGE_LABELS[us.STAGES[idx - 1]].title()
+        moves.append(
+            f'<a class="sc-move" href="{href(act="stage", id=oid, to="prev", screen="pipeline")}"'
+            f' title="Move to {esc(prev_label)}">‹</a>'
+        )
+    if idx < len(us.STAGES) - 1:
+        next_label = STAGE_LABELS[us.STAGES[idx + 1]].title()
+        moves.append(
+            f'<a class="sc-move" href="{href(act="stage", id=oid, to="next", screen="pipeline")}"'
+            f' title="Move to {esc(next_label)}">›</a>'
+        )
     return block(
         f"""
         <div class="sc-card {cls}">
           <a class="sc-row-link" href="{target}" aria-label="{esc(o.title)}"></a>
+          <div class="sc-card-moves">{''.join(moves)}</div>
           <div class="sc-card-title">{esc(o.title)}</div>
           {''.join(subs)}
         </div>
@@ -763,6 +800,18 @@ def workroom_html() -> str:
         stage_html = '<div class="sc-stage-badge archived">ARCHIVED</div>'
     elif stage:
         stage_html = f'<div class="sc-stage-badge">{STAGE_LABELS[stage]}</div>'
+        next_steps = {
+            "watching": ("preparing", "start preparing →"),
+            "preparing": ("submitted", "mark submitted →"),
+            "submitted": ("result", "record result →"),
+        }
+        if stage in next_steps:
+            to, label = next_steps[stage]
+            stage_html += (
+                f'<div><a class="sc-stage-next" '
+                f'href="{href(act="stage", id=oid, to=to, screen="workroom", bid=oid)}">'
+                f"{label}</a></div>"
+            )
     else:
         stage_html = '<div class="sc-stage-badge archived">NOT TRACKED</div>'
     crumb_txt = f"← My Pipeline · {sol_label(o)}"
@@ -920,13 +969,28 @@ def workroom_html() -> str:
         f'<div class="sc-dates">{"".join(dates_html) or "<span class=sc-doc-more>no dates published</span>"}</div>'
     )
 
-    month = date.today().strftime("%B")
-    meters = [("Fit for our crews", 80), (f"Capacity in {month}", 45), ("Expected margin", 65)]
+    tracked_opps = [by_id[i] for i in tracked_ids]
+    committed = [
+        by_id[i] for i in active_tracked
+        if us.stage_of(state, i) in ("preparing", "submitted")
+    ]
+    wl_hits = sum(
+        1 for _, matches, _ in _wl_computed
+        if any(m.opportunity_id == oid for m in matches)
+    )
+    meters = go_no_go(
+        o,
+        tracked=tracked_opps,
+        committed=committed,
+        watchlist_hits=wl_hits,
+        results=state["results"],
+        tracked_by_id={i: by_id[i] for i in tracked_ids},
+    )
     meter_html = "".join(
-        f'<div class="sc-meter-label">{esc(label)}</div>'
-        f'<div class="sc-meter {"last" if i == len(meters) - 1 else ""}">'
-        f'<div style="width:{pct}%"></div></div>'
-        for i, (label, pct) in enumerate(meters)
+        f'<div class="sc-meter-label" title="{esc(m.tooltip)}">{esc(m.label)}</div>'
+        f'<div class="sc-meter {"last" if i == len(meters) - 1 else ""}" title="{esc(m.tooltip)}">'
+        f'<div style="width:{m.score}%"></div></div>'
+        for i, m in enumerate(meters)
     )
     gonogo_block = block(
         f"""
