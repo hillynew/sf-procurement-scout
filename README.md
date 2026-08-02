@@ -1,6 +1,6 @@
 # SF Procurement Scout
 
-Live aggregator for government procurement opportunities across **Miami-Dade**, **Broward**, and **Palm Beach** counties.
+Live aggregator for government procurement opportunities across **Miami-Dade**, **Broward**, and **Palm Beach** counties — plus **federal bids in Florida** (SAM.gov, with a free API key) and a pointer to the **State of Florida's** MyFloridaMarketPlace portal.
 
 **GitHub:** [hillynew/sf-procurement-scout](https://github.com/hillynew/sf-procurement-scout)
 

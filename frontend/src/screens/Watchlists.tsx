@@ -10,8 +10,10 @@ import {
 } from "../api/hooks";
 import type { Watchlist, WatchlistRules } from "../api/types";
 import BidRow from "../components/BidRow";
+import SortControl from "../components/SortControl";
 import { Button, EmptyState, FilterChip, Modal, NewDot, Spinner } from "../components/ui";
 import { COUNTY_LABEL, fmtMoney, OFFER_LABEL } from "../lib/format";
+import { BID_SORT_KEYS, sortOpportunities, useSortPref } from "../lib/sort";
 
 function ruleChips(rules: WatchlistRules): string[] {
   const chips: string[] = [];
@@ -35,6 +37,8 @@ export default function Watchlists() {
   const lists = data?.watchlists ?? [];
   const active = lists.find((w) => w.id === selected) ?? lists[0] ?? null;
   const { data: matchData, isLoading: matchesLoading } = useWatchlistMatches(active?.id ?? null);
+  const [sort, setSort] = useSortPref("watchlists", { key: "due", dir: "asc" });
+  const matches = sortOpportunities(matchData?.matches ?? [], sort.key, sort.dir);
 
   // Viewing a list clears its NEW badge after a moment.
   useEffect(() => {
@@ -98,7 +102,8 @@ export default function Watchlists() {
                   {active.match_count} open match{active.match_count !== 1 ? "es" : ""}
                 </span>
               </h2>
-              <div className="flex gap-1.5">
+              <div className="flex items-center gap-1.5">
+                <SortControl keys={BID_SORT_KEYS} pref={sort} onChange={setSort} />
                 <Button kind="ghost" className="!px-2.5 !py-1.5"
                         onClick={() => setEditing(active)}>
                   <span className="flex items-center gap-1 text-xs"><Pencil size={13} /> Edit</span>
@@ -120,10 +125,10 @@ export default function Watchlists() {
             <div className="flex justify-center py-16"><Spinner size={22} /></div>
           ) : (
             <div className="space-y-2">
-              {(matchData?.matches ?? []).map((o) => (
+              {matches.map((o) => (
                 <BidRow key={o.opportunity_id} bid={o} />
               ))}
-              {active && (matchData?.matches ?? []).length === 0 && (
+              {active && matches.length === 0 && (
                 <div className="py-16 text-center text-sm text-ink-faint">
                   No open bids match right now — you'll get a notification when one does.
                 </div>

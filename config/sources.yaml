@@ -567,3 +567,30 @@ sources:
     adapter: email_alerts
     portal_url: https://www.northmiamifl.gov/list.aspx?Mode=Subscribe#bids
     register_url: https://www.northmiamifl.gov/list.aspx?Mode=Subscribe#bids
+
+  # ---- Beyond the tri-county: federal and Florida state -------------------
+
+  # Federal opportunities via SAM.gov's official public API. Inert until
+  # SF_SCOUT_SAM_KEY is set (free key at sam.gov / api.data.gov); scoped to
+  # active solicitations with a Florida place of performance.
+  - id: sam_gov_fl
+    name: SAM.gov federal bids (Florida)
+    county: federal
+    agency: U.S. Federal (SAM.gov)
+    live_fetch: true
+    adapter: sam_gov
+    portal_url: https://sam.gov/search/?index=opp&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5Bstatus%5D%5Bis_active%5D=true
+    pop_state: FL
+
+  # Florida's statewide portal (MyFloridaMarketPlace VIP) is an Angular SPA
+  # whose bid-search API is not publicly reachable server-to-server, so this
+  # is a directory pointer rather than a scrape — same treatment as the other
+  # login-walled portals above.
+  - id: florida_mfmp
+    name: State of Florida (MyFloridaMarketPlace)
+    county: florida
+    agency: State of Florida
+    live_fetch: false
+    adapter: catalog
+    portal_url: https://vendor.myfloridamarketplace.com/search/bids
+    register_url: https://vendor.myfloridamarketplace.com/registration

@@ -58,6 +58,7 @@ committed file:
 | Variable | Enables | Notes |
 |---|---|---|
 | `SF_SCOUT_ANTHROPIC_KEY` (or `ANTHROPIC_API_KEY`) | AI deal briefs via the Claude API | Default model `claude-haiku-4-5` (~1¢ per 50 bids); switchable to `claude-sonnet-5` in Settings |
+| `SF_SCOUT_SAM_KEY` (or `SAM_API_KEY`) | Federal bids via SAM.gov's public API | Free key from a sam.gov account; source is scoped to Florida place-of-performance |
 | `RESEND_API_KEY` | Email digests (daily or instant) | Free tier at resend.com; recipient set in Settings or `SF_SCOUT_DIGEST_TO` |
 | `SF_SCOUT_DIGEST_TO` / `SF_SCOUT_DIGEST_FROM` | Digest recipient / sender | Sender defaults to Resend's onboarding address |
 | `SF_SCOUT_IMAP_HOST` / `_USER` / `_PASSWORD` | Email bid alerts | App-specific password; mailbox opened read-only |

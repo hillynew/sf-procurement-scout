@@ -1,21 +1,29 @@
 import { format, parseISO } from "date-fns";
 
+// "county" is really the geography slug — the three counties plus the wider
+// federal / state-of-Florida regions.
 export const COUNTY_LABEL: Record<string, string> = {
   "miami-dade": "Miami-Dade",
   broward: "Broward",
   "palm-beach": "Palm Beach",
+  federal: "Federal",
+  florida: "Florida State",
 };
 
 export const COUNTY_COLOR: Record<string, string> = {
   "miami-dade": "var(--color-miami)",
   broward: "var(--color-broward)",
   "palm-beach": "var(--color-palmbeach)",
+  federal: "var(--color-federal)",
+  florida: "var(--color-flstate)",
 };
 
 export const COUNTY_SOFT: Record<string, string> = {
   "miami-dade": "var(--color-miami-soft)",
   broward: "var(--color-broward-soft)",
   "palm-beach": "var(--color-palmbeach-soft)",
+  federal: "var(--color-federal-soft)",
+  florida: "var(--color-flstate-soft)",
 };
 
 export const OFFER_LABEL: Record<string, string> = {

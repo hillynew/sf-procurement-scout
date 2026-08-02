@@ -1,0 +1,44 @@
+{
+  "totalRecords": 2,
+  "limit": 200,
+  "offset": 0,
+  "opportunitiesData": [
+    {
+      "noticeId": "abc123def456",
+      "title": "Roof Replacement Building 402, Homestead ARB",
+      "solicitationNumber": "FA648726B0011",
+      "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE AIR FORCE.AFRC.482 FW.482 CONS",
+      "postedDate": "2026-07-20 14:03:11",
+      "type": "Solicitation",
+      "baseType": "Solicitation",
+      "active": "Yes",
+      "responseDeadLine": "2026-08-21T14:00:00-04:00",
+      "naicsCode": "238160",
+      "typeOfSetAsideDescription": "Total Small Business Set-Aside",
+      "placeOfPerformance": {
+        "city": {"code": "32275", "name": "HOMESTEAD"},
+        "state": {"code": "FL", "name": "Florida"},
+        "country": {"code": "USA", "value": "UNITED STATES"}
+      },
+      "pointOfContact": [
+        {"type": "primary", "email": "kt.officer@us.af.mil", "fullName": "KT Officer"}
+      ],
+      "description": "https://api.sam.gov/prod/opportunities/v1/noticedesc?noticeid=abc123def456",
+      "uiLink": "https://sam.gov/opp/abc123def456/view"
+    },
+    {
+      "noticeId": "inactive999",
+      "title": "Expired Grounds Maintenance",
+      "solicitationNumber": "W912EP26R0001",
+      "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE ARMY.USACE",
+      "postedDate": "2026-05-01 09:00:00",
+      "type": "Solicitation",
+      "active": "No",
+      "responseDeadLine": "2026-06-01T14:00:00-04:00",
+      "naicsCode": "561730",
+      "placeOfPerformance": {"state": {"code": "FL"}},
+      "pointOfContact": [],
+      "uiLink": "https://sam.gov/opp/inactive999/view"
+    }
+  ]
+}

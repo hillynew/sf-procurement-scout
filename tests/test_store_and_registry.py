@@ -94,7 +94,8 @@ def test_shipped_config_is_valid():
     assert configs
     for cfg in configs:
         assert cfg["adapter"] in ADAPTERS, f"{cfg['id']} references an unknown adapter"
-        assert cfg["county"] in {"miami-dade", "broward", "palm-beach"}
+        assert cfg["county"] in {"miami-dade", "broward", "palm-beach",
+                                 "federal", "florida"}
         assert cfg["portal_url"].startswith("https://")
 
 
