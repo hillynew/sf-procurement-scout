@@ -6,7 +6,7 @@
 # /app/data/scout.db (mount a volume there to keep it across restarts).
 
 # --- Stage 1: build the React bundle ---------------------------------------
-FROM node:20-slim AS webbuild
+FROM node:22-slim AS webbuild
 
 WORKDIR /fe
 COPY frontend/package*.json ./
