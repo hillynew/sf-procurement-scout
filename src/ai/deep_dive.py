@@ -19,7 +19,7 @@ from src.models.opportunity import Opportunity
 
 from .summarizer import ALLOWED_MODELS, DEFAULT_MODEL, api_key, build_input, enabled
 
-DEEP_PROMPT_VERSION = 1
+DEEP_PROMPT_VERSION = 2  # v2: contacts + documents_reviewed became required
 
 MAX_DOCS = 8                 # documents downloaded per dive
 MAX_DOC_CHARS = 60_000       # per document
@@ -137,7 +137,8 @@ DEEP_SCHEMA = {
         },
     },
     "required": ["overview", "dollar_amounts", "key_dates", "scope_items",
-                 "requirements", "evaluation", "red_flags", "open_questions",
+                 "requirements", "evaluation", "contacts",
+                 "documents_reviewed", "red_flags", "open_questions",
                  "fit_assessment"],
     "additionalProperties": False,
 }
