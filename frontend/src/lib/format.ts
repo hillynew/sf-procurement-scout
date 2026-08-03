@@ -1,14 +1,32 @@
 import { format, parseISO } from "date-fns";
 
-// "county" is really the geography slug — the three counties plus the wider
-// federal / state-of-Florida regions.
+// "county" is really the geography slug. Since the statewide expansion it can
+// be any of Florida's 67 counties plus the statewide/federal/unknown buckets —
+// the authoritative labels come from /api/taxonomy. This map keeps only the
+// slugs whose display form can't be derived from the slug itself; everything
+// else goes through countyLabel(), which title-cases rather than ever showing
+// a raw slug like "st-johns" in the UI.
 export const COUNTY_LABEL: Record<string, string> = {
   "miami-dade": "Miami-Dade",
   broward: "Broward",
   "palm-beach": "Palm Beach",
   federal: "Federal",
   florida: "Florida State",
+  statewide: "Statewide",
+  unknown: "Unknown",
+  "st-lucie": "St. Lucie",
+  "st-johns": "St. Johns",
+  "santa-rosa": "Santa Rosa",
+  "indian-river": "Indian River",
+  desoto: "DeSoto",
 };
+
+export function countyLabel(slug: string): string {
+  return (
+    COUNTY_LABEL[slug] ??
+    slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}
 
 export const COUNTY_COLOR: Record<string, string> = {
   "miami-dade": "var(--color-miami)",

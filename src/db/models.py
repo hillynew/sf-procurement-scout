@@ -167,6 +167,23 @@ class DeepDive(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
 
+class ResearchThread(Base):
+    """Follow-up research on one deal — the Q&A that comes after a deep dive.
+
+    ``turns`` is the whole conversation as a JSON list of
+    ``{question, answer, citations, model, asked_at}`` dicts. One row per
+    opportunity: research is a running dialogue about a deal, not a set of
+    independent lookups, and each new question is answered with the prior
+    turns in context.
+    """
+
+    __tablename__ = "research_threads"
+
+    opportunity_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    turns: Mapped[list] = mapped_column(JSONVariant, default=list)
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class CustomSource(Base):
     """User-added portals (CivicPlus), merged into the yaml config at runtime."""
 

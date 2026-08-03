@@ -607,6 +607,39 @@ def put_deep_dive(opportunity_id: str, *, content_hash: str, model: str,
         row.created_at = datetime.utcnow()
 
 
+def get_research_thread(opportunity_id: str) -> List[dict]:
+    from .models import ResearchThread
+
+    with session_scope() as s:
+        row = s.get(ResearchThread, opportunity_id)
+    return list(row.turns or []) if row else []
+
+
+def append_research_turn(opportunity_id: str, turn: dict) -> List[dict]:
+    from .models import ResearchThread
+
+    with session_scope() as s:
+        row = s.get(ResearchThread, opportunity_id)
+        if row is None:
+            row = ResearchThread(opportunity_id=opportunity_id, turns=[])
+            s.add(row)
+        # JSON columns don't detect in-place mutation; assign a new list.
+        row.turns = list(row.turns or []) + [turn]
+        row.updated_at = datetime.utcnow()
+        return list(row.turns)
+
+
+def clear_research_thread(opportunity_id: str) -> bool:
+    from .models import ResearchThread
+
+    with session_scope() as s:
+        row = s.get(ResearchThread, opportunity_id)
+        if row is None:
+            return False
+        s.delete(row)
+        return True
+
+
 def prune_deep_dives(current_version: int) -> int:
     with session_scope() as s:
         rows = s.execute(

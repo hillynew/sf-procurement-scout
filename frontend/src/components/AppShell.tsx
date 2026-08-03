@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
-  Calendar,
   Kanban,
   LayoutDashboard,
   List,
@@ -19,7 +18,6 @@ import BidDrawer from "../features/BidDrawer";
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/bids", label: "All bids", icon: List },
-  { to: "/calendar", label: "Calendar", icon: Calendar },
   { to: "/pipeline", label: "Pipeline", icon: Kanban },
   { to: "/watchlists", label: "Watchlists", icon: Star },
   { to: "/sources", label: "Sources", icon: Radar },
@@ -27,7 +25,7 @@ const NAV = [
 ];
 
 const MOBILE_NAV = NAV.filter((n) =>
-  ["/", "/bids", "/calendar", "/pipeline", "/watchlists"].includes(n.to),
+  ["/", "/bids", "/pipeline", "/watchlists"].includes(n.to),
 );
 
 export default function AppShell() {

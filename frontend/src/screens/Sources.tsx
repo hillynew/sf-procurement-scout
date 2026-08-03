@@ -1,11 +1,11 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSourceMutation, useSources } from "../api/hooks";
+import { useSourceMutation, useSources, useTaxonomy } from "../api/hooks";
 import type { DetectResponse, SourceInfo } from "../api/types";
 import SortControl from "../components/SortControl";
 import { Button, FilterChip, Spinner, StatCard } from "../components/ui";
-import { COUNTY_LABEL, fmtRelative } from "../lib/format";
+import { countyLabel, fmtRelative } from "../lib/format";
 import { useSortPref, type SortKeyDef } from "../lib/sort";
 
 const SOURCE_SORT_KEYS: SortKeyDef[] = [
@@ -60,6 +60,7 @@ export default function Sources() {
   const [url, setUrl] = useState("");
   const [detected, setDetected] = useState<DetectResponse | null>(null);
   const [county, setCounty] = useState("broward");
+  const { data: tax } = useTaxonomy();
 
   const sources = data?.sources ?? [];
   const counts = useMemo(() => {
@@ -172,7 +173,7 @@ export default function Sources() {
                   )}
                 </div>
                 <div className="truncate text-xs text-ink-faint">
-                  {COUNTY_LABEL[s.county] ?? s.county}
+                  {countyLabel(s.county)}
                   {s.health?.note && ` · ${s.health.note}`}
                   {s.health?.error && ` · ${s.health.error}`}
                 </div>
@@ -234,8 +235,8 @@ export default function Sources() {
                 <span className="text-sm font-bold">{detected.name}</span>
                 <select value={county} onChange={(e) => setCounty(e.target.value)}
                         className="rounded-lg border border-line bg-surface px-2 py-1.5 text-xs font-semibold">
-                  {Object.entries(COUNTY_LABEL).map(([k, v]) => (
-                    <option key={k} value={k}>{v}</option>
+                  {(tax?.counties ?? []).map((c) => (
+                    <option key={c.slug} value={c.slug}>{c.label}</option>
                   ))}
                 </select>
                 <Button onClick={confirmAdd} disabled={add.isPending} className="!py-1.5">

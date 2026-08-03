@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createBrowserRouter,
   Link,
+  Navigate,
   RouterProvider,
   useRouteError,
 } from "react-router-dom";
@@ -10,7 +11,6 @@ import { Toaster } from "sonner";
 import AppShell from "./components/AppShell";
 import { Spinner } from "./components/ui";
 import AllBids from "./screens/AllBids";
-import CalendarScreen from "./screens/Calendar";
 import Pipeline from "./screens/Pipeline";
 import Workroom from "./screens/Workroom";
 import Watchlists from "./screens/Watchlists";
@@ -72,8 +72,10 @@ const router = createBrowserRouter([
         ),
       },
       { path: "bids", element: <AllBids /> },
+      // The Calendar screen is gone; bookmarks land on the bid list instead
+      // of the crash page.
+      { path: "calendar", element: <Navigate to="/bids" replace /> },
       { path: "bids/:id", element: <Workroom /> },
-      { path: "calendar", element: <CalendarScreen /> },
       { path: "pipeline", element: <Pipeline /> },
       { path: "watchlists", element: <Watchlists /> },
       { path: "sources", element: <Sources /> },

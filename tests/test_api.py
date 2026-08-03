@@ -468,3 +468,37 @@ def test_spa_fallback_without_build(client):
     assert resp.status_code == 200
     # Without frontend/dist the server explains itself instead of 500ing.
     assert "frontend" in resp.text.lower() or "<div id=\"root\"" in resp.text
+
+
+# ---------------------------------------------------------------------------
+# Follow-up research
+# ---------------------------------------------------------------------------
+
+
+def test_research_requires_a_key_and_a_question(seeded, monkeypatch):
+    monkeypatch.delenv("SF_SCOUT_ANTHROPIC_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    bid = first_untracked(seeded)
+    r = seeded.post(f"/api/bids/{bid['opportunity_id']}/research",
+                    json={"question": "What did this cost before?"})
+    assert r.status_code == 503
+
+    monkeypatch.setenv("SF_SCOUT_ANTHROPIC_KEY", "test-key")
+    r = seeded.post(f"/api/bids/{bid['opportunity_id']}/research",
+                    json={"question": "   "})
+    assert r.status_code == 422
+
+
+def test_research_thread_is_served_with_suggestions(seeded):
+    bid = first_untracked(seeded)
+    data = seeded.get(f"/api/bids/{bid['opportunity_id']}/research").json()
+    assert data["turns"] == []
+    assert data["state"] == "idle"
+    # Anticipatory prompts — the point is asking what the documents can't say.
+    assert any("last time" in q for q in data["suggested_questions"])
+
+
+def test_research_unknown_bid_is_404(seeded):
+    assert seeded.get("/api/bids/nope/research").status_code == 404
+    assert seeded.post("/api/bids/nope/research",
+                       json={"question": "?"}).status_code == 404

@@ -4,8 +4,9 @@ import type { Opportunity } from "../api/types";
  *  Sections combine with AND; selections within a section are OR. */
 export interface BidFilters {
   statuses: string[]; // open | upcoming | closed (closed includes cancelled)
-  regions: string[];
+  regions: string[]; // county slugs — any of the 67 plus statewide/federal/unknown
   types: string[];
+  categories: string[]; // taxonomy slugs (roofing, mosquito_control, ...)
   minValue: number | null;
   maxValue: number | null;
   dueWithin: number | null; // days, null = any
@@ -19,6 +20,7 @@ export const EMPTY_FILTERS: BidFilters = {
   statuses: [],
   regions: [],
   types: [],
+  categories: [],
   minValue: null,
   maxValue: null,
   dueWithin: null,
@@ -53,7 +55,7 @@ function num(params: URLSearchParams, key: string): number | null {
 /** URL → filters. A missing URL (no filter params at all) means the default
  *  Open view; an explicit `f=` with other params present is respected. */
 export function parseFilters(params: URLSearchParams): BidFilters {
-  const keys = ["f", "c", "t", "vmin", "vmax", "due", "flags"];
+  const keys = ["f", "c", "t", "cat", "vmin", "vmax", "due", "flags"];
   const anySet = keys.some((k) => params.get(k) !== null);
   if (!anySet) return DEFAULT_FILTERS;
   const flags = new Set(list(params, "flags"));
@@ -61,6 +63,7 @@ export function parseFilters(params: URLSearchParams): BidFilters {
     statuses: list(params, "f").filter((s) => s !== "all"),
     regions: list(params, "c"),
     types: list(params, "t"),
+    categories: list(params, "cat"),
     minValue: num(params, "vmin"),
     maxValue: num(params, "vmax"),
     dueWithin: num(params, "due"),
@@ -81,12 +84,13 @@ export function writeFilters(params: URLSearchParams, filters: BidFilters): URLS
   // "f=" (present but empty) distinguishes "no status filter" from "default".
   const isDefault = JSON.stringify(filters) === JSON.stringify(DEFAULT_FILTERS);
   if (isDefault) {
-    ["f", "c", "t", "vmin", "vmax", "due", "flags"].forEach((k) => next.delete(k));
+    ["f", "c", "t", "cat", "vmin", "vmax", "due", "flags"].forEach((k) => next.delete(k));
     return next;
   }
   next.set("f", filters.statuses.join(","));
   setOrDelete("c", filters.regions.join(","));
   setOrDelete("t", filters.types.join(","));
+  setOrDelete("cat", filters.categories.join(","));
   setOrDelete("vmin", filters.minValue != null ? String(filters.minValue) : "");
   setOrDelete("vmax", filters.maxValue != null ? String(filters.maxValue) : "");
   setOrDelete("due", filters.dueWithin != null ? String(filters.dueWithin) : "");
@@ -107,6 +111,9 @@ export function applyFilters(opps: Opportunity[], f: BidFilters): Opportunity[] 
     if (!statusMatches(o, f.statuses)) return false;
     if (f.regions.length && !f.regions.includes(o.county)) return false;
     if (f.types.length && !f.types.includes(o.offer_type)) return false;
+    if (f.categories.length && !o.categories.some((c) => f.categories.includes(c))) {
+      return false;
+    }
     if (f.minValue != null && (o.budget_amount == null || o.budget_amount < f.minValue)) {
       return false;
     }
@@ -133,6 +140,7 @@ export function countActive(f: BidFilters): number {
   if (f.statuses.length) n += 1;
   if (f.regions.length) n += 1;
   if (f.types.length) n += 1;
+  if (f.categories.length) n += 1;
   if (f.minValue != null || f.maxValue != null) n += 1;
   if (f.dueWithin != null) n += 1;
   for (const key of FLAG_KEYS) if (f[key]) n += 1;

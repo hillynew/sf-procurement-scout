@@ -17,7 +17,7 @@ import { useLoadDemo, useStats } from "../api/hooks";
 import { Button, EmptyState, Spinner, StatCard } from "../components/ui";
 import {
   COUNTY_COLOR,
-  COUNTY_LABEL,
+  countyLabel,
   fmtMoney,
   fmtMoneyCents,
   OFFER_LABEL,
@@ -71,7 +71,7 @@ export default function Dashboard() {
 
   const t = stats.totals;
   const countyData = stats.by_county.map((c) => ({
-    name: COUNTY_LABEL[c.county] ?? c.county,
+    name: countyLabel(c.county),
     county: c.county,
     open: c.open,
     upcoming: c.upcoming,
