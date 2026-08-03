@@ -85,6 +85,20 @@ PSEUDO_COUNTIES: Dict[str, str] = {
 
 ALL_REGIONS: Dict[str, str] = {**COUNTY_NAMES, **PSEUDO_COUNTIES}
 
+#: Display names for the region keys above. Used to group the county picker —
+#: 67 counties in one flat list is a scroll, six regions is a choice.
+REGION_LABEL: Dict[str, str] = {
+    "southeast": "Southeast Florida",
+    "southwest": "Southwest Florida",
+    "tampa-bay": "Tampa Bay",
+    "central": "Central Florida",
+    "northeast": "Northeast Florida",
+    "northwest": "Northwest Florida",
+    "statewide": "Statewide & other",
+    "federal": "Statewide & other",
+    "unknown": "Statewide & other",
+}
+
 
 def county_label(slug: str) -> str:
     """Display name for a county slug, tolerant of anything unrecognised."""

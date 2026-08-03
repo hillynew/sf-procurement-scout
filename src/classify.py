@@ -1,4 +1,11 @@
-"""Category + offer-type classification from titles/descriptions."""
+"""Category + offer-type classification from titles/descriptions.
+
+The category vocabulary lives in :mod:`src.taxonomy`, not here. This module is
+only the matcher. That split is deliberate: the watchlist dropdown offers every
+category in the taxonomy, so a category the matcher cannot reach becomes a
+filter that silently matches nothing forever. Keeping the list in one place
+makes "is this filterable?" and "is this detectable?" the same question.
+"""
 
 from __future__ import annotations
 
@@ -6,6 +13,7 @@ import re
 from typing import List, Optional, Tuple
 
 from .models.opportunity import OfferType, SolicitationType
+from .taxonomy import BY_SLUG, CATEGORIES, Category
 
 
 SOLICITATION_PATTERNS = [
@@ -30,194 +38,17 @@ SOLICITATION_PATTERNS = [
 ]
 
 
-# (category, offer_type, patterns)
-CATEGORY_RULES: List[Tuple[str, OfferType, List[str]]] = [
-    (
-        "construction",
-        OfferType.CONSTRUCTION,
-        [
-            r"\bconstruction\b",
-            r"\brenovation\b",
-            r"\bremodel\b",
-            r"\broof(?:ing)?\b",
-            r"\bdemolition\b",
-            r"\bpaving\b",
-            r"\basphalt\b",
-            r"\bconcrete\b",
-            r"\butility\s+relocation",
-            r"\bpipeline\b",
-            r"\blift\s+station\b",
-            r"\bstormwater\b",
-            r"\bsanitary\s+sewer\b",
-            r"\bwater\s+main\b",
-            r"\bbridge\b",
-            r"\bdesign[- ]build\b",
-            r"\bCMAR\b",
-            r"construction\s+management",
-            r"\bhvac\b",
-            r"\bair\s+handler\b",
-            r"\bgenerator\b",
-            r"\bcrane\b",
-            r"\bpier\b",
-            r"\bfacility\s+renovation",
-        ],
-    ),
-    (
-        "architecture_engineering",
-        OfferType.PROFESSIONAL_SERVICES,
-        [
-            r"\barchitect(?:ural|ure)?\b",
-            r"\bengineering\b",
-            r"\bengineer(?:ing)?\s+consult",
-            r"\bCCNA\b",
-            r"\bsurvey(?:ing|or)?\b",
-            r"\bcivil\s+engineer",
-            r"\bdesign\s+services\b",
-            r"\burban\s+design\b",
-        ],
-    ),
-    (
-        "it_software",
-        OfferType.SERVICES,
-        [
-            r"\bsoftware\b",
-            r"\binformation\s+technology\b",
-            r"\bIT\b",
-            r"\bcyber\b",
-            r"\bnetwork\s+service",
-            r"\bcloud\b",
-            r"\bservice\s+desk\b",
-            r"\bmanaged\s+security\b",
-            r"\bSOC\b",
-            r"\bERP\b",
-            r"\bapplication\b",
-            r"\bdata\s+center\b",
-            r"\btelecom\b",
-            r"\bwireless\b",
-            r"\bcellular\b",
-            r"\bcamera\s+system\b",
-            r"\brecording\s+system\b",
-        ],
-    ),
-    (
-        "facilities_maintenance",
-        OfferType.SERVICES,
-        [
-            r"\bjanitorial\b",
-            r"\bcustodial\b",
-            r"\bcleaning\b",
-            r"\blandscape\b",
-            r"\blawn\b",
-            r"\btree\s+trimm",
-            r"\bpest\b",
-            r"\bpressure\s+wash",
-            r"\bmaintenance\b",
-            r"\bfence\b",
-            r"\blot\s+clear",
-            r"\bboard\s+up\b",
-        ],
-    ),
-    (
-        "professional_services",
-        OfferType.PROFESSIONAL_SERVICES,
-        [
-            r"\bconsult(?:ing|ant)\b",
-            r"\bpublic\s+relations\b",
-            r"\blegal\b",
-            r"\baudit\b",
-            r"\bproject\s+management\b",
-            r"\bprogram\s+management\b",
-            r"\bstaffing\b",
-            r"\bcontract\s+employee\b",
-            r"\btraining\b",
-            r"\bdispatch\b",
-            r"\bplanning\b",
-        ],
-    ),
-    (
-        "transportation",
-        OfferType.SERVICES,
-        [
-            r"\btransit\b",
-            r"\btransportation\b",
-            r"\bbus\b",
-            r"\bairport\b",
-            r"\bFLL\b",
-            r"\bparking\b",
-            r"\btowing\b",
-        ],
-    ),
-    (
-        "public_safety",
-        OfferType.MIXED,
-        [
-            r"\bfire\b",
-            r"\bpolice\b",
-            r"\bpublic\s+safety\b",
-            r"\bemergency\b",
-            r"\bdisaster\s+debris\b",
-            r"\bx[- ]?ray\b",
-            r"\bsecurity\b",
-        ],
-    ),
-    (
-        "utilities_water",
-        OfferType.MIXED,
-        [
-            r"\bwater\b",
-            r"\bwastewater\b",
-            r"\bWWTF\b",
-            r"\butilities?\b",
-            r"\bmeter\b",
-            r"\bsludge\b",
-            r"\bchemical\b",
-            r"\baluminum\s+sulfate\b",
-            r"\bcarbon\s+dioxide\b",
-        ],
-    ),
-    (
-        "waste_recycling",
-        OfferType.SERVICES,
-        [
-            r"\bsolid\s+waste\b",
-            r"\brecycl",
-            r"\blandfill\b",
-            r"\bdebris\b",
-            r"\bhazardous\b",
-        ],
-    ),
-    (
-        "goods_supplies",
-        OfferType.GOODS,
-        [
-            r"\bpurchase\s+and\s+deliver",
-            r"\bfurnish\s+and\s+deliver",
-            r"\bsupplies?\b",
-            r"\bequipment\b",
-            r"\bvehicle\b",
-            r"\btrailer\b",
-            r"\btire\b",
-            r"\buniform\b",
-            r"\bshoes?\b",
-            r"\bboots?\b",
-            r"\bfireworks?\b",
-            r"\bsod\b",
-            r"\bprinting\b",
-        ],
-    ),
-    (
-        "healthcare",
-        OfferType.MIXED,
-        [
-            r"\bmedical\b",
-            r"\bhealth\b",
-            r"\bhospital\b",
-            r"\bEMT\b",
-            r"\bsimulator\b",
-            r"\bclinical\b",
-        ],
-    ),
+#: Patterns are compiled once — the taxonomy is ~200 categories deep and a
+#: fetch classifies hundreds of bids, so recompiling per call is wasted work.
+_COMPILED: List[Tuple[Category, List[re.Pattern]]] = [
+    (c, [re.compile(p, re.I) for p in c.patterns]) for c in CATEGORIES if c.patterns
 ]
+
+#: A title matching a dozen categories helps nobody read the badge row. The cap
+#: is on *detected* categories; umbrellas are added afterwards regardless, since
+#: dropping one would silently break a watchlist saved against the old
+#: twelve-category vocabulary.
+MAX_DETECTED = 8
 
 
 def detect_solicitation_type(text: str) -> SolicitationType:
@@ -251,19 +82,26 @@ def classify_text(title: str, description: str = "") -> Tuple[List[str], OfferTy
     offer_votes = []
     keywords: List[str] = []
 
-    for cat, offer, patterns in CATEGORY_RULES:
+    for cat, patterns in _COMPILED:
         for pat in patterns:
-            if re.search(pat, blob, re.I):
-                if cat not in cats:
-                    cats.append(cat)
-                offer_votes.append(offer)
-                # capture keyword token-ish
-                m = re.search(pat, blob, re.I)
-                if m:
+            m = pat.search(blob)
+            if m:
+                if cat.slug not in cats and len(cats) < MAX_DETECTED:
+                    cats.append(cat.slug)
+                    offer_votes.append(cat.offer)
                     kw = m.group(0).lower().strip()
                     if kw not in keywords:
                         keywords.append(kw)
                 break
+
+    # Umbrellas are applied after the cap, never subject to it: a bid tagged
+    # `roofing` must also carry `construction` or a watchlist written before the
+    # taxonomy existed stops matching work it used to catch.
+    for slug in list(cats):
+        umbrella = BY_SLUG[slug].umbrella
+        if umbrella and umbrella not in cats:
+            cats.append(umbrella)
+            offer_votes.append(BY_SLUG[umbrella].offer)
 
     if not cats:
         cats = ["general"]

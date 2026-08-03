@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from src.db import store as db
+from src.taxonomy import ALL_SLUGS
 from web.services.matching import wl_matches
 from web.services.serialize import opp_out
 
@@ -18,6 +19,7 @@ class Rules(BaseModel):
     keywords: List[str] = Field(default_factory=list)
     counties: List[str] = Field(default_factory=list)
     offers: List[str] = Field(default_factory=list)
+    categories: List[str] = Field(default_factory=list)
     min_value: Optional[int] = None
     max_value: Optional[int] = None
     no_bond: bool = False
@@ -32,6 +34,12 @@ class Rules(BaseModel):
             out["counties"] = self.counties
         if self.offers:
             out["offers"] = self.offers
+        if self.categories:
+            # Unknown slugs are dropped rather than stored: a typo'd category
+            # would match nothing forever and look like an empty watchlist.
+            known = [c for c in self.categories if c in ALL_SLUGS]
+            if known:
+                out["categories"] = known
         if self.min_value:
             out["min_value"] = self.min_value
         if self.max_value:
