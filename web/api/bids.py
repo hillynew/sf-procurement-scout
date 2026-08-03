@@ -8,6 +8,7 @@ from typing import Dict, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from src.ai.summarizer import PROMPT_VERSION
 from src.db import store as db
 from web.services.serialize import opp_out
 
@@ -23,7 +24,7 @@ def _bid_or_404(opportunity_id: str):
 
 def _out(opportunity_id: str) -> dict:
     opp = _bid_or_404(opportunity_id)
-    return opp_out(opp, db.workflow_state(), db.summarized_ids())
+    return opp_out(opp, db.workflow_state(), db.summarized_ids(PROMPT_VERSION))
 
 
 @router.post("/bids/{opportunity_id}/track")
@@ -134,7 +135,7 @@ def unarchive(opportunity_id: str):
 
 @router.get("/bids/{opportunity_id}/summary")
 def get_summary(opportunity_id: str):
-    summary = db.latest_summary(opportunity_id)
+    summary = db.latest_summary(opportunity_id, PROMPT_VERSION)
     if summary is None:
         raise HTTPException(status_code=404, detail="no summary yet")
     return summary

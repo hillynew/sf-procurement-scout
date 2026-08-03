@@ -33,11 +33,31 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+/** Never trust a cached payload's shape — a brief from an older prompt
+ *  version (or a partial model response) must render, not crash. */
+function safeList(v: unknown): string[] {
+  return Array.isArray(v) ? v.map((x) => String(x)) : [];
+}
+
+function sanitizeBrief(raw: AiBrief | undefined): AiBrief | undefined {
+  if (!raw || typeof raw !== "object" || !raw.what_the_work_is) return undefined;
+  return {
+    what_the_work_is: String(raw.what_the_work_is),
+    requirements: safeList(raw.requirements),
+    red_flags: safeList(raw.red_flags),
+    fit_hint: String(raw.fit_hint ?? ""),
+    key_dates: Array.isArray(raw.key_dates)
+      ? raw.key_dates.filter((d) => d && typeof d === "object" && d.label)
+      : [],
+    money: raw.money && typeof raw.money === "object" ? raw.money : undefined,
+  };
+}
+
 function AiBriefCard({ bid }: { bid: OpportunityDetail }) {
   const summarize = useSummarize();
   const { data: settings } = useSettings();
   const aiAvailable = settings?.capabilities.ai_available ?? false;
-  const brief = bid.ai_summary?.summary as AiBrief | undefined;
+  const brief = sanitizeBrief(bid.ai_summary?.summary as AiBrief | undefined);
 
   const generate = (force = false) =>
     summarize.mutate(

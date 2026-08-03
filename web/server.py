@@ -43,6 +43,11 @@ NO_BUILD_PAGE = """<!doctype html><meta charset="utf-8">
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.bootstrap()
+    # Briefs cached under an older prompt version have a different shape —
+    # drop them so the UI regenerates instead of rendering something stale.
+    from src.ai.summarizer import PROMPT_VERSION
+
+    db.prune_summaries(PROMPT_VERSION)
     from web.services import scheduler
 
     task = asyncio.create_task(scheduler.loop())

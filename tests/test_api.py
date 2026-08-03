@@ -136,6 +136,21 @@ def test_checks_notes_result_archive(seeded):
     assert out["archived"] is False
 
 
+def test_stale_v1_brief_is_not_served(seeded):
+    """A brief cached under an old prompt version must be invisible to the UI."""
+    from src.db import store as db
+
+    oid = first_tracked(seeded)["opportunity_id"]
+    db.put_summary(oid, "oldhash", "claude-haiku-4-5", 1,
+                   {"what_the_work_is": "x", "red_flags": "<item>not a list</item>"},
+                   input_chars=5)
+
+    detail = seeded.get(f"/api/opportunities/{oid}").json()
+    assert detail["ai_summary"] is None
+    assert detail["has_summary"] is False
+    assert seeded.get(f"/api/bids/{oid}/summary").status_code == 404
+
+
 def test_summarize_without_key_is_503(seeded, monkeypatch):
     monkeypatch.delenv("SF_SCOUT_ANTHROPIC_KEY", raising=False)
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
