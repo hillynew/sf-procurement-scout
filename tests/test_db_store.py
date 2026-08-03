@@ -225,3 +225,52 @@ def test_purge_targets(db):
     assert db.workflow_state() == {}
     with pytest.raises(ValueError):
         db.purge("everything")
+
+
+def test_save_opportunity_persists_enrichment_in_place(db):
+    """A bid enriched outside a fetch run keeps its scope and documents."""
+    from src.models.opportunity import Document
+
+    opp = make_opp("Roof Replacement")
+    db.save_snapshot([opp], HEALTH)
+
+    stored = db.get_opportunity(opp.opportunity_id)
+    assert stored.documents == []
+
+    stored.scope = "Tear off to deck and re-roof."
+    stored.documents = [Document(name="ITB package.pdf", url="https://example.gov/p.pdf")]
+    stored.detail_fetched = True
+    assert db.save_opportunity(stored) is True
+
+    again = db.get_opportunity(opp.opportunity_id)
+    assert again.detail_fetched is True
+    assert again.scope == "Tear off to deck and re-roof."
+    assert [d.name for d in again.documents] == ["ITB package.pdf"]
+
+
+def test_save_opportunity_refuses_to_create_a_row(db):
+    """An opportunity no snapshot has seen has no business appearing in one."""
+    orphan = make_opp("Never Fetched")
+    assert db.save_opportunity(orphan) is False
+    assert db.get_opportunity(orphan.opportunity_id) is None
+
+
+def test_save_opportunity_keeps_the_filter_columns_in_step(db):
+    """The extracted columns back the county/status filters, not just payload."""
+    opp = make_opp("Roof Replacement", county="broward")
+    db.save_snapshot([opp], HEALTH)
+
+    stored = db.get_opportunity(opp.opportunity_id)
+    stored.county = "duval"
+    stored.status = "closed"
+    db.save_opportunity(stored)
+
+    # Read the extracted columns directly — the payload round-trip alone would
+    # pass even if the columns had gone stale, which is what backs the filters.
+    from src.db.engine import session_scope
+    from src.db.models import OpportunityRow
+
+    with session_scope() as s:
+        row = s.get(OpportunityRow, opp.opportunity_id)
+        assert row.county == "duval"
+        assert row.status == "closed"

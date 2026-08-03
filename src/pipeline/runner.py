@@ -25,7 +25,7 @@ from ..requirements import (
 )
 from ..sources.base import SourceAdapter
 from .history import annotate_recurrence, load_history
-from ..sources.registry import get_adapters
+from ..sources.registry import document_headers, get_adapters
 from ..summarize import apply_briefs
 
 console = Console()
@@ -43,7 +43,11 @@ STALE_OPEN_DAYS = 180
 # The detail pass costs one request per bid, so it is bounded and applies only
 # to listings someone could still act on.
 DETAIL_STATUSES = {"open", "upcoming"}
-MAX_DETAIL_FETCHES = 150
+# Raised from 150 when the source list went statewide: 150 no longer covered a
+# single run's open bids, so the tail of every fetch went un-enriched. The cap
+# still exists to bound run time, but `_fair_share` now decides *which* bids
+# lose rather than letting one source's deadlines take the lot.
+MAX_DETAIL_FETCHES = 400
 
 # Bid packages are megabytes each, so the PDF pass is capped harder than the
 # HTML one. Extracted text is cached on disk, so repeat refreshes are cheap.
@@ -204,8 +208,14 @@ def parse_packages(
         by_url.setdefault(_primary_package(o), []).append(o)
 
     def read(url: str):
+        # Any bid sharing this package will do — they came from the same portal,
+        # and the headers are a property of the portal, not the document.
         try:
-            return url, parse_facts(fetch_text(url))
+            headers = dict(document_headers(by_url[url][0].source_id))
+        except Exception:  # noqa: BLE001
+            headers = {}
+        try:
+            return url, parse_facts(fetch_text(url, headers=headers))
         except Exception:  # noqa: BLE001 — a bad package must not fail the run
             return url, None
 
@@ -242,6 +252,50 @@ def _apply_package_facts(opp: Opportunity, facts) -> None:
     opp.package_parsed = True
 
 
+def _fair_share(candidates: List[Opportunity], limit: int) -> List[Opportunity]:
+    """Pick up to `limit` bids, round-robin across sources, soonest-due first.
+
+    A single global sort by due date was fine for a dozen tri-county portals.
+    Across hundreds of statewide sources it starves whole agencies: one source
+    with a run of imminent deadlines takes the entire budget, and every bid
+    behind it keeps `detail_fetched = False` — no scope, no documents, and a
+    deep dive that can only read the listing and tell you to go fetch the
+    package yourself.
+
+    Round-robin bounds that. Each source gives up its soonest-due bid in turn,
+    so a busy source still gets the most slots overall (it simply has more
+    turns available) without any source getting none.
+    """
+    if limit <= 0 or not candidates:
+        return []
+
+    by_src: Dict[str, List[Opportunity]] = {}
+    for o in candidates:
+        by_src.setdefault(o.source_id, []).append(o)
+    for bucket in by_src.values():
+        bucket.sort(key=lambda o: (o.due_date or datetime.max))
+
+    picked: List[Opportunity] = []
+    # Sorted for determinism — two runs over the same snapshot should enrich
+    # the same bids, or the cache and the health report both wobble.
+    order = sorted(by_src)
+    depth = 0
+    while len(picked) < limit:
+        progressed = False
+        for sid in order:
+            bucket = by_src[sid]
+            if depth >= len(bucket):
+                continue
+            picked.append(bucket[depth])
+            progressed = True
+            if len(picked) >= limit:
+                break
+        if not progressed:
+            break
+        depth += 1
+    return picked
+
+
 def fetch_details(
     opps: List[Opportunity],
     adapters: List[SourceAdapter],
@@ -261,16 +315,15 @@ def fetch_details(
     if not by_source:
         return 0
 
-    targets = [
+    candidates = [
         o
         for o in opps
         if o.source_id in by_source and o.status in DETAIL_STATUSES and not o.detail_fetched
     ]
-    # Richest-first, so a truncated run still enriches the bids closest to due.
-    targets.sort(key=lambda o: (o.due_date or datetime.max))
-    targets = targets[:limit]
+    targets = _fair_share(candidates, limit)
     if not targets:
         return 0
+    dropped = len(candidates) - len(targets)
 
     done = 0
 
@@ -286,8 +339,12 @@ def fetch_details(
             done += bool(ok)
 
     if not quiet:
+        # Name the truncation. A bare "enriched 400/400" reads as full coverage
+        # when it can mean hundreds of bids were never looked at.
+        note = f", {dropped} left for the next run" if dropped else ""
         console.print(
-            f"[cyan]detail[/cyan] enriched {done}/{len(targets)} open opportunities"
+            f"[cyan]detail[/cyan] enriched {done}/{len(targets)} "
+            f"open opportunities{note}"
         )
     return done
 

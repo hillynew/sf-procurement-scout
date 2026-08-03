@@ -187,3 +187,54 @@ def test_zero_rows_is_reported_as_a_fault_not_a_quiet_success():
     """The state always has something open, so empty means something broke."""
     a = MfmpVbsAdapter(CFG)
     assert a.allows_empty is False
+
+
+def test_pacing_serializes_across_threads():
+    """The detail pass shares one adapter across a thread pool.
+
+    Before the lock, every worker read the same `_last_call`, each concluded it
+    had waited long enough, and they fired as one burst — which is precisely
+    what trips the VIP limiter. The limiter answers 200 with HTML, `_decode`
+    raises SourceBlocked, `fetch_detail` swallows it, and the bid ends up with
+    no documents at all. So this asserts on the gaps between calls, not on the
+    presence of a lock.
+    """
+    import threading
+    import time as _time
+    from concurrent.futures import ThreadPoolExecutor
+
+    a = MfmpVbsAdapter(CFG)
+    # Keep the test quick; the invariant under test is "serialized", not "2s".
+    import src.sources.mfmp_vbs as mod
+
+    original = mod.PACE_SECONDS
+    mod.PACE_SECONDS = 0.05
+    try:
+        stamps: list[float] = []
+        guard = threading.Lock()
+
+        def call() -> None:
+            a._pace()
+            with guard:
+                stamps.append(_time.monotonic())
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(lambda _: call(), range(8)))
+    finally:
+        mod.PACE_SECONDS = original
+
+    stamps.sort()
+    gaps = [b - a_ for a_, b in zip(stamps, stamps[1:])]
+    assert len(gaps) == 7
+    # Allow scheduler slop, but a burst would show gaps at ~0.
+    assert all(g > 0.02 for g in gaps), f"requests bunched up: {gaps}"
+
+
+def test_session_is_built_once_under_concurrency():
+    """Two sessions would double the request rate the pacing exists to hold."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    a = MfmpVbsAdapter(CFG)
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        sessions = list(pool.map(lambda _: a._session(), range(8)))
+    assert len({id(s) for s in sessions}) == 1

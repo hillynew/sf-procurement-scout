@@ -169,10 +169,43 @@ def summarize(opportunity_id: str, force: bool = False):
     return result
 
 
+def ensure_detail(opp) -> bool:
+    """Fetch this bid's own page if the capped detail pass never reached it.
+
+    Documents only exist after a detail fetch, and that pass is bounded — so on
+    a statewide run plenty of bids keep `detail_fetched = False`. A deep dive on
+    one of those reads the listing alone and concludes the package must be
+    fetched by hand, which is wrong whenever the portal serves it freely.
+
+    Clicking Go Deep on a specific bid is exactly the moment that one request is
+    worth making. Failure is not fatal: the dive still runs on the listing, the
+    same as before.
+    """
+    if getattr(opp, "detail_fetched", False):
+        return False
+    try:
+        from src.sources.registry import get_adapters
+
+        adapter = next(
+            (a for a in get_adapters() if a.source_id == opp.source_id and a.supports_detail),
+            None,
+        )
+        if adapter is None:
+            return False
+        adapter.fetch_detail(opp)
+    except Exception:  # noqa: BLE001 — an un-enriched dive beats no dive
+        return False
+    if getattr(opp, "detail_fetched", False):
+        db.save_opportunity(opp)  # so the bid page shows the documents too
+        return True
+    return False
+
+
 def _deep_dive_worker(opportunity_id: str, opp, model, force: bool) -> None:
     from src.ai.deep_dive import run_deep_dive
 
     try:
+        ensure_detail(opp)
         run_deep_dive(opp, model=model, force=force)
     except Exception as exc:  # noqa: BLE001 — reported through GET, not logs
         _deep_errors[opportunity_id] = str(exc)

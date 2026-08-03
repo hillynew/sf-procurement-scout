@@ -8,6 +8,7 @@ from src.models.opportunity import HealthStatus
 from src.pipeline.runner import (
     STALE_OPEN_DAYS,
     _classify_health,
+    _fair_share,
     _normalize_status,
     dedupe,
     filter_opportunities,
@@ -196,3 +197,63 @@ def test_sorted_open_first_then_soonest_due(opp_factory):
     closed = opp_factory(status="closed", title="Closed")
     out = filter_opportunities([closed, later, sooner])
     assert [o.title for o in out] == ["Sooner", "Later", "Closed"]
+
+
+# ---------------------------------------------------------------------------
+# Detail budget
+# ---------------------------------------------------------------------------
+
+
+def _cand(opp_factory, source_id: str, days: int):
+    return opp_factory(
+        source_id=source_id,
+        title=f"{source_id} due+{days}",
+        due_date=datetime.now() + timedelta(days=days),
+    )
+
+
+def test_fair_share_does_not_let_one_source_take_the_budget(opp_factory):
+    """A global due-date sort starved whole agencies once we went statewide.
+
+    `hog` holds every one of the soonest deadlines. Sorted globally it takes
+    all ten slots and `quiet` never gets a detail fetch — no scope, no
+    documents, and a deep dive that can only read the listing.
+    """
+    hog = [_cand(opp_factory, "hog", d) for d in range(20)]
+    quiet = [_cand(opp_factory, "quiet", 100 + d) for d in range(3)]
+
+    picked = _fair_share(hog + quiet, limit=10)
+
+    assert len(picked) == 10
+    sources = {o.source_id for o in picked}
+    assert sources == {"hog", "quiet"}, f"a source was starved: {sources}"
+    # Every one of the quiet source's bids gets a slot despite holding none of
+    # the near deadlines; the busy source takes the remainder once the quiet
+    # one is exhausted, so fairness costs it nothing it would otherwise use.
+    assert sum(1 for o in picked if o.source_id == "quiet") == 3
+    assert sum(1 for o in picked if o.source_id == "hog") == 7
+
+
+def test_fair_share_takes_soonest_due_first_within_a_source(opp_factory):
+    cands = [_cand(opp_factory, "s", d) for d in (30, 1, 90, 7)]
+    picked = _fair_share(cands, limit=2)
+    assert [o.title for o in picked] == ["s due+1", "s due+7"]
+
+
+def test_fair_share_is_deterministic(opp_factory):
+    cands = [_cand(opp_factory, s, d) for s in ("a", "b", "c") for d in range(4)]
+    first = [o.title for o in _fair_share(cands, limit=7)]
+    second = [o.title for o in _fair_share(list(reversed(cands)), limit=7)]
+    assert first == second
+
+
+def test_fair_share_handles_undated_and_empty_input(opp_factory):
+    assert _fair_share([], limit=10) == []
+    assert _fair_share([_cand(opp_factory, "s", 1)], limit=0) == []
+    undated = opp_factory(source_id="s", title="no due", due_date=None)
+    assert _fair_share([undated], limit=5) == [undated]
+
+
+def test_fair_share_returns_everything_under_the_limit(opp_factory):
+    cands = [_cand(opp_factory, s, d) for s in ("a", "b") for d in range(3)]
+    assert len(_fair_share(cands, limit=100)) == 6

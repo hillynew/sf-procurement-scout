@@ -147,6 +147,11 @@ DEEP_SCHEMA = {
 def _gather_documents(opp: Opportunity) -> Tuple[str, int]:
     """Download and concatenate text from every attached PDF (bounded)."""
     from src.pdf_extract import fetch_text
+    from src.sources.registry import document_headers
+
+    # Portal quirks travel with the source, not with the document — see
+    # SourceAdapter.document_headers.
+    headers = dict(document_headers(opp.source_id))
 
     chunks: List[str] = []
     read = 0
@@ -157,7 +162,7 @@ def _gather_documents(opp: Opportunity) -> Tuple[str, int]:
         if not doc.url.lower().startswith(("http://", "https://")):
             continue
         try:
-            text = fetch_text(doc.url)
+            text = fetch_text(doc.url, headers=headers)
         except Exception:  # noqa: BLE001 — a dead link must not kill the dive
             text = ""
         if text:

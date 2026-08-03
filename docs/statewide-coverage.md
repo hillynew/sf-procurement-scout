@@ -49,7 +49,7 @@ and it covers:
 **Live right now: 109 open biddable solicitations.** Plus ~12,800 closed ones,
 which is a genuine historical backfill if we ever want to study who wins what.
 
-Two traps in that portal, both now handled:
+Three traps in that portal, all now handled:
 
 - **It has no working pagination.** `pageNumber` is accepted and silently
   ignored, and `pageSize` is capped at 100 no matter what you send. A scraper
@@ -59,9 +59,19 @@ Two traps in that portal, both now handled:
 - **Its rate limiter returns HTTP 200 with an HTML page.** Not a 429 — a normal
   success response containing the web page instead of data. Read carelessly,
   that parses as "no bids today." We detect it and raise instead.
+- **Its attachments content-negotiate on `Accept`.** Ask for a solicitation PDF
+  with the browser-ish `text/html,...` header the shared session sends, and the
+  portal returns 1.1 KB of `index.html` — with a 200. Ask with the XHR-style
+  `application/json, text/plain, */*` its own SPA uses and the same URL returns
+  the 1.9 MB PDF. Nothing else in the header set matters; this was bisected
+  against a live attachment. Sources declare the quirk via
+  `SourceAdapter.document_headers`.
 
-Both of those are the kind of failure that does not look like a failure, which
-is exactly the kind worth writing down.
+All three are the kind of failure that does not look like a failure, which is
+exactly the kind worth writing down. The third was the most expensive: it made
+every state bid look like it had no documents, so deep dives on them read the
+listing alone and concluded — wrongly — that the package had to be fetched by
+hand from VIP.
 
 ### Bonfire — 23 Florida agencies, free JSON
 

@@ -81,7 +81,7 @@ def test_build_deep_input_reads_pdfs(monkeypatch):
     ])
     # fetch_text returns '' for non-PDF payloads (the zip); text for the PDF.
     monkeypatch.setattr("src.pdf_extract.fetch_text",
-                        lambda url: "PDF BODY TEXT" if url.endswith(".pdf") else "")
+                        lambda url, **kw: "PDF BODY TEXT" if url.endswith(".pdf") else "")
     text, read = deep_dive.build_deep_input(opp)
     assert read == 1
     assert "DOCUMENT 1: ITB.pdf" in text
@@ -145,3 +145,148 @@ def test_run_deep_dive_requires_key(db, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="no_api_key"):
         deep_dive.run_deep_dive(make_opp())
+
+
+# ---------------------------------------------------------------------------
+# On-demand detail enrichment
+# ---------------------------------------------------------------------------
+
+
+class _DetailAdapter:
+    """Stands in for a real adapter that can enrich one bid."""
+
+    source_id = "sample"
+    supports_detail = True
+
+    def __init__(self, docs=None, boom=False):
+        self.docs = docs or []
+        self.boom = boom
+        self.calls = 0
+
+    def fetch_detail(self, opp):
+        self.calls += 1
+        if self.boom:
+            raise RuntimeError("portal blocked this client")
+        opp.documents = list(self.docs)
+        opp.detail_fetched = True
+
+
+def _patch_adapters(monkeypatch, adapter):
+    import src.sources.registry as registry
+
+    monkeypatch.setattr(registry, "get_adapters", lambda *a, **k: [adapter])
+
+
+def test_ensure_detail_enriches_a_bid_the_capped_pass_missed(monkeypatch, opp_factory):
+    """The whole point: no documents means the dive can only read the listing."""
+    from src.models.opportunity import Document
+    from web.api.bids import ensure_detail
+
+    doc = Document(name="ITB package.pdf", url="https://example.com/a.pdf")
+    adapter = _DetailAdapter(docs=[doc])
+    _patch_adapters(monkeypatch, adapter)
+    monkeypatch.setattr("src.db.store.save_opportunity", lambda opp: True)
+
+    opp = opp_factory(source_id="sample", detail_fetched=False, documents=[])
+    assert ensure_detail(opp) is True
+    assert adapter.calls == 1
+    assert [d.name for d in opp.documents] == ["ITB package.pdf"]
+
+
+def test_ensure_detail_skips_a_bid_already_enriched(monkeypatch, opp_factory):
+    from web.api.bids import ensure_detail
+
+    adapter = _DetailAdapter()
+    _patch_adapters(monkeypatch, adapter)
+
+    opp = opp_factory(source_id="sample", detail_fetched=True)
+    assert ensure_detail(opp) is False
+    assert adapter.calls == 0, "a second request for data we already have"
+
+
+def test_ensure_detail_survives_a_failing_portal(monkeypatch, opp_factory):
+    """An un-enriched dive still beats no dive at all."""
+    from web.api.bids import ensure_detail
+
+    adapter = _DetailAdapter(boom=True)
+    _patch_adapters(monkeypatch, adapter)
+
+    opp = opp_factory(source_id="sample", detail_fetched=False)
+    assert ensure_detail(opp) is False
+
+
+def test_ensure_detail_ignores_sources_without_a_detail_page(monkeypatch, opp_factory):
+    from web.api.bids import ensure_detail
+
+    adapter = _DetailAdapter()
+    adapter.supports_detail = False
+    _patch_adapters(monkeypatch, adapter)
+
+    opp = opp_factory(source_id="sample", detail_fetched=False)
+    assert ensure_detail(opp) is False
+    assert adapter.calls == 0
+
+
+# ---------------------------------------------------------------------------
+# Portal-specific document headers
+# ---------------------------------------------------------------------------
+
+
+def test_document_headers_reach_the_download(monkeypatch):
+    """MFMP serves its SPA shell unless the download asks for it as XHR.
+
+    The failure this guards is silent: an HTML-first Accept gets a 200 that is
+    not a PDF, `fetch_text` correctly returns '', and the dive reports the bid
+    as simply having no documents.
+    """
+    seen = {}
+
+    def _reader(url, **kw):
+        seen[url] = kw.get("headers")
+        return "PDF BODY TEXT"
+
+    monkeypatch.setattr("src.pdf_extract.fetch_text", _reader)
+    monkeypatch.setattr(
+        "src.sources.registry.document_headers",
+        lambda source_id: (("Accept", "application/json, text/plain, */*"),),
+    )
+
+    opp = make_opp(documents=[
+        Document(name="ITB.pdf", url="https://example.gov/itb.pdf", kind="document"),
+    ])
+    deep_dive.build_deep_input(opp)
+    assert seen["https://example.gov/itb.pdf"] == {
+        "Accept": "application/json, text/plain, */*"
+    }
+
+
+def test_a_source_without_quirks_sends_no_extra_headers(monkeypatch):
+    seen = {}
+
+    def _reader(url, **kw):
+        seen[url] = kw.get("headers")
+        return "PDF BODY TEXT"
+
+    monkeypatch.setattr("src.pdf_extract.fetch_text", _reader)
+    monkeypatch.setattr("src.sources.registry.document_headers", lambda source_id: ())
+
+    opp = make_opp(documents=[
+        Document(name="ITB.pdf", url="https://example.gov/itb.pdf", kind="document"),
+    ])
+    deep_dive.build_deep_input(opp)
+    assert seen["https://example.gov/itb.pdf"] == {}
+
+
+def test_mfmp_declares_the_accept_its_portal_requires():
+    """Verified against a live attachment: this Accept is the whole difference."""
+    from src.sources.registry import document_headers
+
+    assert dict(document_headers("mfmp_vbs")) == {
+        "Accept": "application/json, text/plain, */*"
+    }
+
+
+def test_document_headers_is_empty_for_an_unknown_source():
+    from src.sources.registry import document_headers
+
+    assert dict(document_headers("no_such_source")) == {}
