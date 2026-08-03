@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
-from typing import Any, Dict, List, Type
+from functools import lru_cache
+from typing import Any, Dict, List, Tuple, Type
 import yaml
 
 from .base import SourceAdapter
@@ -36,6 +37,21 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "email_alerts": EmailAlertsAdapter,
     "catalog": CatalogAdapter,
 }
+
+
+@lru_cache(maxsize=None)
+def document_headers(source_id: str) -> Tuple[Tuple[str, str], ...]:
+    """Extra headers to send when downloading this source's documents.
+
+    Resolved from the adapter *class*, so no portal is contacted and nothing is
+    instantiated. Returned as a tuple of pairs to stay hashable for the cache;
+    call `dict(...)` on it.
+    """
+    for cfg in load_source_config():
+        if cfg.get("id") == source_id:
+            cls = ADAPTERS.get(str(cfg.get("adapter") or ""))
+            return tuple(sorted((getattr(cls, "document_headers", None) or {}).items()))
+    return ()
 
 
 def project_root() -> Path:

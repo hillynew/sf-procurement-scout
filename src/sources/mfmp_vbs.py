@@ -36,6 +36,7 @@ nothing should be pointed at it.
 
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any, Dict, List, Optional
 
@@ -137,6 +138,25 @@ class MfmpVbsAdapter(SourceAdapter):
     #: The state always has something open; zero rows means the parse or the
     #: rate limiter broke, and should be reported as a fault rather than calm.
     allows_empty = False
+
+    #: Verified by bisecting the header set against a live attachment: this
+    #: Accept alone is the difference between 1.9 MB of PDF and 1.1 KB of
+    #: `index.html`. The portal content-negotiates on Accept, and the shared
+    #: session's default prefers `text/html`, so every document download
+    #: silently produced the SPA shell — which `fetch_text` correctly rejects
+    #: for not starting with %PDF, and then reports as simply having no
+    #: documents. That is what made deep dives on state bids listing-only.
+    document_headers = {"Accept": "application/json, text/plain, */*"}
+
+    def __init__(self, cfg):
+        super().__init__(cfg)
+        # Both are shared by every thread in the detail pass, so they are
+        # created once here rather than lazily via getattr — a lazily-built
+        # lock is itself a race.
+        self._pace_lock = threading.Lock()
+        self._last_call = 0.0
+        self._session_lock = threading.Lock()
+        self._s = None
 
     def fetch(self) -> List[Opportunity]:
         s = self._session()
@@ -328,8 +348,12 @@ class MfmpVbsAdapter(SourceAdapter):
     # -- transport ---------------------------------------------------------
 
     def _session(self):
-        s = getattr(self, "_s", None)
-        if s is None:
+        # Also guarded: the detail pass calls this from every worker, and two
+        # threads each building their own session would quietly double the
+        # request rate the pacing above exists to hold down.
+        with self._session_lock:
+            if self._s is not None:
+                return self._s
             s = session()
             s.headers.update(
                 {
@@ -384,11 +408,22 @@ class MfmpVbsAdapter(SourceAdapter):
         return resp.json()
 
     def _pace(self) -> None:
-        last = getattr(self, "_last_call", 0.0)
-        wait = PACE_SECONDS - (time.monotonic() - last)
-        if wait > 0:
-            time.sleep(wait)
-        self._last_call = time.monotonic()
+        """Serialize calls at PACE_SECONDS apart, across threads.
+
+        The lock is not decoration. The detail pass runs a thread pool against
+        one adapter instance, so an unlocked read-modify-write on the last-call
+        timestamp lets every worker read the same value, agree it has waited
+        long enough, and fire together — a burst is exactly what trips the VIP
+        limiter. The limiter answers 200 with HTML, `_decode` raises
+        SourceBlocked, `fetch_detail` swallows it, and the bid silently keeps
+        zero documents. Holding the lock across the sleep is the point: it
+        makes the pacing real rather than advisory.
+        """
+        with self._pace_lock:
+            wait = PACE_SECONDS - (time.monotonic() - self._last_call)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_call = time.monotonic()
 
 
 def _strip_html(html: str) -> str:

@@ -177,6 +177,29 @@ def get_opportunity(opportunity_id: str) -> Optional[Opportunity]:
         return None
 
 
+def save_opportunity(opp: Opportunity) -> bool:
+    """Persist one already-known opportunity in place.
+
+    Used when a single bid is enriched outside a fetch run — the detail pass is
+    capped, so a bid someone opens or deep-dives may be the first to get its
+    scope and documents. Deliberately narrow: it refuses to create rows, since
+    an opportunity that no snapshot has seen has no business appearing in one.
+    """
+    with session_scope() as s:
+        row = s.get(OpportunityRow, opp.opportunity_id)
+        if row is None:
+            return False
+        payload = opp.model_dump(mode="json")
+        row.payload = payload
+        row.county = opp.county or ""
+        row.status = str(opp.status or "open")
+        row.offer_type = str(payload.get("offer_type") or "unknown")
+        row.due_date = opp.due_date
+        row.posted_date = opp.posted_date
+        row.budget_amount = opp.budget_amount
+        return True
+
+
 def latest_run() -> Optional[dict]:
     with session_scope() as s:
         run = s.execute(

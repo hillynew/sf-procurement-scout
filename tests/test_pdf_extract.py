@@ -201,7 +201,7 @@ def test_no_documents_means_no_package(opp_factory):
 
 
 def test_package_facts_are_applied(monkeypatch, opp_factory):
-    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url: BREAKDOWN)
+    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url, **kw: BREAKDOWN)
     opp = opp_factory(
         status="open",
         documents=[Document(name="Package", url="https://x.gov/pkg.pdf")],
@@ -217,7 +217,7 @@ def test_one_pdf_serves_every_bid_that_shares_it(monkeypatch, opp_factory):
     """Framework contracts split into several bids behind a single package."""
     reads = []
     monkeypatch.setattr(
-        "src.pipeline.runner.fetch_text", lambda url: (reads.append(url), BREAKDOWN)[1]
+        "src.pipeline.runner.fetch_text", lambda url, **kw: (reads.append(url), BREAKDOWN)[1]
     )
     shared = [Document(name="Package", url="https://x.gov/shared.pdf")]
     opps = [opp_factory(status="open", title=f"Lot {i}", documents=list(shared)) for i in range(3)]
@@ -229,7 +229,7 @@ def test_one_pdf_serves_every_bid_that_shares_it(monkeypatch, opp_factory):
 
 def test_package_value_overrides_a_guess_from_prose(monkeypatch, opp_factory):
     """The solicitation's own figure beats one inferred from a blurb."""
-    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url: BREAKDOWN)
+    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url, **kw: BREAKDOWN)
     opp = opp_factory(
         status="open",
         budget="$99,000",
@@ -240,7 +240,7 @@ def test_package_value_overrides_a_guess_from_prose(monkeypatch, opp_factory):
 
 
 def test_closed_listings_are_not_parsed(monkeypatch, opp_factory):
-    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url: BREAKDOWN)
+    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url, **kw: BREAKDOWN)
     opp = opp_factory(
         status="closed", documents=[Document(name="Package", url="https://x.gov/pkg.pdf")]
     )
@@ -248,7 +248,7 @@ def test_closed_listings_are_not_parsed(monkeypatch, opp_factory):
 
 
 def test_the_pass_respects_its_budget(monkeypatch, opp_factory):
-    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url: BREAKDOWN)
+    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url, **kw: BREAKDOWN)
     opps = [
         opp_factory(
             status="open",
@@ -261,7 +261,7 @@ def test_the_pass_respects_its_budget(monkeypatch, opp_factory):
 
 
 def test_an_unreadable_package_does_not_abort_the_pass(monkeypatch, opp_factory):
-    def _reader(url):
+    def _reader(url, **kw):
         if "bad" in url:
             raise RuntimeError("corrupt pdf")
         return BREAKDOWN
@@ -275,7 +275,7 @@ def test_an_unreadable_package_does_not_abort_the_pass(monkeypatch, opp_factory)
 
 
 def test_already_parsed_listings_are_skipped(monkeypatch, opp_factory):
-    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url: BREAKDOWN)
+    monkeypatch.setattr("src.pipeline.runner.fetch_text", lambda url, **kw: BREAKDOWN)
     opp = opp_factory(status="open", documents=[Document(name="P", url="https://x.gov/p.pdf")])
     opp.package_parsed = True
     assert parse_packages([opp], quiet=True) == 0

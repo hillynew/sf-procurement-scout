@@ -92,8 +92,13 @@ def _db_cache_put(key: str, text: str) -> None:
         pass
 
 
-def fetch_text(url: str, *, use_cache: bool = True) -> str:
-    """Download a PDF and return its leading text. '' when unusable."""
+def fetch_text(url: str, *, use_cache: bool = True, headers: Optional[dict] = None) -> str:
+    """Download a PDF and return its leading text. '' when unusable.
+
+    `headers` carries any portal-specific quirk the source declares — some
+    portals content-negotiate on Accept and answer an HTML-first request with
+    their SPA shell instead of the file, which lands here as "not a PDF".
+    """
     key = hashlib.sha1(url.encode("utf-8")).hexdigest()[:20]
     cached = cache_dir() / f"{key}.txt"
     if use_cache and cached.exists():
@@ -111,7 +116,7 @@ def fetch_text(url: str, *, use_cache: bool = True) -> str:
             return from_db
 
     try:
-        resp = get(url, timeout=FETCH_TIMEOUT, retries=1)
+        resp = get(url, timeout=FETCH_TIMEOUT, retries=1, headers=headers or None)
     except Exception:  # noqa: BLE001 — a missing package must not fail the bid
         return ""
 

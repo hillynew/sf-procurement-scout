@@ -41,6 +41,13 @@ class SourceAdapter(ABC):
         self.degraded_reason = None
         self.empty_note = None
 
+    #: Extra headers this portal needs when its *documents* are downloaded.
+    #: The shared session sends an HTML-first `Accept`, which some portals read
+    #: as a request for a page and answer with their SPA shell rather than the
+    #: file — the download then looks like a 200 that simply is not a PDF.
+    #: Declared here so that quirk lives with the rest of the portal knowledge.
+    document_headers: Dict[str, str] = {}
+
     #: True when the adapter implements `fetch_detail`. List pages carry little
     #: more than a title and a date, so the detail pass is where scope,
     #: documents, requirements and contacts come from.
