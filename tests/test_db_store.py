@@ -173,6 +173,29 @@ def test_summary_cache(db):
     assert db.latest_summary("opp1")["model"] == "claude-haiku-4-5"
 
 
+def test_latest_summary_ignores_superseded_prompt_versions(db):
+    db.put_summary("opp2", "h1", "claude-haiku-4-5", 1,
+                   {"what_the_work_is": "old shape"}, input_chars=10)
+    # A v1-only brief is invisible once the caller requires v2.
+    assert db.latest_summary("opp2", min_prompt_version=2) is None
+    assert db.summarized_ids(min_prompt_version=2) == set()
+
+    db.put_summary("opp2", "h2", "claude-haiku-4-5", 2,
+                   {"what_the_work_is": "new shape"}, input_chars=10)
+    got = db.latest_summary("opp2", min_prompt_version=2)
+    assert got["summary"]["what_the_work_is"] == "new shape"
+    assert db.summarized_ids(min_prompt_version=2) == {"opp2"}
+
+
+def test_prune_summaries_deletes_only_older_versions(db):
+    db.put_summary("a", "h", "m", 1, {"what_the_work_is": "v1"}, input_chars=1)
+    db.put_summary("b", "h", "m", 2, {"what_the_work_is": "v2"}, input_chars=1)
+    assert db.prune_summaries(2) == 1
+    assert db.latest_summary("a") is None
+    assert db.latest_summary("b") is not None
+    assert db.prune_summaries(2) == 0
+
+
 def test_custom_sources(db):
     db.add_custom_source(source_id="custom-x", name="Town of X", county="broward",
                          agency="Town of X", adapter="civicplus",

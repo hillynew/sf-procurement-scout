@@ -111,7 +111,9 @@ def watchlist_matches(wl_id: str):
     matches = wl_matches(wl.get("rules") or {}, opps)
     seen = set(wl.get("seen_ids") or [])
     workflow = db.workflow_state()
-    summarized = db.summarized_ids()
+    from src.ai.summarizer import PROMPT_VERSION
+
+    summarized = db.summarized_ids(PROMPT_VERSION)
     return {
         "watchlist": _with_counts(wl, opps),
         "matches": [

@@ -509,12 +509,17 @@ def get_summary(opportunity_id: str, content_hash: str, model: str,
     return dict(row.summary) if row is not None else None
 
 
-def latest_summary(opportunity_id: str) -> Optional[dict]:
-    """Newest cached summary for a bid regardless of hash/model."""
+def latest_summary(opportunity_id: str, min_prompt_version: int = 0) -> Optional[dict]:
+    """Newest cached summary for a bid, ignoring superseded prompt versions.
+
+    Callers pass the summarizer's current PROMPT_VERSION so briefs cached
+    under an older, differently-shaped prompt are never served to the UI.
+    """
     with session_scope() as s:
         row = s.execute(
             select(AiSummary)
-            .where(AiSummary.opportunity_id == opportunity_id)
+            .where(AiSummary.opportunity_id == opportunity_id,
+                   AiSummary.prompt_version >= min_prompt_version)
             .order_by(AiSummary.created_at.desc())
             .limit(1)
         ).scalar_one_or_none()
@@ -539,9 +544,23 @@ def put_summary(opportunity_id: str, content_hash: str, model: str,
             row.created_at = datetime.utcnow()
 
 
-def summarized_ids() -> set:
+def summarized_ids(min_prompt_version: int = 0) -> set:
     with session_scope() as s:
-        return set(s.execute(select(AiSummary.opportunity_id)).scalars())
+        return set(s.execute(
+            select(AiSummary.opportunity_id)
+            .where(AiSummary.prompt_version >= min_prompt_version)
+        ).scalars())
+
+
+def prune_summaries(current_version: int) -> int:
+    """Delete briefs cached under an older prompt version. Returns count."""
+    with session_scope() as s:
+        rows = s.execute(
+            select(AiSummary).where(AiSummary.prompt_version < current_version)
+        ).scalars().all()
+        for row in rows:
+            s.delete(row)
+        return len(rows)
 
 
 # ---------------------------------------------------------------------------
