@@ -238,6 +238,38 @@ def check_mailbox():
         )
 
 
+@app.command("test-email")
+def test_email():
+    """Send one email through Resend to confirm digests will actually arrive.
+
+    Uses the same code path as the daily digest, so a success here means the
+    key, sender and recipient are all good — no full fetch required.
+    """
+    from src.db import store as db
+    from web.services import digest
+
+    db.bootstrap()
+    if not digest.enabled():
+        console.print(
+            "[yellow]RESEND_API_KEY is not set.[/yellow] Get a free key at "
+            "resend.com, then set it in the environment — see .env.example."
+        )
+        raise typer.Exit(1)
+
+    sent, error, recipient = digest.send_test_email()
+    if not recipient:
+        console.print(
+            "[yellow]No recipient configured.[/yellow] Set SF_SCOUT_DIGEST_TO "
+            "or the recipient in Settings → Email digest."
+        )
+        raise typer.Exit(1)
+    if sent:
+        console.print(f"[green]Sent.[/green] Check {recipient} (and its spam folder).")
+        return
+    console.print(f"[red]Not sent:[/red] {error}")
+    raise typer.Exit(1)
+
+
 @app.command("subscribe-links")
 def subscribe_links():
     """List each CivicPlus city's 'Notify Me' bid-alert subscription page.

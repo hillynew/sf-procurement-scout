@@ -89,6 +89,15 @@ def put_settings(body: SettingsPatch):
     return {"settings": settings, "capabilities": _capabilities()}
 
 
+@router.post("/settings/digest/test")
+def test_digest_email():
+    """Send a one-off email so the user can confirm the wiring from the UI."""
+    from web.services import digest
+
+    sent, error, recipient = digest.send_test_email()
+    return {"sent": sent, "error": error, "recipient": recipient}
+
+
 class PurgeBody(BaseModel):
     target: str  # snapshot | workflow | summaries | notifications | pdf_cache
 

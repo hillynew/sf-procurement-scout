@@ -66,13 +66,36 @@ def _wrap(title: str, inner: str) -> str:
     )
 
 
-def send_email(subject: str, html: str) -> bool:
-    """One call site for Resend. Returns True when accepted."""
+def _resend_error(resp: httpx.Response) -> str:
+    """Resend's JSON error, reduced to one line a human can act on."""
+    try:
+        body = resp.json()
+    except ValueError:
+        body = {}
+    message = body.get("message") or (resp.text or "").strip()[:200]
+    if resp.status_code == 401 or resp.status_code == 403:
+        return message or "Resend rejected the API key (401)."
+    if resp.status_code == 422:
+        return message or "Resend rejected the message (422) — check the sender address."
+    if resp.status_code == 429:
+        return message or "Resend rate limit reached — try again shortly."
+    return f"Resend returned {resp.status_code}" + (f": {message}" if message else "")
+
+
+def send_email_detailed(subject: str, html: str) -> Tuple[bool, Optional[str]]:
+    """One call site for Resend. Returns (accepted, error) — error is None on success.
+
+    Callers in the pipeline use :func:`send_email` and ignore the reason; the
+    Settings "send test" path shows it, which is the only way a user can tell a
+    bad key from a bad recipient without reading server logs.
+    """
     key = resend_key()
     settings = db.get_settings()
     to = _recipient(settings)
-    if not key or not to:
-        return False
+    if not key:
+        return False, "RESEND_API_KEY is not set in the environment."
+    if not to:
+        return False, "No recipient — set one in Settings or SF_SCOUT_DIGEST_TO."
     try:
         resp = httpx.post(
             RESEND_URL,
@@ -80,9 +103,17 @@ def send_email(subject: str, html: str) -> bool:
             json={"from": _sender(), "to": [to], "subject": subject, "html": html},
             timeout=15,
         )
-        return resp.status_code < 300
-    except Exception:  # noqa: BLE001 — email must never break the pipeline
-        return False
+    except Exception as exc:  # noqa: BLE001 — email must never break the pipeline
+        return False, f"Could not reach Resend: {type(exc).__name__}"
+    if resp.status_code >= 300:
+        return False, _resend_error(resp)
+    return True, None
+
+
+def send_email(subject: str, html: str) -> bool:
+    """Returns True when Resend accepted the message."""
+    ok, _ = send_email_detailed(subject, html)
+    return ok
 
 
 def send_instant_digest(new_by_watchlist: Dict[str, List[Opportunity]]) -> bool:
@@ -165,3 +196,19 @@ def send_daily_digest(opps: List[Opportunity]) -> bool:
         return False
     subject, html = built
     return send_email(subject, html)
+
+
+def send_test_email() -> Tuple[bool, Optional[str], str]:
+    """Prove the Resend wiring end to end. Returns (sent, error, recipient)."""
+    to = _recipient(db.get_settings())
+    body = (
+        '<p style="margin:0 0 12px">Email is wired up correctly — digests will '
+        "arrive at this address.</p>"
+        '<p style="margin:0;color:#5A6478;font-size:13px">Sent from '
+        f"<strong>{_sender()}</strong> via Resend. Cadence and recipient are in "
+        "Settings → Email digest.</p>"
+    )
+    sent, error = send_email_detailed(
+        "Scout: test email", _wrap("Test email", body)
+    )
+    return sent, error, to
