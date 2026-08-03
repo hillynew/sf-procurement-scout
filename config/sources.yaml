@@ -594,3 +594,19 @@ sources:
     adapter: catalog
     portal_url: https://vendor.myfloridamarketplace.com/search/bids
     register_url: https://vendor.myfloridamarketplace.com/registration
+
+  # ---------------------------------------------------------------------
+  # Statewide. One adapter, every state-level advertisement.
+  # Rule 60A-1.021, F.A.C. makes the MyFloridaMarketPlace Vendor Information
+  # Portal the state's mandatory posting point, so this single source covers
+  # every executive-branch agency, all 12 state universities, the state
+  # colleges and all 5 water management districts — free and without a login.
+  # ---------------------------------------------------------------------
+  - id: mfmp_vbs
+    name: MyFloridaMarketPlace (State of Florida)
+    county: statewide
+    agency: State of Florida
+    live_fetch: true
+    adapter: mfmp_vbs
+    portal_url: https://vendor.myfloridamarketplace.com/search/bids
+    register_url: https://vendor.myfloridamarketplace.com/

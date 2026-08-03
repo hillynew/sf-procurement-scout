@@ -9,12 +9,15 @@ from typing import Dict, List, Optional, Tuple
 import httpx
 
 from src.db import store as db
+from src.fl_geo import ALL_REGIONS
 from src.models.opportunity import Opportunity
 
 RESEND_URL = "https://api.resend.com/emails"
 
-COUNTY_LABEL = {"miami-dade": "Miami-Dade", "broward": "Broward",
-                "palm-beach": "Palm Beach"}
+#: Kept as a name for backwards compatibility, but the labels now come from the
+#: statewide geography module — a hard-coded tri-county map would print raw
+#: slugs like "st-johns" for every agency outside South Florida.
+COUNTY_LABEL = ALL_REGIONS
 
 
 def resend_key() -> Optional[str]:

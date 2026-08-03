@@ -15,6 +15,7 @@ from .notice_links import NoticeLinksAdapter
 from .miami_dade_informs import MiamiDadeInformsAdapter
 from .miami_dade_construction import MiamiDadeConstructionAdapter, MiamiDadeFutureAdapter
 from .mdc_college import MdcCollegeAdapter
+from .mfmp_vbs import MfmpVbsAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
 from .sam_gov import SamGovAdapter
@@ -29,6 +30,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "west_palm_beach": WestPalmBeachAdapter,
     "palm_beach_schools": PalmBeachSchoolsAdapter,
     "sam_gov": SamGovAdapter,
+    "mfmp_vbs": MfmpVbsAdapter,
     "civicplus": CivicPlusAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,
@@ -41,9 +43,47 @@ def project_root() -> Path:
 
 
 def load_source_config(path: Path | None = None) -> List[Dict[str, Any]]:
-    cfg_path = path or (project_root() / "config" / "sources.yaml")
-    with open(cfg_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+    """Load ``config/sources.yaml`` plus any generated companion files.
+
+    The hand-maintained tri-county config is the base list. Statewide expansion
+    is generated (``scripts/discover_fl_agencies.py`` writes
+    ``config/sources.florida.yaml``), so it lives in its own file: regenerating
+    hundreds of discovered agencies must never clobber a portal someone tuned
+    by hand. An explicit ``path`` loads only that file, which is what the tests
+    rely on.
+
+    Later files never override earlier ones — the first definition of an id
+    wins, so a hand-written entry always beats a discovered one.
+    """
+    if path is not None:
+        return _read_sources(path)
+
+    cfg_dir = project_root() / "config"
+    paths = [cfg_dir / "sources.yaml"]
+    paths += sorted(p for p in cfg_dir.glob("sources.*.yaml") if p.name != "sources.yaml")
+
+    merged: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for p in paths:
+        for entry in _read_sources(p):
+            sid = entry.get("id") if isinstance(entry, dict) else None
+            if sid and sid in seen:
+                continue
+            if sid:
+                seen.add(sid)
+            merged.append(entry)
+    return merged
+
+
+def _read_sources(path: Path) -> List[Dict[str, Any]]:
+    if not path.exists():
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except yaml.YAMLError as e:
+        warnings.warn(f"{path.name}: unreadable ({e})", RuntimeWarning, stacklevel=3)
+        return []
     return list(data.get("sources") or [])
 
 
