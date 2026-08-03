@@ -24,8 +24,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
 from src.db import store as db
-from web.api import (bids, fetch, misc, opportunities, sources, taxonomy,
-                     watchlists)
+from web.api import (bids, contractors, fetch, misc, opportunities, sources,
+                     taxonomy, watchlists)
 
 DIST = ROOT / "frontend" / "dist"
 
@@ -46,11 +46,13 @@ async def lifespan(app: FastAPI):
     db.bootstrap()
     # Briefs cached under an older prompt version have a different shape —
     # drop them so the UI regenerates instead of rendering something stale.
+    from src.ai.contractors import MATCH_PROMPT_VERSION
     from src.ai.deep_dive import DEEP_PROMPT_VERSION
     from src.ai.summarizer import PROMPT_VERSION
 
     db.prune_summaries(PROMPT_VERSION)
     db.prune_deep_dives(DEEP_PROMPT_VERSION)
+    db.prune_contractor_matches(MATCH_PROMPT_VERSION)
     from web.services import scheduler
 
     task = asyncio.create_task(scheduler.loop())
@@ -73,8 +75,9 @@ def create_app() -> FastAPI:
             db_ok = False
         return {"status": "ok", "db": "ok" if db_ok else "error"}
 
-    for router in (opportunities.router, bids.router, watchlists.router,
-                   sources.router, fetch.router, taxonomy.router, misc.router):
+    for router in (opportunities.router, bids.router, contractors.router,
+                   watchlists.router, sources.router, fetch.router,
+                   taxonomy.router, misc.router):
         app.include_router(router, prefix="/api")
 
     # --- SPA hosting (after the API so /api always wins) --------------------

@@ -13,19 +13,29 @@ import {
   Send,
   Sparkles,
   Telescope,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
   useAskResearch,
   useBidMutation,
+  useContractorMatches,
   useDeepDive,
   useOpportunity,
   useResearch,
+  useSetMatchStatus,
   useSettings,
+  useStartContractorMatch,
   useStartDeepDive,
   useSummarize,
 } from "../api/hooks";
-import type { AiBrief, DeepDiveReport, OpportunityDetail } from "../api/types";
+import type {
+  AiBrief,
+  ContractorMatch,
+  DeepDiveReport,
+  MatchStatus,
+  OpportunityDetail,
+} from "../api/types";
 import {
   Button,
   CountyPill,
@@ -35,7 +45,7 @@ import {
   TypeTag,
   ValueTag,
 } from "../components/ui";
-import { fmtDateTime, STAGE_LABEL, STAGES } from "../lib/format";
+import { fmtDateTime, MATCH_STATUS_LABEL, STAGE_LABEL, STAGES } from "../lib/format";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -521,6 +531,7 @@ export default function Workroom() {
         <div className="space-y-4">
           <AiBriefCard bid={bid} />
           <DeepDiveCard bid={bid} />
+          <ContractorsCard bid={bid} />
           <ResearchCard bid={bid} />
 
           {scope && (
@@ -688,6 +699,193 @@ export default function Workroom() {
           </Section>
         </div>
       </div>
+    </div>
+  );
+}
+
+const GOV_EXPERIENCE_LABEL: Record<string, string> = {
+  none: "New to gov work",
+  some: "Some gov work",
+  regular: "Regular gov bidder",
+  unknown: "Gov experience unknown",
+};
+
+/** Never trust a cached payload's shape — same stance as sanitizeBrief. */
+function sanitizeMatches(raw: unknown): ContractorMatch[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m): m is ContractorMatch =>
+      !!m && typeof m === "object" && !!(m as ContractorMatch).name)
+    .map((m) => ({
+      ...m,
+      sources: Array.isArray(m.sources) ? m.sources : [],
+      status: (m.status in MATCH_STATUS_LABEL ? m.status : "suggested") as MatchStatus,
+    }));
+}
+
+/** Contractor matching: 3-4 real local firms that could fill this bid.
+ *
+ *  This is the brokering half of the app. The scout finds the deal; this card
+ *  finds who to hand it to — small local firms that do the work commercially
+ *  but don't bid government, which is exactly the pitch: we file the bid and
+ *  keep it compliant, for a share of the award. Every firm found joins the
+ *  Network screen so the outsourcing bench compounds across deals. */
+function ContractorsCard({ bid }: { bid: OpportunityDetail }) {
+  const { data: settings } = useSettings();
+  const aiAvailable = settings?.capabilities.ai_available ?? false;
+  const { data } = useContractorMatches(bid.opportunity_id);
+  const start = useStartContractorMatch();
+  const setStatus = useSetMatchStatus();
+
+  if (!aiAvailable) return null;
+
+  const running = data?.state === "running" || start.isPending;
+  const matches = sanitizeMatches(data?.matches);
+
+  const go = (force = false) =>
+    start.mutate(
+      { id: bid.opportunity_id, force },
+      {
+        onSuccess: () => toast.info("🤝 Scouting contractors who could fill this bid…"),
+        onError: (e) => toast.error(`Couldn't start matching: ${e.message}`),
+      },
+    );
+
+  return (
+    <div className="card border-accent/25 p-4">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-accent">
+          <Users size={13} /> Who could fill this
+          {data?.state === "done" && (
+            <span className="font-medium normal-case text-ink-faint">
+              · {data.model} · {data.searches ?? 0} searches
+            </span>
+          )}
+        </div>
+        {matches.length > 0 && !running && (
+          <button onClick={() => go(true)} disabled={start.isPending}
+                  className="text-xs font-semibold text-accent hover:underline disabled:opacity-50">
+            Re-run
+          </button>
+        )}
+      </div>
+
+      {data?.state === "error" && (
+        <div className="mb-3 flex items-start gap-2 rounded-[10px] bg-danger-soft px-3 py-2 text-[13px] text-danger">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <div>
+            Matching failed: {data.error}
+            <button onClick={() => go(true)} className="ml-2 font-bold underline">Try again</button>
+          </div>
+        </div>
+      )}
+
+      {running ? (
+        <div className="flex items-center gap-3 py-2 text-sm text-ink-soft">
+          <Spinner size={18} />
+          <div>
+            <div className="font-semibold text-ink">Scouting the local market…</div>
+            <div className="text-xs text-ink-faint">
+              Searching for small firms near the job that could do this work.
+              Usually under a minute — you can leave this page.
+            </div>
+          </div>
+        </div>
+      ) : matches.length > 0 ? (
+        <div className="space-y-3">
+          {matches.map((m) => (
+            <div key={m.contractor_id} className="rounded-[10px] border border-line p-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  {m.website ? (
+                    <a href={m.website} target="_blank" rel="noreferrer"
+                       className="text-sm font-bold text-ink hover:text-accent hover:underline">
+                      {m.name}
+                    </a>
+                  ) : (
+                    <span className="text-sm font-bold text-ink">{m.name}</span>
+                  )}
+                  <span className="text-xs text-ink-faint">
+                    {[m.trade, m.location].filter(Boolean).join(" · ")}
+                  </span>
+                </div>
+                <select
+                  value={m.status}
+                  onChange={(e) =>
+                    setStatus.mutate(
+                      { id: bid.opportunity_id, contractorId: m.contractor_id,
+                        status: e.target.value },
+                      { onError: (err) => toast.error(`Couldn't update: ${err.message}`) },
+                    )}
+                  className="rounded-[10px] border border-line bg-bg px-2 py-1 text-xs font-semibold outline-none focus:border-accent"
+                >
+                  {Object.entries(MATCH_STATUS_LABEL).map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                <span className={`rounded px-1.5 py-0.5 font-bold ${
+                  m.gov_experience === "none"
+                    ? "bg-open-soft text-open"
+                    : "bg-bg text-ink-faint"
+                }`}>
+                  {GOV_EXPERIENCE_LABEL[m.gov_experience] ?? GOV_EXPERIENCE_LABEL.unknown}
+                </span>
+                {m.phone && (
+                  <a href={`tel:${m.phone}`} className="flex items-center gap-1 text-accent hover:underline">
+                    <Phone size={11} /> {m.phone}
+                  </a>
+                )}
+                {m.email && (
+                  <a href={`mailto:${m.email}`} className="flex items-center gap-1 text-accent hover:underline">
+                    <Mail size={11} /> {m.email}
+                  </a>
+                )}
+              </div>
+
+              {m.why_fit && (
+                <p className="mt-1.5 text-[13px] leading-relaxed text-ink-soft">{m.why_fit}</p>
+              )}
+              {m.pitch_angle && (
+                <p className="mt-1.5 rounded-[10px] bg-accent-soft/50 px-2.5 py-1.5 text-[13px] italic text-ink-soft">
+                  “{m.pitch_angle}”
+                </p>
+              )}
+              {m.sources.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {m.sources.map((url) => (
+                    <a key={url} href={url} target="_blank" rel="noreferrer"
+                       className="flex max-w-60 items-center gap-1 rounded-full bg-bg px-2 py-0.5 text-[11px] font-medium text-ink-soft hover:text-accent">
+                      <Link2 size={10} className="shrink-0" />
+                      <span className="truncate">{url.replace(/^https?:\/\/(www\.)?/, "")}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+          {data?.market_note && (
+            <p className="text-xs text-ink-faint">{data.market_note}</p>
+          )}
+          <Link to="/network" className="inline-block text-xs font-bold text-accent hover:underline">
+            View the whole network →
+          </Link>
+        </div>
+      ) : (
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-[13px] text-ink-soft">
+            Find <span className="font-semibold text-ink">3-4 real local firms</span> that
+            could perform this work — favoring small businesses that don't usually bid
+            government contracts. They join your network for outreach: you handle the
+            filing and compliance, they do the job, you take a fee of the award.
+          </p>
+          <Button kind="soft" onClick={() => go()} disabled={start.isPending}>
+            🤝 Find contractors
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

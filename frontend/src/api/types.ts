@@ -120,6 +120,62 @@ export interface ResearchStatus {
   error?: string;
 }
 
+export type MatchStatus = "suggested" | "pitched" | "interested" | "committed" | "passed";
+export type ContractorStatus = "prospect" | "contacted" | "in_network" | "passed";
+
+export interface ContractorMatch {
+  contractor_id: string;
+  name: string;
+  location: string;
+  trade: string;
+  website: string;
+  phone: string;
+  email: string;
+  gov_experience: "none" | "some" | "regular" | "unknown";
+  why_fit: string;
+  pitch_angle: string;
+  sources: string[];
+  status: MatchStatus;
+  contractor_status: ContractorStatus;
+}
+
+export interface ContractorMatchesStatus {
+  state: "none" | "running" | "done" | "error";
+  error?: string;
+  matches?: ContractorMatch[];
+  market_note?: string;
+  model?: string;
+  searches?: number;
+  created_at?: string;
+}
+
+export interface MatchedBid {
+  opportunity_id: string;
+  title: string;
+  agency: string;
+  county: string;
+  due_date: string | null;
+  match_status: MatchStatus;
+  matched_at: string;
+}
+
+export interface Contractor {
+  id: string;
+  name: string;
+  county: string;
+  location: string;
+  trade: string;
+  website: string;
+  phone: string;
+  email: string;
+  status: ContractorStatus;
+  notes: string;
+  profile: { gov_experience?: string; sources?: string[] };
+  created_at: string;
+  updated_at: string;
+  matched_bids: MatchedBid[];
+}
+
 export interface SnapshotResponse {
   fetched_at: string | null;
   count: number;

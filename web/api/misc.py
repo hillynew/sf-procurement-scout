@@ -99,7 +99,7 @@ def test_digest_email():
 
 
 class PurgeBody(BaseModel):
-    target: str  # snapshot | workflow | summaries | notifications | pdf_cache
+    target: str  # snapshot | workflow | summaries | notifications | pdf_cache | contractors
 
 
 @router.post("/settings/data/purge")

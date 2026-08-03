@@ -184,6 +184,54 @@ class ResearchThread(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 
+class Contractor(Base):
+    """One business in the outsourcing network.
+
+    Rows are created when AI matching surfaces a firm for a bid and are kept
+    forever after — the network is the durable asset, the matches are how it
+    grows. ``profile`` holds whatever the finder learned (government
+    experience, source URLs, size hints); the flat columns exist for cheap
+    listing and filtering.
+    """
+
+    __tablename__ = "contractors"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str] = mapped_column(String(256))
+    county: Mapped[str] = mapped_column(String(32), default="")
+    location: Mapped[str] = mapped_column(String(256), default="")
+    trade: Mapped[str] = mapped_column(String(256), default="")
+    website: Mapped[str] = mapped_column(String(512), default="")
+    phone: Mapped[str] = mapped_column(String(64), default="")
+    email: Mapped[str] = mapped_column(String(256), default="")
+    # prospect | contacted | in_network | passed — the relationship, not a match
+    status: Mapped[str] = mapped_column(String(16), default="prospect")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    profile: Mapped[dict] = mapped_column(JSONVariant, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+    updated_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class ContractorMatchSet(Base):
+    """Cached AI contractor matches for one bid — same shape rules as DeepDive.
+
+    ``matches`` is a JSON list of per-contractor entries; each carries its own
+    outreach status (suggested → pitched → interested → committed | passed),
+    which is the per-deal pipeline layered over the per-firm relationship.
+    """
+
+    __tablename__ = "contractor_matches"
+
+    opportunity_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    content_hash: Mapped[str] = mapped_column(String(16), default="")
+    model: Mapped[str] = mapped_column(String(64), default="")
+    prompt_version: Mapped[int] = mapped_column(Integer, default=1)
+    matches: Mapped[list] = mapped_column(JSONVariant, default=list)
+    market_note: Mapped[str] = mapped_column(Text, default="")
+    searches: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class CustomSource(Base):
     """User-added portals (CivicPlus), merged into the yaml config at runtime."""
 

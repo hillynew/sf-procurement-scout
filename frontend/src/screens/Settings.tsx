@@ -271,6 +271,7 @@ export default function SettingsScreen() {
           ["snapshot", "Clear bid snapshot", "Removes fetched bids and run history"],
           ["workflow", "Clear my pipeline", "Removes tracked bids, notes, results"],
           ["summaries", "Clear AI briefs", "Regenerate summaries from scratch"],
+          ["contractors", "Clear contractor network", "Removes every matched firm and its bid matches"],
           ["notifications", "Clear notifications", ""],
         ].map(([target, label, hint]) => (
           <Row key={target} label={label} hint={hint || undefined}>
