@@ -81,6 +81,29 @@ export interface AiSummaryEnvelope {
   created_at: string;
 }
 
+export interface DeepDiveReport {
+  overview: string;
+  dollar_amounts: { label: string; amount: string; source?: string }[];
+  key_dates: { label: string; date: string; note?: string }[];
+  scope_items: string[];
+  requirements: { category: string; item: string }[];
+  evaluation: string[];
+  contacts: { name: string; role?: string; email?: string; phone?: string }[];
+  documents_reviewed: { name: string; gist: string }[];
+  red_flags: string[];
+  open_questions: string[];
+  fit_assessment: string;
+}
+
+export interface DeepDiveStatus {
+  state: "none" | "running" | "done" | "error";
+  error?: string;
+  report?: DeepDiveReport;
+  model?: string;
+  docs_read?: number;
+  created_at?: string;
+}
+
 export interface SnapshotResponse {
   fetched_at: string | null;
   count: number;

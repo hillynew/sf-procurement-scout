@@ -23,6 +23,7 @@ from .models import (
     AiSummary,
     BidResult,
     CustomSource,
+    DeepDive,
     FetchRun,
     HistoryRecord,
     Notification,
@@ -552,6 +553,47 @@ def summarized_ids(min_prompt_version: int = 0) -> set:
         ).scalars())
 
 
+def get_deep_dive(opportunity_id: str, min_prompt_version: int = 0) -> Optional[dict]:
+    with session_scope() as s:
+        row = s.get(DeepDive, opportunity_id)
+    if row is None or row.prompt_version < min_prompt_version:
+        return None
+    return {
+        "report": dict(row.report),
+        "model": row.model,
+        "content_hash": row.content_hash,
+        "docs_read": row.docs_read,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+def put_deep_dive(opportunity_id: str, *, content_hash: str, model: str,
+                  prompt_version: int, report: dict, input_chars: int,
+                  docs_read: int) -> None:
+    with session_scope() as s:
+        row = s.get(DeepDive, opportunity_id)
+        if row is None:
+            row = DeepDive(opportunity_id=opportunity_id, report={})
+            s.add(row)
+        row.content_hash = content_hash
+        row.model = model
+        row.prompt_version = prompt_version
+        row.report = report
+        row.input_chars = input_chars
+        row.docs_read = docs_read
+        row.created_at = datetime.utcnow()
+
+
+def prune_deep_dives(current_version: int) -> int:
+    with session_scope() as s:
+        rows = s.execute(
+            select(DeepDive).where(DeepDive.prompt_version < current_version)
+        ).scalars().all()
+        for row in rows:
+            s.delete(row)
+        return len(rows)
+
+
 def prune_summaries(current_version: int) -> int:
     """Delete briefs cached under an older prompt version. Returns count."""
     with session_scope() as s:
@@ -621,6 +663,7 @@ def purge(target: str) -> None:
             s.execute(delete(BidResult))
         elif target == "summaries":
             s.execute(delete(AiSummary))
+            s.execute(delete(DeepDive))
         elif target == "notifications":
             s.execute(delete(Notification))
         elif target == "pdf_cache":

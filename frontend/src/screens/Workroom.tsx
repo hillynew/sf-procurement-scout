@@ -4,13 +4,23 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
+  FileText,
+  HelpCircle,
   Mail,
   Phone,
   Sparkles,
+  Telescope,
 } from "lucide-react";
 import { toast } from "sonner";
-import { useBidMutation, useOpportunity, useSettings, useSummarize } from "../api/hooks";
-import type { AiBrief, OpportunityDetail } from "../api/types";
+import {
+  useBidMutation,
+  useDeepDive,
+  useOpportunity,
+  useSettings,
+  useStartDeepDive,
+  useSummarize,
+} from "../api/hooks";
+import type { AiBrief, DeepDiveReport, OpportunityDetail } from "../api/types";
 import {
   Button,
   CountyPill,
@@ -151,6 +161,269 @@ function AiBriefCard({ bid }: { bid: OpportunityDetail }) {
   );
 }
 
+/** Same defensive stance as sanitizeBrief: render whatever shape arrives. */
+function objList<T extends object>(v: unknown, key: string): T[] {
+  return Array.isArray(v)
+    ? v.filter((x): x is T => !!x && typeof x === "object" && !!(x as Record<string, unknown>)[key])
+    : [];
+}
+
+function sanitizeReport(raw: DeepDiveReport | undefined): DeepDiveReport | undefined {
+  if (!raw || typeof raw !== "object" || !raw.overview) return undefined;
+  return {
+    overview: String(raw.overview),
+    dollar_amounts: objList(raw.dollar_amounts, "amount"),
+    key_dates: objList(raw.key_dates, "label"),
+    scope_items: safeList(raw.scope_items),
+    requirements: objList(raw.requirements, "item"),
+    evaluation: safeList(raw.evaluation),
+    contacts: objList(raw.contacts, "name"),
+    documents_reviewed: objList(raw.documents_reviewed, "name"),
+    red_flags: safeList(raw.red_flags),
+    open_questions: safeList(raw.open_questions),
+    fit_assessment: String(raw.fit_assessment ?? ""),
+  };
+}
+
+const REQ_CATEGORY_LABEL: Record<string, string> = {
+  bonding: "Bonding",
+  insurance: "Insurance",
+  licensing: "Licensing",
+  submission: "Submission",
+  wage_set_aside: "Wage / set-aside",
+  other: "Other",
+};
+
+function DeepSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-xs font-bold uppercase tracking-wide text-ink-soft">
+        {title}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Bullets({ items, tone = "accent" }: { items: string[]; tone?: "accent" | "danger" | "warn" }) {
+  const dot = tone === "danger" ? "text-danger" : tone === "warn" ? "text-warn" : "text-accent";
+  return (
+    <ul className="space-y-1">
+      {items.map((x, i) => (
+        <li key={i} className="flex gap-1.5 text-[13px] text-ink-soft">
+          <span className={dot}>•</span>
+          <span>{x}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function DeepDiveCard({ bid }: { bid: OpportunityDetail }) {
+  const { data: settings } = useSettings();
+  const aiAvailable = settings?.capabilities.ai_available ?? false;
+  const { data: dive } = useDeepDive(bid.opportunity_id);
+  const start = useStartDeepDive();
+
+  if (!aiAvailable) return null;
+
+  const running = dive?.state === "running" || start.isPending;
+  const report = sanitizeReport(dive?.report);
+
+  const go = (force = false) =>
+    start.mutate(
+      { id: bid.opportunity_id, force },
+      {
+        onSuccess: () => toast.info("🔭 Going deep — reading every document…"),
+        onError: (e) => toast.error(`Couldn't start deep dive: ${e.message}`),
+      },
+    );
+
+  return (
+    <div className="card border-accent/25 p-4">
+      <div className="mb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-accent">
+          <Telescope size={13} /> Go Deep
+          {dive?.state === "done" && (
+            <span className="font-medium normal-case text-ink-faint">
+              · {dive.model} · read {dive.docs_read ?? 0} doc{(dive.docs_read ?? 0) === 1 ? "" : "s"}
+            </span>
+          )}
+        </div>
+        {report && !running && (
+          <button onClick={() => go(true)} disabled={start.isPending}
+                  className="text-xs font-semibold text-accent hover:underline disabled:opacity-50">
+            Re-run
+          </button>
+        )}
+      </div>
+
+      {dive?.state === "error" && (
+        <div className="mb-3 flex items-start gap-2 rounded-[10px] bg-danger-soft px-3 py-2 text-[13px] text-danger">
+          <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+          <div>
+            Deep dive failed: {dive.error}
+            <button onClick={() => go(true)} className="ml-2 font-bold underline">Try again</button>
+          </div>
+        </div>
+      )}
+
+      {running ? (
+        <div className="flex items-center gap-3 py-2 text-sm text-ink-soft">
+          <Spinner size={18} />
+          <div>
+            <div className="font-semibold text-ink">Reading everything on this deal…</div>
+            <div className="text-xs text-ink-faint">
+              Downloading the documents and compiling dollar amounts, dates, scope and
+              requirements. Usually one to two minutes — you can leave this page.
+            </div>
+          </div>
+        </div>
+      ) : report ? (
+        <div className="space-y-4 text-sm">
+          <p className="leading-relaxed text-ink">{report.overview}</p>
+
+          {report.dollar_amounts.length > 0 && (
+            <DeepSection title={`Every dollar amount (${report.dollar_amounts.length})`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <tbody>
+                    {report.dollar_amounts.map((d, i) => (
+                      <tr key={i} className="border-b border-line last:border-0">
+                        <td className="py-1.5 pr-3 text-ink-soft">{d.label}</td>
+                        <td className="money whitespace-nowrap py-1.5 pr-3 text-right font-bold">
+                          {d.amount}
+                        </td>
+                        <td className="hidden py-1.5 text-right text-xs text-ink-faint sm:table-cell">
+                          {d.source ?? ""}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </DeepSection>
+          )}
+
+          {report.key_dates.length > 0 && (
+            <DeepSection title="Dates that matter">
+              <div className="space-y-1.5">
+                {report.key_dates.map((d, i) => (
+                  <div key={i} className="flex items-baseline justify-between gap-2 text-[13px]">
+                    <span className="text-ink-soft">
+                      {d.label}
+                      {d.note && <span className="text-ink-faint"> — {d.note}</span>}
+                    </span>
+                    <span className="whitespace-nowrap font-semibold">{d.date}</span>
+                  </div>
+                ))}
+              </div>
+            </DeepSection>
+          )}
+
+          {report.scope_items.length > 0 && (
+            <DeepSection title="Scope, line by line">
+              <Bullets items={report.scope_items} />
+            </DeepSection>
+          )}
+
+          {report.requirements.length > 0 && (
+            <DeepSection title="Requirements">
+              <div className="space-y-1">
+                {report.requirements.map((r, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[13px] text-ink-soft">
+                    <span className="mt-px shrink-0 rounded bg-bg px-1.5 py-0.5 text-[10px] font-bold uppercase text-ink-faint">
+                      {REQ_CATEGORY_LABEL[r.category] ?? r.category}
+                    </span>
+                    <span>{r.item}</span>
+                  </div>
+                ))}
+              </div>
+            </DeepSection>
+          )}
+
+          {report.evaluation.length > 0 && (
+            <DeepSection title="How the award is decided">
+              <Bullets items={report.evaluation} />
+            </DeepSection>
+          )}
+
+          {report.red_flags.length > 0 && (
+            <DeepSection title="Red flags">
+              <Bullets items={report.red_flags} tone="danger" />
+            </DeepSection>
+          )}
+
+          {report.open_questions.length > 0 && (
+            <DeepSection title="Worth asking before the deadline">
+              <ul className="space-y-1">
+                {report.open_questions.map((q, i) => (
+                  <li key={i} className="flex gap-1.5 text-[13px] text-ink-soft">
+                    <HelpCircle size={13} className="mt-0.5 shrink-0 text-warn" />
+                    <span>{q}</span>
+                  </li>
+                ))}
+              </ul>
+            </DeepSection>
+          )}
+
+          {report.contacts.length > 0 && (
+            <DeepSection title="Contacts">
+              <div className="space-y-1.5 text-[13px]">
+                {report.contacts.map((c, i) => (
+                  <div key={i} className="flex flex-wrap items-baseline gap-x-2">
+                    <span className="font-semibold text-ink">{c.name}</span>
+                    {c.role && <span className="text-ink-faint">{c.role}</span>}
+                    {c.email && (
+                      <a href={`mailto:${c.email}`} className="text-accent hover:underline">{c.email}</a>
+                    )}
+                    {c.phone && (
+                      <a href={`tel:${c.phone}`} className="text-accent hover:underline">{c.phone}</a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </DeepSection>
+          )}
+
+          {report.documents_reviewed.length > 0 && (
+            <DeepSection title="What each document says">
+              <div className="space-y-1.5">
+                {report.documents_reviewed.map((d, i) => (
+                  <div key={i} className="flex items-start gap-2 text-[13px]">
+                    <FileText size={13} className="mt-0.5 shrink-0 text-ink-faint" />
+                    <div>
+                      <span className="font-semibold text-ink">{d.name}</span>
+                      <span className="text-ink-soft"> — {d.gist}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </DeepSection>
+          )}
+
+          {report.fit_assessment && (
+            <p className="rounded-[10px] bg-accent-soft/50 px-3 py-2 text-[13px] font-medium italic text-ink-soft">
+              {report.fit_assessment}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-start gap-2">
+          <p className="text-[13px] text-ink-soft">
+            Have Claude read <span className="font-semibold text-ink">every attached document</span> and
+            compile the full picture: every dollar amount, every date, scope line items,
+            requirements, evaluation criteria, red flags and the questions worth asking.
+          </p>
+          <Button kind="soft" onClick={() => go()} disabled={start.isPending}>
+            🔭 Go Deep
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Workroom() {
   const { id } = useParams<{ id: string }>();
   const { data: bid, isLoading } = useOpportunity(id ?? null);
@@ -242,6 +515,7 @@ export default function Workroom() {
         {/* Left column */}
         <div className="space-y-4">
           <AiBriefCard bid={bid} />
+          <DeepDiveCard bid={bid} />
 
           {scope && (
             <Section title="Scope of work">
