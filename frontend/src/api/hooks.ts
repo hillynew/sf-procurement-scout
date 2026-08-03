@@ -11,6 +11,7 @@ import type {
   NotificationItem,
   Opportunity,
   OpportunityDetail,
+  ResearchStatus,
   SettingsResponse,
   SnapshotResponse,
   SourcesResponse,
@@ -33,6 +34,7 @@ export const keys = {
   fetchStatus: ["fetch-status"] as const,
   deepDive: (id: string) => ["deep-dive", id] as const,
   taxonomy: ["taxonomy"] as const,
+  research: (id: string) => ["research", id] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -217,6 +219,34 @@ export function useStartDeepDive() {
       // Flip the query into its polling loop immediately.
       qc.setQueryData<DeepDiveStatus>(keys.deepDive(vars.id), { state: "running" });
       qc.invalidateQueries({ queryKey: keys.deepDive(vars.id) });
+    },
+  });
+}
+
+export function useResearch(id: string | null) {
+  return useQuery({
+    queryKey: keys.research(id ?? "none"),
+    queryFn: () => api.get<ResearchStatus>(`/api/bids/${id}/research`),
+    enabled: !!id,
+    // Poll while an answer is being researched; web search takes ~15-60s.
+    refetchInterval: (query) =>
+      query.state.data?.state === "running" ? 3000 : false,
+  });
+}
+
+export function useAskResearch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, question }: { id: string; question: string }) =>
+      api.post<{ state: string }>(`/api/bids/${id}/research`, { question }),
+    onSuccess: (_data, vars) => {
+      // Flip the query into its polling loop immediately.
+      qc.setQueryData<ResearchStatus>(keys.research(vars.id), (old) => ({
+        turns: old?.turns ?? [],
+        suggested_questions: old?.suggested_questions ?? [],
+        state: "running",
+      }));
+      qc.invalidateQueries({ queryKey: keys.research(vars.id) });
     },
   });
 }

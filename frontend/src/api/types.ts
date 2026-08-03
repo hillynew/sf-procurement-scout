@@ -104,6 +104,22 @@ export interface DeepDiveStatus {
   created_at?: string;
 }
 
+export interface ResearchTurn {
+  question: string;
+  answer: string;
+  citations: { url: string; title: string }[];
+  searches: number;
+  model: string;
+  asked_at: string;
+}
+
+export interface ResearchStatus {
+  state: "idle" | "running";
+  turns: ResearchTurn[];
+  suggested_questions: string[];
+  error?: string;
+}
+
 export interface SnapshotResponse {
   fetched_at: string | null;
   count: number;

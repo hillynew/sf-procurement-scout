@@ -4,18 +4,23 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowUpRight,
+  Compass,
   FileText,
   HelpCircle,
+  Link2,
   Mail,
   Phone,
+  Send,
   Sparkles,
   Telescope,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
+  useAskResearch,
   useBidMutation,
   useDeepDive,
   useOpportunity,
+  useResearch,
   useSettings,
   useStartDeepDive,
   useSummarize,
@@ -516,6 +521,7 @@ export default function Workroom() {
         <div className="space-y-4">
           <AiBriefCard bid={bid} />
           <DeepDiveCard bid={bid} />
+          <ResearchCard bid={bid} />
 
           {scope && (
             <Section title="Scope of work">
@@ -681,6 +687,132 @@ export default function Workroom() {
             </div>
           </Section>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Follow-up research: ask Claude to dig past what the documents say.
+ *
+ *  The deep dive is bounded by the bid package. The questions a bidder prices
+ *  with — what did this go for last time, who won it, what does the agency
+ *  usually pay — live on the open web, so this card sends them to Claude with
+ *  web search and keeps the answers as a running thread on the deal. */
+function ResearchCard({ bid }: { bid: OpportunityDetail }) {
+  const { data: settings } = useSettings();
+  const aiAvailable = settings?.capabilities.ai_available ?? false;
+  const { data } = useResearch(bid.opportunity_id);
+  const ask = useAskResearch();
+  const [question, setQuestion] = useState("");
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const running = data?.state === "running";
+  const turns = data?.turns ?? [];
+
+  useEffect(() => {
+    if (running || turns.length) {
+      endRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [running, turns.length]);
+
+  if (!aiAvailable) return null;
+
+  const submit = (q: string) => {
+    const text = q.trim();
+    if (!text || running) return;
+    ask.mutate(
+      { id: bid.opportunity_id, question: text },
+      {
+        onSuccess: () => setQuestion(""),
+        onError: (e) => toast.error(`Couldn't start research: ${e.message}`),
+      },
+    );
+  };
+
+  // Suggested questions stay useful mid-thread, but the openers matter most
+  // before anything has been asked.
+  const suggestions = (data?.suggested_questions ?? []).slice(0, turns.length ? 2 : 3);
+
+  return (
+    <div className="card border-accent/25 p-4">
+      <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-accent">
+        <Compass size={13} /> Dig deeper
+        <span className="font-medium normal-case text-ink-faint">
+          · web research on this deal — past awards, pricing, competitors
+        </span>
+      </div>
+
+      <div className="space-y-3">
+        {turns.map((t, i) => (
+          <div key={i}>
+            <div className="mb-1 flex items-start gap-2">
+              <span className="mt-0.5 shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[10px] font-bold text-accent">
+                Q
+              </span>
+              <span className="text-sm font-semibold">{t.question}</span>
+            </div>
+            <div className="whitespace-pre-line pl-7 text-sm leading-relaxed text-ink-soft">
+              {t.answer}
+            </div>
+            {t.citations.length > 0 && (
+              <div className="mt-1.5 flex flex-wrap gap-1.5 pl-7">
+                {t.citations.map((c) => (
+                  <a key={c.url} href={c.url} target="_blank" rel="noreferrer"
+                     className="flex max-w-60 items-center gap-1 rounded-full bg-bg px-2 py-0.5 text-[11px] font-medium text-ink-soft hover:text-accent">
+                    <Link2 size={10} className="shrink-0" />
+                    <span className="truncate">{c.title}</span>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {running && (
+          <div className="flex items-center gap-2.5 pl-1 text-sm text-ink-soft">
+            <Spinner size={16} />
+            <span>
+              Researching — searching the web for awards, prices and history…
+            </span>
+          </div>
+        )}
+
+        {data?.error && !running && (
+          <div className="flex items-start gap-2 rounded-[10px] bg-danger-soft px-3 py-2 text-[13px] text-danger">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+            <span>Research failed: {data.error}</span>
+          </div>
+        )}
+
+        {!running && suggestions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {suggestions.map((q) => (
+              <button key={q} onClick={() => submit(q)}
+                      className="rounded-full border border-line px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-accent hover:text-accent">
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => { e.preventDefault(); submit(question); }}
+        >
+          <input
+            value={question}
+            onChange={(e) => setQuestion(e.target.value)}
+            disabled={running}
+            placeholder={turns.length ? "Ask a follow-up…"
+                                      : "e.g. What did they pay for this service before?"}
+            className="w-full rounded-[10px] border border-line px-3 py-2 text-sm outline-none transition-colors placeholder:text-ink-faint focus:border-accent disabled:opacity-60"
+          />
+          <Button type="submit" disabled={running || !question.trim()}
+                  className="!px-3 shrink-0">
+            <Send size={15} />
+          </Button>
+        </form>
+        <div ref={endRef} />
       </div>
     </div>
   );

@@ -252,3 +252,82 @@ def get_deep_dive(opportunity_id: str):
     if envelope is None:
         return {"state": "none"}
     return {"state": "done"} | envelope
+
+
+# ---------------------------------------------------------------------------
+# Follow-up research — dig past what the documents say
+# ---------------------------------------------------------------------------
+
+_research_running: Set[str] = set()
+_research_errors: Dict[str, str] = {}
+
+
+class ResearchBody(BaseModel):
+    question: str
+
+
+def _research_worker(opportunity_id: str, opp, question: str, model) -> None:
+    from src.ai import research
+
+    try:
+        # Research is grounded in the deal's own facts, so make sure they've
+        # been fetched — same reasoning as the deep dive's on-demand pass.
+        ensure_detail(opp)
+        research.ask(opp, question, model=model)
+    except Exception as exc:  # noqa: BLE001 — reported through GET, not logs
+        _research_errors[opportunity_id] = str(exc)
+    finally:
+        _research_running.discard(opportunity_id)
+
+
+@router.post("/bids/{opportunity_id}/research", status_code=202)
+async def start_research(opportunity_id: str, body: ResearchBody):
+    from src.ai import summarizer
+
+    opp = _bid_or_404(opportunity_id)
+    if not summarizer.enabled():
+        raise HTTPException(
+            status_code=503,
+            detail={"reason": "no_api_key",
+                    "message": "Set SF_SCOUT_ANTHROPIC_KEY to enable research."},
+        )
+    question = body.question.strip()
+    if not question:
+        raise HTTPException(status_code=422, detail="question is empty")
+    if len(question) > 1000:
+        raise HTTPException(status_code=422, detail="question is too long")
+    if opportunity_id in _research_running:
+        raise HTTPException(status_code=409, detail="research already running")
+
+    settings = db.get_settings()
+    _research_running.add(opportunity_id)
+    _research_errors.pop(opportunity_id, None)
+    asyncio.get_running_loop().create_task(
+        asyncio.to_thread(_research_worker, opportunity_id, opp, question,
+                          settings["ai"].get("model"))
+    )
+    return {"state": "running"}
+
+
+@router.get("/bids/{opportunity_id}/research")
+def get_research(opportunity_id: str):
+    from src.ai.research import SUGGESTED_QUESTIONS
+
+    _bid_or_404(opportunity_id)
+    turns = db.get_research_thread(opportunity_id)
+    out = {
+        "turns": turns,
+        "suggested_questions": SUGGESTED_QUESTIONS,
+        "state": "running" if opportunity_id in _research_running else "idle",
+    }
+    error = _research_errors.get(opportunity_id)
+    if error and opportunity_id not in _research_running:
+        out["error"] = error
+    return out
+
+
+@router.delete("/bids/{opportunity_id}/research", status_code=204)
+def clear_research(opportunity_id: str):
+    _bid_or_404(opportunity_id)
+    _research_errors.pop(opportunity_id, None)
+    db.clear_research_thread(opportunity_id)

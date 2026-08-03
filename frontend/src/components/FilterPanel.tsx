@@ -1,14 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { SlidersHorizontal, X } from "lucide-react";
+import { useTaxonomy } from "../api/hooks";
+import type { TaxonomyResponse } from "../api/types";
 import type { BidFilters } from "../lib/filters";
 import { countActive, DEFAULT_FILTERS, EMPTY_FILTERS } from "../lib/filters";
-import { COUNTY_LABEL, fmtMoney, OFFER_LABEL } from "../lib/format";
+import { countyLabel, fmtMoney, OFFER_LABEL } from "../lib/format";
+import MultiSelect, { type MultiSelectOption } from "./MultiSelect";
 import { FilterChip } from "./ui";
 
 const STATUS_OPTIONS = [
   ["open", "Open"], ["upcoming", "Upcoming"], ["closed", "Closed"],
 ] as const;
-const TYPE_OPTIONS = ["construction", "services", "goods", "professional_services"];
 const DUE_OPTIONS = [
   [null, "Any time"], [7, "7 days"], [14, "14 days"], [30, "30 days"],
 ] as const;
@@ -19,13 +21,18 @@ const FLAG_OPTIONS: [keyof BidFilters, string][] = [
   ["noBond", "No bond required"],
 ];
 
-function Section({ label, children }: { label: string; children: React.ReactNode }) {
+function Section({ label, hint, children }: {
+  label: string; hint?: string; children: React.ReactNode;
+}) {
   return (
     <div>
-      <div className="mb-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
-        {label}
+      <div className="mb-1.5 flex items-baseline justify-between gap-2">
+        <span className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+          {label}
+        </span>
+        {hint && <span className="text-[11px] text-ink-faint">{hint}</span>}
       </div>
-      <div className="flex flex-wrap gap-1.5">{children}</div>
+      {children}
     </div>
   );
 }
@@ -34,7 +41,11 @@ function toggle(list: string[], value: string): string[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
-/** One button, every filter. Popover on desktop, bottom sheet on mobile. */
+/** One button, every filter. Popover on desktop, bottom sheet on mobile.
+ *
+ *  The vocabulary comes from /api/taxonomy, not from the loaded snapshot:
+ *  since the statewide expansion "region" means any of the 67 counties, and
+ *  five hard-coded chips silently made most of the state unfilterable. */
 export default function FilterPanel({ filters, onChange, matchCount }: {
   filters: BidFilters;
   onChange: (next: BidFilters) => void;
@@ -42,6 +53,7 @@ export default function FilterPanel({ filters, onChange, matchCount }: {
 }) {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const { data: tax } = useTaxonomy();
   const active = countActive(filters);
 
   useEffect(() => {
@@ -52,6 +64,45 @@ export default function FilterPanel({ filters, onChange, matchCount }: {
   }, [open]);
 
   const set = (patch: Partial<BidFilters>) => onChange({ ...filters, ...patch });
+
+  const countyOptions: MultiSelectOption[] = useMemo(
+    () =>
+      (tax?.counties ?? []).map((c) => ({
+        value: c.slug,
+        label: c.label,
+        group: c.region_label,
+        count: c.count,
+      })),
+    [tax],
+  );
+  const countyGroupOrder = useMemo(() => {
+    const seen: { key: string; label: string }[] = [];
+    for (const c of tax?.counties ?? []) {
+      if (!seen.some((g) => g.key === c.region_label)) {
+        seen.push({ key: c.region_label, label: c.region_label });
+      }
+    }
+    return seen;
+  }, [tax]);
+
+  const categoryOptions: MultiSelectOption[] = useMemo(
+    () =>
+      (tax?.categories ?? []).map((c) => ({
+        value: c.slug,
+        label: c.label,
+        group: c.group,
+        count: c.count,
+        synonyms: c.slug.replace(/_/g, " "),
+      })),
+    [tax],
+  );
+
+  const offerOptions = tax?.offer_types ?? [
+    { key: "construction", label: "Construction", count: 0 },
+    { key: "services", label: "Services", count: 0 },
+    { key: "professional_services", label: "Professional services", count: 0 },
+    { key: "goods", label: "Goods", count: 0 },
+  ];
 
   return (
     <div className="relative">
@@ -90,29 +141,48 @@ export default function FilterPanel({ filters, onChange, matchCount }: {
 
             <Section label="Status">
               {STATUS_OPTIONS.map(([value, label]) => (
-                <FilterChip key={value} active={filters.statuses.includes(value)}
-                            onClick={() => set({ statuses: toggle(filters.statuses, value) })}>
-                  {label}
-                </FilterChip>
+                <div key={value} className="mr-1.5 inline-block">
+                  <FilterChip active={filters.statuses.includes(value)}
+                              onClick={() => set({ statuses: toggle(filters.statuses, value) })}>
+                    {label}
+                  </FilterChip>
+                </div>
               ))}
             </Section>
 
-            <Section label="Region">
-              {Object.entries(COUNTY_LABEL).map(([value, label]) => (
-                <FilterChip key={value} active={filters.regions.includes(value)}
-                            onClick={() => set({ regions: toggle(filters.regions, value) })}>
-                  {label}
-                </FilterChip>
-              ))}
+            <Section label="Category"
+                     hint={tax ? `${categoryOptions.length} to choose from` : undefined}>
+              <MultiSelect
+                options={categoryOptions}
+                selected={filters.categories}
+                onChange={(next) => set({ categories: next })}
+                placeholder="Any category"
+                groupOrder={(tax?.groups ?? []).map((g) => ({ key: g.slug, label: g.label }))}
+              />
+            </Section>
+
+            <Section label="County" hint="all 67, grouped by region">
+              <MultiSelect
+                options={countyOptions}
+                selected={filters.regions}
+                onChange={(next) => set({ regions: next })}
+                placeholder="Anywhere in Florida"
+                groupOrder={countyGroupOrder}
+              />
             </Section>
 
             <Section label="Work type">
-              {TYPE_OPTIONS.map((value) => (
-                <FilterChip key={value} active={filters.types.includes(value)}
-                            onClick={() => set({ types: toggle(filters.types, value) })}>
-                  {OFFER_LABEL[value]}
-                </FilterChip>
-              ))}
+              <div className="flex flex-wrap gap-1.5">
+                {offerOptions.map((o) => (
+                  <FilterChip key={o.key} active={filters.types.includes(o.key)}
+                              onClick={() => set({ types: toggle(filters.types, o.key) })}>
+                    {o.label}
+                    {o.count > 0 && (
+                      <span className="ml-1 text-[10px] opacity-70">{o.count}</span>
+                    )}
+                  </FilterChip>
+                ))}
+              </div>
             </Section>
 
             <Section label="Estimated value ($)">
@@ -143,20 +213,24 @@ export default function FilterPanel({ filters, onChange, matchCount }: {
 
             <Section label="Due within">
               {DUE_OPTIONS.map(([value, label]) => (
-                <FilterChip key={label} active={filters.dueWithin === value}
-                            onClick={() => set({ dueWithin: value })}>
-                  {label}
-                </FilterChip>
+                <div key={label} className="mr-1.5 inline-block">
+                  <FilterChip active={filters.dueWithin === value}
+                              onClick={() => set({ dueWithin: value })}>
+                    {label}
+                  </FilterChip>
+                </div>
               ))}
             </Section>
 
             <Section label="More">
-              {FLAG_OPTIONS.map(([key, label]) => (
-                <FilterChip key={key} active={Boolean(filters[key])}
-                            onClick={() => set({ [key]: !filters[key] } as Partial<BidFilters>)}>
-                  {label}
-                </FilterChip>
-              ))}
+              <div className="flex flex-wrap gap-1.5">
+                {FLAG_OPTIONS.map(([key, label]) => (
+                  <FilterChip key={key} active={Boolean(filters[key])}
+                              onClick={() => set({ [key]: !filters[key] } as Partial<BidFilters>)}>
+                    {label}
+                  </FilterChip>
+                ))}
+              </div>
             </Section>
 
             <div className="flex items-center justify-between border-t border-line pt-3">
@@ -196,8 +270,12 @@ export function ActiveFilterChips({ filters, onChange }: {
   filters: BidFilters;
   onChange: (next: BidFilters) => void;
 }) {
+  const { data: tax } = useTaxonomy();
   const chips: { label: string; remove: () => void }[] = [];
   const set = (patch: Partial<BidFilters>) => onChange({ ...filters, ...patch });
+
+  const catLabel = (slug: string, t?: TaxonomyResponse) =>
+    t?.categories.find((c) => c.slug === slug)?.label ?? slug.replace(/_/g, " ");
 
   for (const s of filters.statuses) {
     chips.push({
@@ -205,9 +283,15 @@ export function ActiveFilterChips({ filters, onChange }: {
       remove: () => set({ statuses: filters.statuses.filter((v) => v !== s) }),
     });
   }
+  for (const c of filters.categories) {
+    chips.push({
+      label: catLabel(c, tax),
+      remove: () => set({ categories: filters.categories.filter((v) => v !== c) }),
+    });
+  }
   for (const r of filters.regions) {
     chips.push({
-      label: COUNTY_LABEL[r] ?? r,
+      label: tax?.county_labels[r] ?? countyLabel(r),
       remove: () => set({ regions: filters.regions.filter((v) => v !== r) }),
     });
   }

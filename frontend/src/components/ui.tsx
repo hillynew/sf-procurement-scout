@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import { Loader2, Sparkles } from "lucide-react";
 import {
   COUNTY_COLOR,
-  COUNTY_LABEL,
   COUNTY_SOFT,
+  countyLabel,
   dueText,
   dueTone,
   fmtMoney,
@@ -11,7 +11,7 @@ import {
 } from "../lib/format";
 
 export function CountyPill({ county, small }: { county: string; small?: boolean }) {
-  const label = COUNTY_LABEL[county] ?? county;
+  const label = countyLabel(county);
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full font-semibold ${

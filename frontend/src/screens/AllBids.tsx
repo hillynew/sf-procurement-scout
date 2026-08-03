@@ -1,14 +1,69 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Search } from "lucide-react";
+import { LayoutGrid, List, Rows3, Search } from "lucide-react";
 import { useLoadDemo, useOpportunities } from "../api/hooks";
 import type { Opportunity } from "../api/types";
 import BidRow from "../components/BidRow";
+import { BidCard, BidCompactRow } from "../components/BidCard";
 import FilterPanel, { ActiveFilterChips } from "../components/FilterPanel";
 import SortControl from "../components/SortControl";
 import { Button, EmptyState, Spinner } from "../components/ui";
 import { applyFilters, parseFilters, writeFilters, type BidFilters } from "../lib/filters";
 import { BID_SORT_KEYS, sortOpportunities, useSortPref } from "../lib/sort";
+
+type ViewMode = "list" | "cards" | "compact";
+
+const VIEW_OPTIONS: { key: ViewMode; label: string; icon: typeof List }[] = [
+  { key: "list", label: "List", icon: List },
+  { key: "cards", label: "Cards", icon: LayoutGrid },
+  { key: "compact", label: "Compact", icon: Rows3 },
+];
+
+/** localStorage-backed view preference, same idea as useSortPref. */
+function useViewPref(): [ViewMode, (v: ViewMode) => void] {
+  const storageKey = "scout.view.bids";
+  const [view, setView] = useState<ViewMode>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw === "list" || raw === "cards" || raw === "compact") return raw;
+    } catch {
+      // localStorage unavailable (private mode) — fall through
+    }
+    return "list";
+  });
+  const set = (next: ViewMode) => {
+    setView(next);
+    try {
+      localStorage.setItem(storageKey, next);
+    } catch {
+      // best effort
+    }
+  };
+  return [view, set];
+}
+
+function ViewToggle({ view, onChange }: { view: ViewMode; onChange: (v: ViewMode) => void }) {
+  return (
+    <div className="flex items-center rounded-[10px] border border-line bg-surface p-0.5">
+      {VIEW_OPTIONS.map(({ key, label, icon: Icon }) => (
+        <button
+          key={key}
+          onClick={() => onChange(key)}
+          title={label}
+          aria-label={`${label} view`}
+          aria-pressed={view === key}
+          className={`rounded-lg px-2.5 py-1.5 transition-colors ${
+            view === key
+              ? "bg-accent-soft text-accent"
+              : "text-ink-faint hover:text-ink"
+          }`}
+        >
+          <Icon size={15} />
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function matchesQuery(o: Opportunity, q: string): boolean {
   const hay = [o.title, o.agency, o.external_id ?? "", o.brief ?? "",
@@ -23,6 +78,7 @@ export default function AllBids() {
   const [query, setQuery] = useState(params.get("q") ?? "");
   const searchRef = useRef<HTMLInputElement>(null);
   const [sort, setSort] = useSortPref("bids", { key: "due", dir: "asc" });
+  const [view, setView] = useViewPref();
 
   // One filter object drives everything; state lives in the URL so views
   // stay shareable and refresh-safe.
@@ -80,7 +136,10 @@ export default function AllBids() {
           <h1 className="text-xl font-extrabold">All bids</h1>
           <p className="text-sm text-ink-soft">{visible.length} shown · {all.length} captured</p>
         </div>
-        <SortControl keys={BID_SORT_KEYS} pref={sort} onChange={setSort} />
+        <div className="flex items-center gap-2">
+          <ViewToggle view={view} onChange={setView} />
+          <SortControl keys={BID_SORT_KEYS} pref={sort} onChange={setSort} />
+        </div>
       </div>
 
       <div className="mb-3 flex items-center gap-2">
@@ -101,16 +160,30 @@ export default function AllBids() {
         <ActiveFilterChips filters={filters} onChange={setFilters} />
       </div>
 
-      <div className="space-y-2">
-        {visible.map((bid) => (
-          <BidRow key={bid.opportunity_id} bid={bid} showStatus={showStatus} />
-        ))}
-        {visible.length === 0 && (
-          <div className="py-16 text-center text-sm text-ink-faint">
-            Nothing matches — loosen a filter or clear the search.
-          </div>
-        )}
-      </div>
+      {view === "cards" ? (
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {visible.map((bid) => (
+            <BidCard key={bid.opportunity_id} bid={bid} showStatus={showStatus} />
+          ))}
+        </div>
+      ) : view === "compact" ? (
+        <div className="card overflow-hidden px-2 py-1">
+          {visible.map((bid) => (
+            <BidCompactRow key={bid.opportunity_id} bid={bid} showStatus={showStatus} />
+          ))}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {visible.map((bid) => (
+            <BidRow key={bid.opportunity_id} bid={bid} showStatus={showStatus} />
+          ))}
+        </div>
+      )}
+      {visible.length === 0 && (
+        <div className="py-16 text-center text-sm text-ink-faint">
+          Nothing matches — loosen a filter or clear the search.
+        </div>
+      )}
     </div>
   );
 }

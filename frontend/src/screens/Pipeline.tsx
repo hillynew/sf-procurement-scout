@@ -222,7 +222,7 @@ export default function Pipeline() {
     return (
       <EmptyState
         title="Your pipeline is empty"
-        body="Track bids from All Bids or the Calendar and they'll appear here, moving from Watching to Result."
+        body="Track bids from All Bids and they'll appear here, moving from Watching to Result."
         action={<Link to="/bids" className="rounded-[10px] bg-accent px-4 py-2 text-sm font-bold text-white">Browse bids</Link>}
       />
     );

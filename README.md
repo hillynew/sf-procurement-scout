@@ -75,7 +75,6 @@ a FastAPI JSON API (`web/server.py`, routers in `web/api/`). Fully responsive
 |--------|--------------|
 | **Dashboard** | Stat tiles (open bids, open value, due-soon, win rate) plus charts: bids by county, value by work type, 8-week deadline load, won revenue by month, top sources |
 | **All bids** | Instant search-as-you-type, county/type/status filter chips, sortable list with value and detail-score on every row |
-| **Calendar** | Month grid of bids on their due dates with county dots and values; an agenda list on mobile |
 | **Pipeline** | Drag-and-drop kanban (Watching → Preparing → Submitted → Result) with per-column dollar totals, a win/loss dialog that records real amounts, and an archive |
 | **Workroom** | Deep read of one bid: AI deal brief, scope, requirements checklist, documents, key dates, commercial terms, go/no-go, autosaving notes |
 | **Watchlists** | Real rule builder (keywords, counties, types, value range, no-bond, recurring) with live match preview, rename/delete, and genuinely-correct NEW badges |
@@ -410,7 +409,7 @@ docker-compose.yml      # local: web + optional 4-hourly fetch sidecar
 runtime.txt             # Python version hint
 config/sources.yaml     # portal registry
 frontend/               # React SPA (Vite + TypeScript + Tailwind)
-frontend/src/screens/   # Dashboard, AllBids, Calendar, Pipeline, Workroom, …
+frontend/src/screens/   # Dashboard, AllBids, Pipeline, Workroom, …
 frontend/src/api/       # typed client + TanStack Query hooks
 src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-portal adapters (+ DB-stored custom sources)
