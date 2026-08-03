@@ -162,6 +162,72 @@ def test_summarize_without_key_is_503(seeded, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# Go Deep
+# ---------------------------------------------------------------------------
+
+
+def _wait_for_deep_dive(client, oid, tries=200):
+    import time
+
+    for _ in range(tries):
+        body = client.get(f"/api/bids/{oid}/deep-dive").json()
+        if body["state"] != "running":
+            return body
+        time.sleep(0.02)
+    raise AssertionError("deep dive never finished")
+
+
+def test_deep_dive_without_key_is_503(seeded, monkeypatch):
+    monkeypatch.delenv("SF_SCOUT_ANTHROPIC_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    oid = first_tracked(seeded)["opportunity_id"]
+    resp = seeded.post(f"/api/bids/{oid}/deep-dive")
+    assert resp.status_code == 503
+    assert resp.json()["detail"]["reason"] == "no_api_key"
+    assert seeded.get("/api/bids/nope/deep-dive").status_code == 404
+
+
+def test_deep_dive_lifecycle(seeded, monkeypatch):
+    from src.ai import deep_dive
+
+    monkeypatch.setenv("SF_SCOUT_ANTHROPIC_KEY", "test-key")
+    monkeypatch.setattr(deep_dive, "_call_claude", lambda model, text: {
+        "overview": "Big roof job.",
+        "dollar_amounts": [{"label": "Estimate", "amount": "$2M"}],
+        "red_flags": "not-a-list",   # normalizer must coerce
+    })
+    oid = first_tracked(seeded)["opportunity_id"]
+
+    assert seeded.get(f"/api/bids/{oid}/deep-dive").json() == {"state": "none"}
+
+    resp = seeded.post(f"/api/bids/{oid}/deep-dive")
+    assert resp.status_code == 202
+
+    body = _wait_for_deep_dive(seeded, oid)
+    assert body["state"] == "done"
+    assert body["report"]["overview"] == "Big roof job."
+    assert body["report"]["dollar_amounts"] == [{"label": "Estimate", "amount": "$2M"}]
+    assert body["report"]["red_flags"] == []
+    assert body["docs_read"] == 0
+
+
+def test_deep_dive_error_is_reported(seeded, monkeypatch):
+    from src.ai import deep_dive
+
+    def boom(model, text):
+        raise RuntimeError("api exploded")
+
+    monkeypatch.setenv("SF_SCOUT_ANTHROPIC_KEY", "test-key")
+    monkeypatch.setattr(deep_dive, "_call_claude", boom)
+    oid = first_untracked(seeded)["opportunity_id"]
+
+    assert seeded.post(f"/api/bids/{oid}/deep-dive").status_code == 202
+    body = _wait_for_deep_dive(seeded, oid)
+    assert body["state"] == "error"
+    assert "api exploded" in body["error"]
+
+
+# ---------------------------------------------------------------------------
 # Watchlists
 # ---------------------------------------------------------------------------
 

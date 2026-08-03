@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
+  DeepDiveStatus,
   DetectResponse,
   FetchStatus,
   NotificationItem,
@@ -28,6 +29,7 @@ export const keys = {
   notifications: ["notifications"] as const,
   settings: ["settings"] as const,
   fetchStatus: ["fetch-status"] as const,
+  deepDive: (id: string) => ["deep-dive", id] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -178,6 +180,30 @@ export function useSummarize() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: keys.opportunity(vars.id) });
       qc.invalidateQueries({ queryKey: keys.opportunities });
+    },
+  });
+}
+
+export function useDeepDive(id: string | null) {
+  return useQuery({
+    queryKey: keys.deepDive(id ?? "none"),
+    queryFn: () => api.get<DeepDiveStatus>(`/api/bids/${id}/deep-dive`),
+    enabled: !!id,
+    // Poll while the dive is running; a dive takes a minute or two.
+    refetchInterval: (query) =>
+      query.state.data?.state === "running" ? 3000 : false,
+  });
+}
+
+export function useStartDeepDive() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
+      api.post<DeepDiveStatus>(`/api/bids/${id}/deep-dive${force ? "?force=true" : ""}`),
+    onSuccess: (_data, vars) => {
+      // Flip the query into its polling loop immediately.
+      qc.setQueryData<DeepDiveStatus>(keys.deepDive(vars.id), { state: "running" });
+      qc.invalidateQueries({ queryKey: keys.deepDive(vars.id) });
     },
   });
 }

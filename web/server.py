@@ -45,9 +45,11 @@ async def lifespan(app: FastAPI):
     db.bootstrap()
     # Briefs cached under an older prompt version have a different shape —
     # drop them so the UI regenerates instead of rendering something stale.
+    from src.ai.deep_dive import DEEP_PROMPT_VERSION
     from src.ai.summarizer import PROMPT_VERSION
 
     db.prune_summaries(PROMPT_VERSION)
+    db.prune_deep_dives(DEEP_PROMPT_VERSION)
     from web.services import scheduler
 
     task = asyncio.create_task(scheduler.loop())

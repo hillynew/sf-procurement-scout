@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import date
-from typing import Dict, Optional
+from typing import Dict, Optional, Set
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -13,6 +14,13 @@ from src.db import store as db
 from web.services.serialize import opp_out
 
 router = APIRouter()
+
+# Deep dives run for a minute or more (multiple PDF downloads + a long
+# Claude call), so they run as background tasks and the UI polls. In-memory
+# is fine: one process, and a lost "running" flag on restart just means the
+# user re-runs.
+_deep_running: Set[str] = set()
+_deep_errors: Dict[str, str] = {}
 
 
 def _bid_or_404(opportunity_id: str):
@@ -159,3 +167,55 @@ def summarize(opportunity_id: str, force: bool = False):
     except Exception as exc:  # noqa: BLE001 — surface API failures as 502
         raise HTTPException(status_code=502, detail=f"summarizer failed: {exc}")
     return result
+
+
+def _deep_dive_worker(opportunity_id: str, opp, model, force: bool) -> None:
+    from src.ai.deep_dive import run_deep_dive
+
+    try:
+        run_deep_dive(opp, model=model, force=force)
+    except Exception as exc:  # noqa: BLE001 — reported through GET, not logs
+        _deep_errors[opportunity_id] = str(exc)
+    finally:
+        _deep_running.discard(opportunity_id)
+
+
+@router.post("/bids/{opportunity_id}/deep-dive", status_code=202)
+async def start_deep_dive(opportunity_id: str, force: bool = False):
+    from src.ai import summarizer
+
+    opp = _bid_or_404(opportunity_id)
+    if not summarizer.enabled():
+        raise HTTPException(
+            status_code=503,
+            detail={"reason": "no_api_key",
+                    "message": "Set SF_SCOUT_ANTHROPIC_KEY to enable Go Deep."},
+        )
+    if opportunity_id in _deep_running:
+        raise HTTPException(status_code=409, detail="deep dive already running")
+
+    settings = db.get_settings()
+    _deep_running.add(opportunity_id)
+    _deep_errors.pop(opportunity_id, None)
+    asyncio.get_running_loop().create_task(
+        asyncio.to_thread(_deep_dive_worker, opportunity_id, opp,
+                          settings["ai"].get("model"), force)
+    )
+    return {"state": "running"}
+
+
+@router.get("/bids/{opportunity_id}/deep-dive")
+def get_deep_dive(opportunity_id: str):
+    from src.ai.deep_dive import DEEP_PROMPT_VERSION
+
+    _bid_or_404(opportunity_id)
+    if opportunity_id in _deep_running:
+        return {"state": "running"}
+    envelope = db.get_deep_dive(opportunity_id, DEEP_PROMPT_VERSION)
+    error = _deep_errors.get(opportunity_id)
+    if error:
+        # Keep any older successful report visible under the error banner.
+        return {"state": "error", "error": error} | (envelope or {})
+    if envelope is None:
+        return {"state": "none"}
+    return {"state": "done"} | envelope

@@ -152,6 +152,21 @@ class AiSummary(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime)
 
 
+class DeepDive(Base):
+    """Cached "Go Deep" reports — the exhaustive all-documents analysis."""
+
+    __tablename__ = "deep_dives"
+
+    opportunity_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    content_hash: Mapped[str] = mapped_column(String(16), default="")
+    model: Mapped[str] = mapped_column(String(64), default="")
+    prompt_version: Mapped[int] = mapped_column(Integer, default=1)
+    report: Mapped[dict] = mapped_column(JSONVariant)
+    input_chars: Mapped[int] = mapped_column(Integer, default=0)
+    docs_read: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
 class CustomSource(Base):
     """User-added portals (CivicPlus), merged into the yaml config at runtime."""
 
