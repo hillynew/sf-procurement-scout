@@ -15,6 +15,7 @@ import type {
   SnapshotResponse,
   SourcesResponse,
   Stats,
+  TestEmailResult,
   Watchlist,
   WatchlistRules,
 } from "./types";
@@ -268,6 +269,12 @@ export function useSettingsMutation() {
     mutationFn: (patch: Record<string, unknown>) =>
       api.put<SettingsResponse>("/api/settings", patch),
     onSuccess: (data) => qc.setQueryData(keys.settings, data),
+  });
+}
+
+export function useTestDigestEmail() {
+  return useMutation({
+    mutationFn: () => api.post<TestEmailResult>("/api/settings/digest/test"),
   });
 }
 

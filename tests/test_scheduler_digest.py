@@ -98,3 +98,105 @@ def test_send_email_inert_without_key(monkeypatch):
     monkeypatch.delenv("RESEND_API_KEY", raising=False)
     assert digest.enabled() is False
     assert digest.send_email("subject", "<p>hi</p>") is False
+
+    sent, error = digest.send_email_detailed("subject", "<p>hi</p>")
+    assert sent is False
+    assert "RESEND_API_KEY" in error
+
+
+def test_send_email_reports_missing_recipient(monkeypatch):
+    from web.services import digest
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.delenv("SF_SCOUT_DIGEST_TO", raising=False)
+    db.update_settings({"digest": {"email": ""}})
+
+    sent, error = digest.send_email_detailed("subject", "<p>hi</p>")
+    assert sent is False
+    assert "recipient" in error.lower()
+
+
+def test_send_email_posts_to_resend(monkeypatch):
+    import httpx
+
+    from web.services import digest
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    monkeypatch.setenv("SF_SCOUT_DIGEST_FROM", "Scout <scout@example.com>")
+    db.update_settings({"digest": {"email": "buyer@example.com"}})
+    captured = {}
+
+    def fake_post(url, **kw):
+        captured["url"] = url
+        captured["headers"] = kw["headers"]
+        captured["json"] = kw["json"]
+        return httpx.Response(200, json={"id": "abc"}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(digest.httpx, "post", fake_post)
+    sent, error = digest.send_email_detailed("Scout: hi", "<p>hi</p>")
+
+    assert (sent, error) == (True, None)
+    assert captured["url"] == digest.RESEND_URL
+    assert captured["headers"]["Authorization"] == "Bearer re_test"
+    assert captured["json"] == {
+        "from": "Scout <scout@example.com>",
+        "to": ["buyer@example.com"],
+        "subject": "Scout: hi",
+        "html": "<p>hi</p>",
+    }
+
+
+def test_send_email_surfaces_resend_error(monkeypatch):
+    import httpx
+
+    from web.services import digest
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_bad")
+    db.update_settings({"digest": {"email": "buyer@example.com"}})
+
+    def fake_post(url, **kw):
+        return httpx.Response(401, json={"message": "API key is invalid"},
+                              request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(digest.httpx, "post", fake_post)
+    sent, error = digest.send_email_detailed("s", "<p>hi</p>")
+    assert sent is False
+    assert error == "API key is invalid"
+
+
+def test_send_email_survives_network_failure(monkeypatch):
+    import httpx
+
+    from web.services import digest
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    db.update_settings({"digest": {"email": "buyer@example.com"}})
+
+    def fake_post(url, **kw):
+        raise httpx.ConnectError("no route to host")
+
+    monkeypatch.setattr(digest.httpx, "post", fake_post)
+    sent, error = digest.send_email_detailed("s", "<p>hi</p>")
+    assert sent is False
+    assert "ConnectError" in error
+    assert digest.send_email("s", "<p>hi</p>") is False  # pipeline call site stays bool
+
+
+def test_send_test_email_returns_recipient(monkeypatch):
+    import httpx
+
+    from web.services import digest
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    db.update_settings({"digest": {"email": "buyer@example.com"}})
+    seen = {}
+
+    def fake_post(url, **kw):
+        seen.update(kw["json"])
+        return httpx.Response(200, json={"id": "abc"}, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(digest.httpx, "post", fake_post)
+    sent, error, recipient = digest.send_test_email()
+
+    assert (sent, error, recipient) == (True, None, "buyer@example.com")
+    assert seen["subject"] == "Scout: test email"

@@ -365,6 +365,29 @@ def test_settings_get_put_and_capabilities(client):
     assert out["settings"]["ai"]["model"] == "claude-sonnet-5"
 
 
+def test_digest_test_email_without_key(client, monkeypatch):
+    monkeypatch.delenv("RESEND_API_KEY", raising=False)
+    body = client.post("/api/settings/digest/test").json()
+    assert body["sent"] is False
+    assert "RESEND_API_KEY" in body["error"]
+
+
+def test_digest_test_email_sends(client, monkeypatch):
+    import httpx
+
+    from web.services import digest
+
+    monkeypatch.setenv("RESEND_API_KEY", "re_test")
+    client.put("/api/settings", json={"digest": {"email": "buyer@example.com"}})
+    monkeypatch.setattr(
+        digest.httpx, "post",
+        lambda url, **kw: httpx.Response(200, json={"id": "abc"},
+                                         request=httpx.Request("POST", url)),
+    )
+    body = client.post("/api/settings/digest/test").json()
+    assert body == {"sent": True, "error": None, "recipient": "buyer@example.com"}
+
+
 def test_purge_endpoint(seeded):
     assert seeded.post("/api/settings/data/purge",
                        json={"target": "workflow"}).status_code == 200

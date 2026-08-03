@@ -104,7 +104,8 @@ the pre-fetch state, not an error.
 | Fetch button errors with 409 | a fetch is already running | expected — wait for it; `GET /api/fetch/status` shows progress |
 | AI briefs disabled in Settings | no Anthropic key set | set `SF_SCOUT_ANTHROPIC_KEY` in the Environment tab |
 | Email digest disabled | `RESEND_API_KEY` unset | set it, then enable digests in Settings |
-| Diagnostics without a full fetch | — | `python run.py health`, `auth-status`, `check-mailbox` via Render's **Shell** tab |
+| Key set but no mail arrives | unverified sender, or the default `onboarding@resend.dev` sending anywhere but the Resend account owner's own address | Settings → Email digest → **Send test email** (or `python run.py test-email`) reports Resend's reason; verify a domain and set `SF_SCOUT_DIGEST_FROM` |
+| Diagnostics without a full fetch | — | `python run.py health`, `auth-status`, `check-mailbox`, `test-email` via Render's **Shell** tab |
 
 ## What not to do
 

@@ -195,6 +195,12 @@ export interface SettingsResponse {
   capabilities: Capabilities;
 }
 
+export interface TestEmailResult {
+  sent: boolean;
+  error: string | null;
+  recipient: string;
+}
+
 export interface FetchStatus {
   state: "idle" | "running" | "done" | "error";
   started_at?: string;

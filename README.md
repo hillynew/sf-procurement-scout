@@ -144,6 +144,33 @@ python run.py subscribe-links   # every CivicPlus city's subscribe page, as a ch
 python run.py check-mailbox     # confirms SF_SCOUT_IMAP_* actually works, no full fetch
 ```
 
+## Outgoing email digests (Resend)
+
+The mailbox above is mail coming *in*. Digests are mail going *out*: watchlist
+matches and deadlines, sent through [Resend](https://resend.com) (free tier is
+ample). Three environment variables, all optional:
+
+| Variable | Meaning |
+|---|---|
+| `RESEND_API_KEY` | API key from resend.com — without it the whole feature stays inert and Settings says so |
+| `SF_SCOUT_DIGEST_TO` | Fallback recipient; the recipient set in Settings wins |
+| `SF_SCOUT_DIGEST_FROM` | Sender, e.g. `Scout <scout@yourdomain.com>`. Defaults to Resend's shared `onboarding@resend.dev`, which only delivers to the address that owns the Resend account — verify a domain to send anywhere else |
+
+Then pick a cadence in **Settings → Email digest**: `daily` at a chosen UTC
+hour, or `instant` right after any fetch that turns up new watchlist matches.
+
+Nothing about email is worth trusting until you've seen one arrive, so both the
+UI and the CLI can send one on demand through the exact code path the digest
+uses:
+
+```bash
+python run.py test-email        # or: Settings → Email digest → Send test email
+```
+
+A failure reports Resend's own reason — bad key, unverified sender, missing
+recipient — rather than failing silently. Scheduled digests stay fire-and-forget:
+a send that fails is logged as not-sent and never breaks a fetch.
+
 ## Authenticated Bonfire sessions
 
 Bonfire's public API only shows what is open to everyone. A signed-in vendor
@@ -254,6 +281,7 @@ python run.py health
 python run.py history
 python run.py auth-status
 python run.py check-mailbox
+python run.py test-email
 python run.py subscribe-links
 python run.py list-sources
 python run.py import-legacy-state   # one-shot: old data/user_state.json → DB

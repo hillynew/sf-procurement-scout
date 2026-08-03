@@ -8,6 +8,7 @@ import {
   usePurge,
   useSettings,
   useSettingsMutation,
+  useTestDigestEmail,
 } from "../api/hooks";
 import { Button, SegmentedControl, Spinner } from "../components/ui";
 import { fmtRelative } from "../lib/format";
@@ -56,6 +57,7 @@ export default function SettingsScreen() {
   const save = useSettingsMutation();
   const purge = usePurge();
   const demo = useLoadDemo();
+  const testEmail = useTestDigestEmail();
   const { data: snapshot } = useOpportunities();
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
@@ -68,6 +70,15 @@ export default function SettingsScreen() {
     save.mutate({ [section]: values }, {
       onSuccess: () => toast.success("Settings saved"),
       onError: (e) => toast.error(`Couldn't save: ${e.message}`),
+    });
+
+  const sendTestEmail = () =>
+    testEmail.mutate(undefined, {
+      onSuccess: (r) =>
+        r.sent
+          ? toast.success(`Test email sent to ${r.recipient}`)
+          : toast.error(r.error ?? "Resend didn't accept the message"),
+      onError: (e) => toast.error(`Couldn't send: ${e.message}`),
     });
 
   const doPurge = (target: string) => {
@@ -190,6 +201,13 @@ export default function SettingsScreen() {
             placeholder="you@company.com"
             className="w-56 rounded-[10px] border border-line px-3 py-2 text-sm outline-none focus:border-accent"
           />
+        </Row>
+        <Row label="Test email" hint="Sends one message now so you can confirm delivery">
+          <Button kind="ghost"
+                  disabled={!capabilities.email_available || testEmail.isPending}
+                  onClick={sendTestEmail}>
+            {testEmail.isPending ? "Sending…" : "Send test email"}
+          </Button>
         </Row>
       </Card>
 
