@@ -10,6 +10,7 @@ import yaml
 
 from src.models.opportunity import HealthStatus, SourceHealth
 from src.pipeline import store
+from src.fl_geo import COUNTY_NAMES, PSEUDO_COUNTIES
 from src.sources.registry import ADAPTERS, get_adapters, load_source_config
 
 
@@ -92,11 +93,23 @@ def test_latest_files_are_never_pruned(temp_data_dir, opp_factory):
 def test_shipped_config_is_valid():
     configs = load_source_config()
     assert configs
+    # Statewide coverage means county is now any of the 67, plus the buckets
+    # for bodies that belong to no single county. Anything else is a typo that
+    # would quietly hide a source from every county filter in the UI.
+    valid_counties = set(COUNTY_NAMES) | set(PSEUDO_COUNTIES) | {"florida"}
     for cfg in configs:
         assert cfg["adapter"] in ADAPTERS, f"{cfg['id']} references an unknown adapter"
-        assert cfg["county"] in {"miami-dade", "broward", "palm-beach",
-                                 "federal", "florida"}
+        assert cfg["county"] in valid_counties, (
+            f"{cfg['id']} has unrecognised county {cfg['county']!r}"
+        )
         assert cfg["portal_url"].startswith("https://")
+
+
+def test_shipped_config_has_no_duplicate_ids():
+    """Generated statewide entries must never collide with hand-tuned ones."""
+    ids = [c["id"] for c in load_source_config()]
+    dupes = {i for i in ids if ids.count(i) > 1}
+    assert not dupes, f"duplicate source ids: {sorted(dupes)}"
 
 
 def test_every_shipped_source_builds():
