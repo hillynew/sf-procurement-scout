@@ -114,6 +114,7 @@ export interface WatchlistRules {
   keywords?: string[];
   counties?: string[];
   offers?: string[];
+  categories?: string[];
   min_value?: number | null;
   max_value?: number | null;
   no_bond?: boolean;
@@ -242,4 +243,41 @@ export interface Stats {
     unmet_count: number;
     budget_amount: number | null;
   }[];
+}
+
+// --- Filter vocabulary ------------------------------------------------------
+// Served by /api/taxonomy rather than derived from the loaded snapshot, so a
+// category with no bids today is still selectable. `count` is what keeps that
+// honest in the UI: it separates "nothing open right now" from "broken filter".
+
+export interface TaxonomyGroup {
+  slug: string;
+  label: string;
+  blurb: string;
+}
+
+export interface TaxonomyCategory {
+  slug: string;
+  label: string;
+  group: string;
+  offer_type: string;
+  detectable: boolean;
+  count: number;
+}
+
+export interface TaxonomyCounty {
+  slug: string;
+  label: string;
+  region: string;
+  region_label: string;
+  count: number;
+}
+
+export interface TaxonomyResponse {
+  groups: TaxonomyGroup[];
+  categories: TaxonomyCategory[];
+  offer_types: { key: string; label: string; count: number }[];
+  counties: TaxonomyCounty[];
+  county_labels: Record<string, string>;
+  total_open: number;
 }

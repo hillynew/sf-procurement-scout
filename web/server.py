@@ -24,7 +24,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
 from src.db import store as db
-from web.api import bids, fetch, misc, opportunities, sources, watchlists
+from web.api import (bids, fetch, misc, opportunities, sources, taxonomy,
+                     watchlists)
 
 DIST = ROOT / "frontend" / "dist"
 
@@ -73,7 +74,7 @@ def create_app() -> FastAPI:
         return {"status": "ok", "db": "ok" if db_ok else "error"}
 
     for router in (opportunities.router, bids.router, watchlists.router,
-                   sources.router, fetch.router, misc.router):
+                   sources.router, fetch.router, taxonomy.router, misc.router):
         app.include_router(router, prefix="/api")
 
     # --- SPA hosting (after the API so /api always wins) --------------------

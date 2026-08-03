@@ -4,6 +4,7 @@ Rules shape (all keys optional):
     keywords: list[str]        — any keyword appearing in title/scope/description/categories
     counties: list[str]        — county slugs
     offers:   list[str]        — offer_type keys (construction, services, ...)
+    categories: list[str]      — taxonomy slugs (roofing, mosquito_control, ...)
     min_value / max_value: int — dollar bounds against the parsed budget
     no_bond: bool              — exclude bids with a bond requirement
     recurring_only: bool       — only bids with prior cycles on record
@@ -36,6 +37,11 @@ def matches_rules(o: Opportunity, rules: dict) -> bool:
         return False
     if rules.get("offers") and offer_key(o) not in rules["offers"]:
         return False
+    if rules.get("categories"):
+        # The classifier already stamps umbrellas onto each bid, so a rule for
+        # `construction` matches a bid tagged `roofing` without expanding here.
+        if not set(rules["categories"]) & set(o.categories or []):
+            return False
     amount = o.budget_amount
     if rules.get("min_value") and amount is not None and amount < rules["min_value"]:
         return False

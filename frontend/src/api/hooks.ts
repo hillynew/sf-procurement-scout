@@ -15,6 +15,7 @@ import type {
   SnapshotResponse,
   SourcesResponse,
   Stats,
+  TaxonomyResponse,
   TestEmailResult,
   Watchlist,
   WatchlistRules,
@@ -31,6 +32,7 @@ export const keys = {
   settings: ["settings"] as const,
   fetchStatus: ["fetch-status"] as const,
   deepDive: (id: string) => ["deep-dive", id] as const,
+  taxonomy: ["taxonomy"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -58,6 +60,16 @@ export function useStats() {
     queryKey: keys.stats,
     queryFn: () => api.get<Stats>("/api/stats"),
     staleTime: 30_000,
+  });
+}
+
+export function useTaxonomy() {
+  return useQuery({
+    queryKey: keys.taxonomy,
+    queryFn: () => api.get<TaxonomyResponse>("/api/taxonomy"),
+    // The vocabulary is declared in code, not derived from data — only the
+    // counts move, and never fast enough to be worth refetching often.
+    staleTime: 5 * 60_000,
   });
 }
 

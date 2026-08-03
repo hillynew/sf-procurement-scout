@@ -275,6 +275,63 @@ def test_watchlist_value_and_flag_rules(seeded):
         assert not any("bond" in r.lower() for r in m["requirements"])
 
 
+def test_watchlist_category_rule(seeded):
+    """A category rule filters, and unknown slugs never reach storage."""
+    created = seeded.post("/api/watchlists", json={
+        "name": "Roofs only",
+        "rules": {"categories": ["roofing", "not_a_real_category"]},
+    }).json()
+    # The typo is dropped rather than stored — a bogus slug would match nothing
+    # forever and be indistinguishable from an empty watchlist.
+    assert created["rules"]["categories"] == ["roofing"]
+
+    matches = seeded.get(f"/api/watchlists/{created['id']}/matches").json()["matches"]
+    for m in matches:
+        assert "roofing" in m["categories"]
+
+
+def test_watchlist_rule_of_only_unknown_categories_is_not_a_filter(seeded):
+    """Dropping every slug must not silently become "match everything"."""
+    created = seeded.post("/api/watchlists", json={
+        "name": "Bogus", "rules": {"categories": ["nope_not_real"]},
+    }).json()
+    assert "categories" not in created["rules"]
+
+
+# ---------------------------------------------------------------------------
+# Taxonomy
+# ---------------------------------------------------------------------------
+
+
+def test_taxonomy_is_complete_regardless_of_data(client):
+    """Served before any fetch: the vocabulary is declared, not derived."""
+    data = client.get("/api/taxonomy").json()
+    assert len(data["categories"]) > 150
+    assert len(data["groups"]) > 10
+    # All 67 counties plus the pseudo-county buckets, not merely those seen.
+    assert len([c for c in data["counties"] if c["region"] != c["slug"]]) >= 67
+    assert data["total_open"] == 0
+    assert all(c["count"] == 0 for c in data["categories"])
+
+
+def test_taxonomy_counts_reflect_open_bids(seeded):
+    data = seeded.get("/api/taxonomy").json()
+    assert data["total_open"] > 0
+    assert any(c["count"] > 0 for c in data["categories"]), "demo data should tag something"
+    # Anticipatory entries stay listed with a zero count rather than vanishing.
+    assert any(c["count"] == 0 for c in data["categories"])
+    by_slug = {c["slug"]: c for c in data["categories"]}
+    assert "general" not in by_slug
+    assert by_slug["roofing"]["group"] == "construction"
+
+
+def test_taxonomy_categories_are_all_detectable(client):
+    data = client.get("/api/taxonomy").json()
+    assert all(c["detectable"] for c in data["categories"]), (
+        "an offered category that cannot be detected is a dead filter"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Sources
 # ---------------------------------------------------------------------------

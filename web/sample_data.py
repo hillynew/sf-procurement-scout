@@ -11,6 +11,7 @@ from __future__ import annotations
 from datetime import date, datetime, time, timedelta
 from typing import Dict, List, Tuple
 
+from src.classify import classify_text
 from src.models.opportunity import Document, HealthStatus, Opportunity, SourceHealth
 from src.sources.registry import load_source_config
 
@@ -58,6 +59,15 @@ def build_sample() -> Tuple[Dict[str, Opportunity], List[SourceHealth]]:
             detail_fetched=True,
         )
         base.update(kw)
+        # Sample bids declare their offer_type by hand but not their
+        # categories, which left every entry in the category picker reading
+        # zero on a first-run "Load sample data" — the filter looked broken
+        # before the user had any real data to judge it by. Derive them the
+        # same way a fetched bid would, without touching the curated fields.
+        if not base.get("categories"):
+            base["categories"] = classify_text(
+                base.get("title", ""), base.get("scope") or ""
+            )[0]
         bids[key] = Opportunity(**base)
 
     add(
