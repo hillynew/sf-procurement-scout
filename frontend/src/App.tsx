@@ -14,6 +14,7 @@ import AllBids from "./screens/AllBids";
 import Pipeline from "./screens/Pipeline";
 import Workroom from "./screens/Workroom";
 import Watchlists from "./screens/Watchlists";
+import Network from "./screens/Network";
 import Sources from "./screens/Sources";
 import SettingsScreen from "./screens/Settings";
 
@@ -78,6 +79,7 @@ const router = createBrowserRouter([
       { path: "bids/:id", element: <Workroom /> },
       { path: "pipeline", element: <Pipeline /> },
       { path: "watchlists", element: <Watchlists /> },
+      { path: "network", element: <Network /> },
       { path: "sources", element: <Sources /> },
       { path: "settings", element: <SettingsScreen /> },
     ],

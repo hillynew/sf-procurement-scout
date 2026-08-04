@@ -35,6 +35,10 @@ from .models import (
 
 STAGES = ("watching", "preparing", "submitted", "result")
 
+# Relationship with a firm in the network vs. outreach on one specific match.
+CONTRACTOR_STATUSES = ("prospect", "contacted", "in_network", "passed")
+MATCH_STATUSES = ("suggested", "pitched", "interested", "committed", "passed")
+
 DEFAULT_SETTINGS: Dict[str, dict] = {
     "auto_fetch": {"mode": "off", "interval_minutes": 240, "stale_minutes": 360},
     "notifications": {"deadline_days": 5, "watchlist": True, "fetch_events": True},
@@ -662,6 +666,187 @@ def prune_summaries(current_version: int) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Contractor network
+# ---------------------------------------------------------------------------
+
+
+def _contractor_out(row) -> dict:
+    return {
+        "id": row.id, "name": row.name, "county": row.county,
+        "location": row.location, "trade": row.trade, "website": row.website,
+        "phone": row.phone, "email": row.email, "status": row.status,
+        "notes": row.notes, "profile": dict(row.profile or {}),
+        "created_at": row.created_at.isoformat(),
+        "updated_at": row.updated_at.isoformat(),
+    }
+
+
+def list_contractors() -> List[dict]:
+    from .models import Contractor
+
+    with session_scope() as s:
+        rows = s.execute(select(Contractor).order_by(Contractor.name)).scalars().all()
+    return [_contractor_out(r) for r in rows]
+
+
+def get_contractor(contractor_id: str) -> Optional[dict]:
+    from .models import Contractor
+
+    with session_scope() as s:
+        row = s.get(Contractor, contractor_id)
+        return _contractor_out(row) if row is not None else None
+
+
+def upsert_contractor(record: dict) -> dict:
+    """Create or enrich one firm; existing user-entered fields never regress.
+
+    A re-run of the matcher must not blow away the phone number or notes the
+    user corrected by hand, so incoming values only fill blanks — except
+    ``profile``, where fresh finder output merges over the old keys.
+    """
+    from .models import Contractor
+
+    now = datetime.utcnow()
+    with session_scope() as s:
+        row = s.get(Contractor, record["id"])
+        if row is None:
+            row = Contractor(id=record["id"], name=record.get("name") or "",
+                             status="prospect", notes="", profile={},
+                             created_at=now)
+            s.add(row)
+        for field_name in ("name", "county", "location", "trade",
+                          "website", "phone", "email"):
+            incoming = (record.get(field_name) or "").strip()
+            if incoming and not getattr(row, field_name, ""):
+                setattr(row, field_name, incoming)
+        if isinstance(record.get("profile"), dict):
+            row.profile = dict(row.profile or {}) | record["profile"]
+        row.updated_at = now
+        s.flush()
+        return _contractor_out(row)
+
+
+def update_contractor(contractor_id: str, **fields) -> Optional[dict]:
+    """Patch the user-editable fields on one firm."""
+    from .models import Contractor
+
+    allowed = {"status", "notes", "phone", "email", "website", "trade", "county"}
+    bad = set(fields) - allowed
+    if bad:
+        raise ValueError(f"unknown fields {sorted(bad)}")
+    if "status" in fields and fields["status"] not in CONTRACTOR_STATUSES:
+        raise ValueError(f"unknown status {fields['status']!r}")
+    with session_scope() as s:
+        row = s.get(Contractor, contractor_id)
+        if row is None:
+            return None
+        for key, value in fields.items():
+            setattr(row, key, value)
+        row.updated_at = datetime.utcnow()
+        s.flush()
+        return _contractor_out(row)
+
+
+def delete_contractor(contractor_id: str) -> bool:
+    from .models import Contractor
+
+    with session_scope() as s:
+        row = s.get(Contractor, contractor_id)
+        if row is None:
+            return False
+        s.delete(row)
+        return True
+
+
+def get_contractor_matches(opportunity_id: str,
+                           min_prompt_version: int = 0) -> Optional[dict]:
+    from .models import ContractorMatchSet
+
+    with session_scope() as s:
+        row = s.get(ContractorMatchSet, opportunity_id)
+    if row is None or row.prompt_version < min_prompt_version:
+        return None
+    return {
+        "matches": list(row.matches or []),
+        "market_note": row.market_note,
+        "model": row.model,
+        "content_hash": row.content_hash,
+        "searches": row.searches,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+def put_contractor_matches(opportunity_id: str, *, content_hash: str, model: str,
+                           prompt_version: int, matches: List[dict],
+                           market_note: str, searches: int) -> None:
+    from .models import ContractorMatchSet
+
+    with session_scope() as s:
+        row = s.get(ContractorMatchSet, opportunity_id)
+        if row is None:
+            row = ContractorMatchSet(opportunity_id=opportunity_id, matches=[])
+            s.add(row)
+        row.content_hash = content_hash
+        row.model = model
+        row.prompt_version = prompt_version
+        row.matches = matches
+        row.market_note = market_note or ""
+        row.searches = searches
+        row.created_at = datetime.utcnow()
+
+
+def set_match_status(opportunity_id: str, contractor_id: str,
+                     status: str) -> Optional[List[dict]]:
+    """Move one bid↔contractor match through the outreach pipeline."""
+    from .models import ContractorMatchSet
+
+    if status not in MATCH_STATUSES:
+        raise ValueError(f"unknown status {status!r}")
+    with session_scope() as s:
+        row = s.get(ContractorMatchSet, opportunity_id)
+        if row is None:
+            return None
+        found = False
+        # JSON columns don't detect in-place mutation; assign a new list.
+        updated = []
+        for m in row.matches or []:
+            if m.get("contractor_id") == contractor_id:
+                m = dict(m) | {"status": status}
+                found = True
+            updated.append(m)
+        if not found:
+            return None
+        row.matches = updated
+        return updated
+
+
+def list_match_sets() -> Dict[str, dict]:
+    """All match sets keyed by opportunity_id, for Python-side joins."""
+    from .models import ContractorMatchSet
+
+    with session_scope() as s:
+        rows = s.execute(select(ContractorMatchSet)).scalars().all()
+    return {
+        r.opportunity_id: {"matches": list(r.matches or []),
+                           "created_at": r.created_at.isoformat()}
+        for r in rows
+    }
+
+
+def prune_contractor_matches(current_version: int) -> int:
+    from .models import ContractorMatchSet
+
+    with session_scope() as s:
+        rows = s.execute(
+            select(ContractorMatchSet)
+            .where(ContractorMatchSet.prompt_version < current_version)
+        ).scalars().all()
+        for row in rows:
+            s.delete(row)
+        return len(rows)
+
+
+# ---------------------------------------------------------------------------
 # Custom sources
 # ---------------------------------------------------------------------------
 
@@ -724,6 +909,11 @@ def purge(target: str) -> None:
             s.execute(delete(Notification))
         elif target == "pdf_cache":
             s.execute(delete(PdfCacheEntry))
+        elif target == "contractors":
+            from .models import Contractor, ContractorMatchSet
+
+            s.execute(delete(ContractorMatchSet))
+            s.execute(delete(Contractor))
         else:
             raise ValueError(f"unknown purge target {target!r}")
 

@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
+  Handshake,
   Kanban,
   LayoutDashboard,
   List,
@@ -20,6 +21,7 @@ const NAV = [
   { to: "/bids", label: "All bids", icon: List },
   { to: "/pipeline", label: "Pipeline", icon: Kanban },
   { to: "/watchlists", label: "Watchlists", icon: Star },
+  { to: "/network", label: "Network", icon: Handshake },
   { to: "/sources", label: "Sources", icon: Radar },
   { to: "/settings", label: "Settings", icon: Settings },
 ];

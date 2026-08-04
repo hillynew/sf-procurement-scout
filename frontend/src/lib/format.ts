@@ -135,3 +135,22 @@ export function dueText(days: number | null | undefined, status: string): string
   if (days === 1) return "due tomorrow";
   return `${days}d left`;
 }
+
+// --- Contractor network -----------------------------------------------------
+
+/** Per-deal outreach pipeline on one bid↔contractor match. */
+export const MATCH_STATUS_LABEL: Record<string, string> = {
+  suggested: "Suggested",
+  pitched: "Pitched",
+  interested: "Interested",
+  committed: "Committed",
+  passed: "Passed",
+};
+
+/** The standing relationship with a firm, independent of any one bid. */
+export const CONTRACTOR_STATUS_LABEL: Record<string, string> = {
+  prospect: "Prospect",
+  contacted: "Contacted",
+  in_network: "In network",
+  passed: "Passed",
+};

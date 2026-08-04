@@ -5,6 +5,8 @@ import {
 } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
+  Contractor,
+  ContractorMatchesStatus,
   DeepDiveStatus,
   DetectResponse,
   FetchStatus,
@@ -35,6 +37,8 @@ export const keys = {
   deepDive: (id: string) => ["deep-dive", id] as const,
   taxonomy: ["taxonomy"] as const,
   research: (id: string) => ["research", id] as const,
+  contractorMatches: (id: string) => ["contractor-matches", id] as const,
+  contractors: ["contractors"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -249,6 +253,90 @@ export function useAskResearch() {
       qc.invalidateQueries({ queryKey: keys.research(vars.id) });
     },
   });
+}
+
+// ---------------------------------------------------------------------------
+// Contractor matching + network
+// ---------------------------------------------------------------------------
+
+export function useContractorMatches(id: string | null) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: keys.contractorMatches(id ?? "none"),
+    queryFn: async () => {
+      const data = await api.get<ContractorMatchesStatus>(`/api/bids/${id}/contractors`);
+      // A finished run may have added firms to the network list.
+      if (data.state === "done") qc.invalidateQueries({ queryKey: keys.contractors });
+      return data;
+    },
+    enabled: !!id,
+    // Poll while matching runs; a run web-searches for up to a minute.
+    refetchInterval: (query) =>
+      query.state.data?.state === "running" ? 3000 : false,
+  });
+}
+
+export function useStartContractorMatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, force }: { id: string; force?: boolean }) =>
+      api.post<ContractorMatchesStatus>(
+        `/api/bids/${id}/contractors${force ? "?force=true" : ""}`,
+      ),
+    onSuccess: (_data, vars) => {
+      // Flip the query into its polling loop immediately.
+      qc.setQueryData<ContractorMatchesStatus>(keys.contractorMatches(vars.id), {
+        state: "running",
+      });
+      qc.invalidateQueries({ queryKey: keys.contractorMatches(vars.id) });
+    },
+  });
+}
+
+export function useSetMatchStatus() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, contractorId, status }: {
+      id: string; contractorId: string; status: string }) =>
+      api.put<ContractorMatchesStatus>(
+        `/api/bids/${id}/contractors/${contractorId}`,
+        { status },
+      ),
+    onSuccess: (data, vars) => {
+      qc.setQueryData(keys.contractorMatches(vars.id), data);
+      qc.invalidateQueries({ queryKey: keys.contractors });
+    },
+  });
+}
+
+export function useContractors() {
+  return useQuery({
+    queryKey: keys.contractors,
+    queryFn: () =>
+      api.get<{ count: number; contractors: Contractor[] }>("/api/contractors"),
+    staleTime: 30_000,
+  });
+}
+
+export function useContractorMutation() {
+  const qc = useQueryClient();
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: keys.contractors });
+    qc.invalidateQueries({ queryKey: ["contractor-matches"] });
+  };
+  return {
+    update: useMutation({
+      mutationFn: ({ id, ...body }: { id: string } & Partial<{
+        status: string; notes: string; phone: string; email: string;
+        website: string; trade: string }>) =>
+        api.put<Contractor>(`/api/contractors/${id}`, body),
+      onSuccess: invalidate,
+    }),
+    remove: useMutation({
+      mutationFn: (id: string) => api.del(`/api/contractors/${id}`),
+      onSuccess: invalidate,
+    }),
+  };
 }
 
 // ---------------------------------------------------------------------------
