@@ -72,8 +72,11 @@ MATCH_SCHEMA = {
     "properties": {
         "matches": {
             "type": "array",
-            "maxItems": 4,
-            "description": "3-4 real firms found via search; fewer only if the market is genuinely thin.",
+            # No maxItems: strict tool mode rejects array length constraints
+            # (400: "property 'maxItems' is not supported"). The instruction
+            # lives in the description and normalize_matches() hard-caps at 4.
+            "description": "3-4 real firms found via search — never more than "
+                           "4; fewer only if the market is genuinely thin.",
             "items": {
                 "type": "object",
                 "properties": {

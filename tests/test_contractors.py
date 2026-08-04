@@ -79,6 +79,25 @@ def test_contractor_id_ignores_legal_suffixes_and_punctuation():
     assert a != contractors.contractor_id("Apex Plumbing LLC")
 
 
+def test_schema_avoids_keywords_strict_mode_rejects():
+    """The API 400s on array length constraints in strict tool schemas —
+    'For array type, property maxItems is not supported'. The 3-4 cap lives
+    in the description and in normalize_matches() instead."""
+    banned = {"maxItems", "minItems", "maxLength", "minLength"}
+
+    def walk(node):
+        if isinstance(node, dict):
+            hit = banned & set(node)
+            assert not hit, f"strict-mode-unsupported keyword(s) {hit} in schema"
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(contractors.MATCH_SCHEMA)
+
+
 # ---------------------------------------------------------------------------
 # Normalization
 # ---------------------------------------------------------------------------
