@@ -59,7 +59,10 @@ class Opportunity(BaseModel):
     url: str
 
     # Geography / agency
-    county: str  # miami-dade | broward | palm-beach
+    # Any of the 67 county slugs in `src.fl_geo`, or `statewide` / `unknown`.
+    # (This was three tri-county literals before the statewide expansion; the
+    # comment outlived the constraint and read as if the limit were still real.)
+    county: str
     agency: str
     department: Optional[str] = None
 
