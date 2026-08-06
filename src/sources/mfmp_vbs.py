@@ -42,6 +42,7 @@ from typing import Any, Dict, List, Optional
 
 from ..classify import enrich
 from ..dates import parse_dt
+from ..protest import protest_deadline
 from ..fl_geo import infer_county
 from ..http_util import CRAWLER_UA, SourceBlocked, session
 from ..netpolicy import check, log_fetch
@@ -76,9 +77,19 @@ BIDDABLE_TYPES = {
     "2",  # Grant Opportunities
 }
 
-#: Kept out of the default pull but useful context: 1 Agency Decision,
-#: 3 Informational Notice, 7 Public Meeting Notice, 10 Single Source.
-NOTICE_TYPES = {"1", "3", "7", "10"}
+#: Notices of intended decision. Always pulled, and never as biddable work:
+#: under s. 120.57(3)(b) the posting of one of these starts a 72-hour protest
+#: clock, which makes it the shortest-lived and highest-value event in the
+#: system. It was previously lumped in with the notice types below and
+#: therefore never fetched at all — the state posts a handful a week, and the
+#: scout saw none of them.
+AWARD_TYPES = {"1"}  # Agency Decision
+
+#: Kept out of the default pull but useful context: 3 Informational Notice,
+#: 7 Public Meeting Notice, 10 Single Source. Single source is arguably also a
+#: protestable decision; it is left out until that is confirmed rather than
+#: guessed.
+NOTICE_TYPES = {"3", "7", "10"}
 
 _TYPE_NAMES = {
     "1": "Agency Decision", "2": "Grant Opportunities", "3": "Informational Notice",
@@ -171,7 +182,7 @@ class MfmpVbsAdapter(SourceAdapter):
                 for i in self.cfg["agency_ids"]
             ]
 
-        wanted = set(BIDDABLE_TYPES)
+        wanted = set(BIDDABLE_TYPES) | AWARD_TYPES
         if self.cfg.get("include_notices"):
             wanted |= NOTICE_TYPES
 
@@ -324,6 +335,16 @@ class MfmpVbsAdapter(SourceAdapter):
         # Prefer the type the portal states over the one inferred from wording.
         sol_type = _TYPE_TO_SOLICITATION.get(type_id) or fields["solicitation_type"]
 
+        # An intended decision is not a bid. It gets its own status so it stays
+        # out of every open-bid view — the thing to do with it is protest it,
+        # and the deadline for that is 72 hours excluding weekends.
+        is_award = type_id in AWARD_TYPES
+        published = parse_dt(row.get("publishDate"))
+        if is_award:
+            status = "award"
+        else:
+            status = "open" if str(row.get("status")).upper() == "OPEN" else "closed"
+
         return Opportunity(
             source_id=self.source_id,
             source_name=self.name,
@@ -341,7 +362,8 @@ class MfmpVbsAdapter(SourceAdapter):
             if row.get("publishDate")
             else None,
             due_date=parse_dt(row.get("closeDate")),
-            status="open" if str(row.get("status")).upper() == "OPEN" else "closed",
+            status=status,
+            protest_deadline=protest_deadline(published) if is_award else None,
             description=type_name or None,
             raw={"advertisementId": ad_id, "typeId": row.get("typeId"), "vbs": row},
         )

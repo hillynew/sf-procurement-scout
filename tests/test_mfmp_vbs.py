@@ -14,7 +14,7 @@ import pytest
 
 from src.http_util import SourceBlocked
 from src.models.opportunity import SolicitationType
-from src.sources.mfmp_vbs import PAGE_SIZE, MfmpVbsAdapter
+from src.sources.mfmp_vbs import AWARD_TYPES, BIDDABLE_TYPES, PAGE_SIZE, MfmpVbsAdapter
 
 CFG = {
     "id": "mfmp_vbs",
@@ -78,12 +78,14 @@ def test_slices_by_type_rather_than_paging():
     opps = a.fetch()
 
     searches = [c for c in a.calls if c["url"].endswith("/bids")]
-    # One search per biddable type, each carrying exactly one type filter.
-    assert len(searches) == 6
+    # One search per type we pull — the six biddable ones plus Agency Decision,
+    # each carrying exactly one type filter.
+    assert len(searches) == len(BIDDABLE_TYPES) + len(AWARD_TYPES) == 7
     assert all(len(c["body"]["type"]) == 1 for c in searches)
-    # 6 types x 3 rows, all distinct.
-    assert len(opps) == 18
-    assert len({o.opportunity_id for o in opps}) == 18
+    assert {c["body"]["type"][0]["id"] for c in searches} == BIDDABLE_TYPES | AWARD_TYPES
+    # 7 types x 3 rows, all distinct.
+    assert len(opps) == 21
+    assert len({o.opportunity_id for o in opps}) == 21
 
 
 def test_a_capped_slice_is_sub_sliced_by_agency():
@@ -125,14 +127,23 @@ def test_a_short_slice_is_not_sub_sliced():
 
 
 def test_notices_are_excluded_unless_asked_for():
+    """Meeting and informational notices stay out; intended decisions do not.
+
+    Agency Decision used to sit in this bucket, which meant the highest-value
+    event in the system was never fetched by any configuration we ship.
+    """
     def responder(url, body, expect_json):
         if url.endswith("/count"):
             return "0"
         tid = body["type"][0]["id"]
         return [_row(int(tid), tid)]
 
-    assert len(_FakeAdapter(CFG, responder).fetch()) == 6
-    assert len(_FakeAdapter({**CFG, "include_notices": True}, responder).fetch()) == 10
+    default = _FakeAdapter(CFG, responder).fetch()
+    assert len(default) == len(BIDDABLE_TYPES) + len(AWARD_TYPES)
+    assert any(o.status == "award" for o in default), "intended decisions must always be pulled"
+
+    with_notices = _FakeAdapter({**CFG, "include_notices": True}, responder).fetch()
+    assert len(with_notices) == 10
 
 
 def test_the_portal_stated_type_beats_the_title_guess():

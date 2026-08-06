@@ -75,7 +75,15 @@ class Opportunity(BaseModel):
     # Dates & status
     posted_date: Optional[date] = None
     due_date: Optional[datetime] = None
-    status: str = "open"  # open | closed | cancelled | upcoming | catalog
+    # `award` is a notice of intended decision rather than something biddable.
+    # It is a separate status precisely so it stays out of every open-bid view:
+    # the thing to do with it is protest it, not respond to it.
+    status: str = "open"  # open | closed | cancelled | upcoming | catalog | award
+
+    # Set on an `award` notice: when a notice of protest is due under
+    # s. 120.57(3)(b), 72 hours excluding weekends and state holidays. This is
+    # the tightest deadline in the system by an order of magnitude.
+    protest_deadline: Optional[datetime] = None
 
     # Narrative
     description: Optional[str] = None
