@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import warnings
 from pathlib import Path
 from functools import lru_cache
@@ -17,13 +18,16 @@ from .miami_dade_informs import MiamiDadeInformsAdapter
 from .miami_dade_construction import MiamiDadeConstructionAdapter, MiamiDadeFutureAdapter
 from .mdc_college import MdcCollegeAdapter
 from .mfmp_vbs import MfmpVbsAdapter
+from .opengov import OpenGovAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
 from .sam_gov import SamGovAdapter
+from .vendorlink import VendorLinkAdapter
 from .catalog import CatalogAdapter
 
 ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "bonfire": BonfireAdapter,
+    "opengov": OpenGovAdapter,
     "miami_dade_informs": MiamiDadeInformsAdapter,
     "miami_dade_construction": MiamiDadeConstructionAdapter,
     "miami_dade_future": MiamiDadeFutureAdapter,
@@ -33,6 +37,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "sam_gov": SamGovAdapter,
     "mfmp_vbs": MfmpVbsAdapter,
     "civicplus": CivicPlusAdapter,
+    "vendorlink": VendorLinkAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,
     "catalog": CatalogAdapter,
@@ -122,10 +127,13 @@ def get_adapters(
     """
     configs = load_source_config(config_path)
     configs = configs + _custom_source_configs({c.get("id") for c in configs if isinstance(c, dict)})
+    superseded = _superseded_catalog_ids(configs)
     adapters: List[SourceAdapter] = []
     for cfg in configs:
         if not isinstance(cfg, dict):
             _reject(strict, f"Source entry is not a mapping: {cfg!r}")
+            continue
+        if cfg.get("id") in superseded:
             continue
         missing = [k for k in REQUIRED_KEYS if not cfg.get(k)]
         if missing:
@@ -150,6 +158,61 @@ def get_adapters(
             if sid not in found:
                 _reject(strict, f"No configured source with id '{sid}'")
     return adapters
+
+
+_AGENCY_NOISE = re.compile(r"[^a-z0-9]+")
+
+
+def _agency_key(name: Any) -> str:
+    """Normalize an agency name enough to spot the same body across config files.
+
+    Deliberately blunt: strip punctuation and the leading form of address, which
+    is the only difference that actually shows up ("City of Davie" from a
+    discovery script vs "Davie" from a hand-written entry). Anything looser and
+    two genuinely different agencies would collapse into one.
+    """
+    key = _AGENCY_NOISE.sub("", str(name or "").lower())
+    for prefix in ("cityof", "townof", "villageof", "countyof"):
+        if key.startswith(prefix):
+            return key[len(prefix) :]
+    return key
+
+
+def _superseded_catalog_ids(configs: List[Dict[str, Any]]) -> set:
+    """Catalog pointers for an agency some live adapter now actually fetches.
+
+    A catalog entry exists to say "we cannot read this portal — go register".
+    Once a platform adapter covers that same agency for real, the pointer stops
+    being a fallback and becomes a false negative sitting next to live bids:
+    it tells the user to go sign up for a portal whose solicitations are already
+    on the page. Dedupe cannot catch it, since a registration pointer shares no
+    title or reference number with any actual solicitation.
+
+    This resolves across files by design — the OpenGov tenant list is generated
+    by one script and the Public Purchase catalog by another, and neither can
+    see what the other wrote.
+    """
+    live: set = set()
+    for cfg in configs:
+        if not isinstance(cfg, dict) or cfg.get("adapter") == "catalog":
+            continue
+        if not cfg.get("live_fetch", True) or not cfg.get("agency"):
+            continue
+        # An adapter this build does not have fetches nothing, so it cannot
+        # stand in for the pointer — otherwise one typo in a config silently
+        # removes the only coverage an agency had.
+        if cfg.get("adapter") not in ADAPTERS:
+            continue
+        live.add(_agency_key(cfg["agency"]))
+
+    return {
+        cfg["id"]
+        for cfg in configs
+        if isinstance(cfg, dict)
+        and cfg.get("adapter") == "catalog"
+        and cfg.get("id")
+        and _agency_key(cfg.get("agency")) in live
+    }
 
 
 def _custom_source_configs(known_ids: set) -> List[Dict[str, Any]]:

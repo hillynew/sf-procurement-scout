@@ -78,15 +78,20 @@ sources:
     portal_url: https://www.palmbeachschools.org/doing-business-with-the-district/construction-vendorssuppliers/currentfuture-solicitations
     register_url: https://www.bidnetdirect.com/palmbeachschools
 
+  # Moved to Bonfire. The CivicPlus board at swa.org/Bids.aspx and the BidSync
+  # registration link were both stale — the page still resolves and returns
+  # zero rows, which reads as "no bids" rather than "wrong platform". Keeping
+  # the source id so tracked bids and history stay attached.
   - id: swa_pbc
     name: Solid Waste Authority of Palm Beach County
     county: palm-beach
     agency: Solid Waste Authority of Palm Beach County
     live_fetch: true
-    adapter: civicplus
+    adapter: bonfire
+    platform: bonfire
     default_categories: [waste_recycling]
-    portal_url: https://www.swa.org/Bids.aspx
-    register_url: https://www.bidsync.com/SupplierRegister?ac=register&pathid=1050
+    bonfire_host: swa.bonfirehub.com
+    portal_url: https://swa.bonfirehub.com/portal/?tab=openOpportunities
 
 
   # ---------------------------------------------------------------------

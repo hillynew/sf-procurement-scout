@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -11,8 +11,15 @@ import httpx
 from src.db import store as db
 from src.fl_geo import ALL_REGIONS
 from src.models.opportunity import Opportunity
+from src.protest import RECORDS_RIPE_DAYS, business_hours_left
+from src.contracts import expiring_within, load_stored
+from src.records import ripe_for_request
 
 RESEND_URL = "https://api.resend.com/emails"
+
+#: Horizon for the incumbent-contract section. Shorter than the module's own
+#: default: a year out is planning, a quarter out is a decision.
+CONTRACT_HORIZON_DAYS = 120
 
 #: Kept as a name for backwards compatibility, but the labels now come from the
 #: statewide geography module — a hard-coded tri-county map would print raw
@@ -136,6 +143,108 @@ def send_instant_digest(new_by_watchlist: Dict[str, List[Opportunity]]) -> bool:
     return send_email(subject, _wrap("New watchlist matches", "".join(sections)))
 
 
+def _award_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
+    """(count, html) for intended awards whose protest window is still open.
+
+    Expired windows are dropped rather than listed: once the 72 hours are gone
+    there is nothing to do with the notice, and carrying it forward would train
+    the reader to skim the one section that must never be skimmed.
+    """
+    live = []
+    for o in opps:
+        if o.status != "award" or o.protest_deadline is None:
+            continue
+        left = business_hours_left(o.protest_deadline)
+        if left is not None and left > 0:
+            live.append((left, o))
+    if not live:
+        return None
+
+    live.sort(key=lambda pair: pair[0])
+    rows = []
+    for left, o in live[:10]:
+        urgency = "#B42318" if left <= 24 else "#B54708"
+        when = f"{left:.0f}h left" if left >= 1 else "under an hour"
+        rows.append(
+            f'<li style="margin:0 0 8px"><a href="{o.url}" style="color:#1849A9">{o.title}</a>'
+            f'<br><span style="color:{urgency};font-weight:600;font-size:13px">'
+            f"protest window: {when}</span>"
+            f'<span style="color:#5A6478;font-size:13px"> · {o.agency}'
+            f" · due {o.protest_deadline:%a %-d %b %-I:%M%p}</span></li>"
+        )
+    html = (
+        '<h3 style="margin:20px 0 8px">Intended awards — 72-hour protest window</h3>'
+        '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
+        "A notice of protest is due within 72 hours of posting, excluding weekends "
+        "and state holidays (s. 120.57(3)(b), F.S.).</p>"
+        f'<ul style="padding-left:18px;margin:0">{"".join(rows)}</ul>'
+    )
+    return len(live), html
+
+
+def _records_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
+    """(count, html) for tabulations that crossed day 31 today.
+
+    Only the ones that became requestable *today*. The backlog is real and
+    worth working, but a digest that repeats it every morning is a digest
+    nobody finishes reading — the daily email's job is to report what changed.
+    """
+    leads = [lead for lead in ripe_for_request(opps) if lead.ripe_for_days == 0]
+    if not leads:
+        return None
+
+    rows = "".join(
+        f'<li style="margin:0 0 8px"><a href="{lead.opportunity.url}" '
+        f'style="color:#1849A9">{lead.opportunity.title}</a>'
+        f'<br><span style="color:#5A6478;font-size:13px">{lead.opportunity.agency}'
+        f" · opened {lead.ripe_on - timedelta(days=RECORDS_RIPE_DAYS):%-d %b}"
+        " · no award posted</span></li>"
+        for lead in leads[:10]
+    )
+    html = (
+        '<h3 style="margin:20px 0 8px">Bid tabulations now requestable</h3>'
+        '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
+        "Sealed bids stop being exempt 30 days after opening when no intended "
+        "decision has been posted (s. 119.071(1)(b)2, F.S.), so these can be "
+        "requested as of today.</p>"
+        f'<ul style="padding-left:18px;margin:0">{rows}</ul>'
+    )
+    return len(leads), html
+
+
+def _contracts_section() -> Optional[Tuple[int, str]]:
+    """(count, html) for incumbent contracts about to run out.
+
+    The longest-range signal in the email. A rebid is advertised weeks before
+    it opens and scoped months before that, so an incumbent's end date is the
+    earliest warning available — and unlike everything else here it is not
+    perishable, so it is reported as a horizon rather than an alarm.
+    """
+    stored = load_stored()
+    if not stored:
+        return None
+    soon = expiring_within(stored, days=CONTRACT_HORIZON_DAYS)
+    if not soon:
+        return None
+
+    rows = "".join(
+        f'<li style="margin:0 0 8px">{c.name}'
+        f'<br><span style="color:#5A6478;font-size:13px">{c.agency}'
+        f" · incumbent: {c.vendor or 'not named'}"
+        f" · ends {c.end_date:%-d %b %Y} ({c.days_until_expiry()}d)</span></li>"
+        for c in soon[:10]
+    )
+    html = (
+        f'<h3 style="margin:20px 0 8px">Incumbent contracts ending within '
+        f"{CONTRACT_HORIZON_DAYS} days</h3>"
+        '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
+        "A rebid is scoped long before it is advertised. These are the agencies "
+        "whose current supplier is about to run out.</p>"
+        f'<ul style="padding-left:18px;margin:0">{rows}</ul>'
+    )
+    return len(soon), html
+
+
 def build_daily_digest(
     opps: List[Opportunity],
     workflow: Dict[str, dict],
@@ -145,6 +254,23 @@ def build_daily_digest(
     from .matching import wl_matches
 
     sections: List[str] = []
+
+    # Intended awards go first and unconditionally. Everything else in this
+    # email keeps until tomorrow; a protest is due within 72 hours of the
+    # notice posting, excluding weekends, so a digest that buries one below the
+    # watchlists has already wasted a meaningful fraction of the window.
+    awards = _award_section(opps)
+    if awards:
+        sections.append(awards[1])
+
+    records = _records_section(opps)
+    if records:
+        sections.append(records[1])
+
+    contracts = _contracts_section()
+    if contracts:
+        sections.append(contracts[1])
+
     total_new = 0
     for wl in watchlists:
         if not wl.get("email_digest"):
@@ -185,6 +311,10 @@ def build_daily_digest(
     if not sections:
         return None
     bits = []
+    if awards:
+        bits.append(f"{awards[0]} protest window{'s' if awards[0] != 1 else ''} open")
+    if records:
+        bits.append(f"{records[0]} tabulation{'s' if records[0] != 1 else ''} requestable")
     if total_new:
         bits.append(f"{total_new} new match{'es' if total_new != 1 else ''}")
     if deadlines:

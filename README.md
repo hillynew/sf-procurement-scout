@@ -1,6 +1,14 @@
 # SF Procurement Scout
 
-Live aggregator for government procurement opportunities across **Miami-Dade**, **Broward**, and **Palm Beach** counties — plus **federal bids in Florida** (SAM.gov, with a free API key) and a pointer to the **State of Florida's** MyFloridaMarketPlace portal.
+Live aggregator for government procurement across **Florida** — every state
+agency through MyFloridaMarketPlace, plus **289 live local sources** on five
+platforms (OpenGov, CivicPlus, VendorLink, Bonfire, and a handful of bespoke
+portals), **federal bids in Florida** via SAM.gov, and a catalog of the portals
+that cannot be read without an account.
+
+It started as a tri-county tool. The county field now takes any of Florida's 67,
+and coverage grew by writing one adapter per *platform* rather than per agency:
+one OpenGov adapter serves 91 agencies, one CivicPlus parser serves 90.
 
 **GitHub:** [hillynew/sf-procurement-scout](https://github.com/hillynew/sf-procurement-scout)
 
@@ -16,6 +24,10 @@ Live aggregator for government procurement opportunities across **Miami-Dade**, 
 | **F. Source health** | Every portal reports `ok` / `no listings` / `degraded` / `error` so silent breakage is visible |
 | **G. Pipeline** | Drag-and-drop kanban from Watching to Result, with win/loss dollars and an archive |
 | **H. Alerts** | In-app notification center + optional email digests for watchlist matches and deadlines |
+| **I. Protest clock** | Intended-award notices carry a 72-hour protest deadline under s. 120.57(3)(b), counted excluding weekends and state holidays |
+| **J. Records trigger** | Sealed bids stop being exempt 30 days after opening; day 31 turns into a ready-to-send Chapter 119 request |
+| **K. Incumbents** | Executed contracts with vendor names and end dates — the earliest warning that a rebid is coming |
+| **L. Discovery** | Fingerprints an agency's own website to work out which platform it runs, so the source list grows without hand-written rows |
 
 Sources are fetched concurrently in the background with live per-source
 progress — the UI never blocks on a refresh.
@@ -119,9 +131,10 @@ the same recurring buy while "Roof Repairs Fire Station 12" and "Roof Repairs
 Water Plant" stay distinct. Matches show as `prior_cycles` and
 `last_cycle_closed`, and as a 🔁 badge in the UI.
 
-Coverage is limited to agencies whose portal exposes an archive — currently the
-Bonfire ones (Broward County, Town of Palm Beach, FAU, Tri-Rail), about 945
-past solicitations.
+Coverage is limited to agencies whose portal exposes an archive — the Bonfire
+ones (Broward County, Town of Palm Beach, FAU, Tri-Rail), about 945 past
+solicitations, plus the 91 OpenGov tenants, whose public project list carries
+closed and awarded projects alongside open ones.
 
 ## Bid alerts by email
 
@@ -323,20 +336,37 @@ re-capture the fixture and update the adapter together.
 
 ## Live sources
 
-| Source | Method |
-|--------|--------|
-| Broward County BPRO | Bonfire public API |
-| Town of Palm Beach | Bonfire public API |
-| Miami-Dade INFORMS | Public bidding events HTML |
-| Miami-Dade construction / future | ISD DataTables JSON endpoints |
-| City of West Palm Beach | City page / DemandStar fallback |
-| Miami Dade College | Bid posting page (announcements grouped per solicitation) |
-| Palm Beach Schools construction | District tables |
-| Florida Atlantic University | Bonfire public API |
-| Tri-Rail / SFRTA | Bonfire public API |
-| City of Plantation | Bonfire public API |
-| City of Coral Gables | Public-notice link list |
-| **27 city bid boards + SWA** | CivicPlus Bids module (one shared adapter) |
+Coverage is by platform, not by agency — that is what makes statewide
+tractable. Counts are what is configured and answering today.
+
+| Platform | Sources | How |
+|---|---:|---|
+| **OpenGov Procurement** | 91 | Open JSON API on `api.procurement.opengov.com`. The portal host is Cloudflare-challenged; the API host is not. Documents arrive as pre-signed S3 URLs. |
+| **CivicPlus Bids** | 90 | One parser for byte-identical markup across hundreds of city bid boards |
+| **VendorLink** | 66 | Florida-native ASP.NET grid, paged via ViewState postbacks. List-only: detail is behind a login |
+| **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
+| **MyFloridaMarketPlace (VIP)** | 1 | Every state agency, university, college and water management district in one adapter, with anonymous PDF downloads |
+| **SAM.gov** | 1 | Federal solicitations with a Florida place of performance (free API key) |
+| Bespoke portals | 8 | Miami-Dade INFORMS and construction, West Palm Beach, MDC, Palm Beach Schools, notice links, the bid mailbox |
+| Catalog pointers | 227 | Portals that need an account — recorded so the gap is visible, and superseded automatically once an adapter can read the agency for real |
+
+Two registries drive this rather than hand-editing:
+
+- `data/registry/fl_agencies.csv` — 2,817 Florida buying entities, the universe.
+- `data/registry/fl_procurement_sources.csv` — 133 verified agency → platform rows.
+
+and four scripts turn them into config:
+
+```bash
+python scripts/discover_opengov_tenants.py     # OpenGov's own directory → config
+python scripts/discover_vendorlink.py --probe  # VendorLink's agency dropdown → config
+python scripts/seed_from_registry.py           # verified registry → config
+python scripts/fingerprint_agencies.py         # ask each agency's site what it runs
+python scripts/sources_from_fingerprints.py    # strong matches → live sources
+```
+
+Each one prints what it *skipped* and why. The gap between "verified" and
+"fetched" is the number worth watching, so none of them hide it.
 
 ### Adding a city
 
@@ -407,12 +437,20 @@ render.yaml             # Render Blueprint (Docker web service + free Postgres)
 Dockerfile              # multi-stage: node builds the SPA, python serves it
 docker-compose.yml      # local: web + optional 4-hourly fetch sidecar
 runtime.txt             # Python version hint
-config/sources.yaml     # portal registry
+config/sources.yaml     # hand-maintained portal registry
+config/sources.*.yaml   # generated companions (opengov, vendorlink, fingerprinted, …)
+data/registry/          # the agency census and verified source rows the generators read
+research/               # the field research the statewide expansion was built from
 frontend/               # React SPA (Vite + TypeScript + Tailwind)
 frontend/src/screens/   # Dashboard, AllBids, Pipeline, Workroom, …
 frontend/src/api/       # typed client + TanStack Query hooks
 src/models/             # Opportunity + SourceHealth models
-src/sources/            # per-portal adapters (+ DB-stored custom sources)
+src/sources/            # per-platform adapters (+ DB-stored custom sources)
+src/netpolicy.py        # crawl policy: identity, robots.txt, per-host rate limit, fetch log
+src/protest.py          # the 72-hour protest clock and the day-31 records sunset
+src/records.py          # which tabulations are requestable, and the Chapter 119 letter
+src/contracts.py        # incumbent contracts and when they expire
+src/pipeline/fingerprint.py  # work out which platform an agency runs, from its own site
 src/classify.py         # categories + offer type
 src/requirements.py     # bid terms, pricing and deadlines from scope prose
 src/pdf_extract.py      # commercial terms from the bid package PDF
@@ -436,3 +474,52 @@ data/                   # SQLite DB (local) + CSV/JSON snapshots from the CLI
 ## Always verify on the official portal
 
 Due dates, addenda, and bid packages can change. Confirm on the agency site before submitting.
+
+## Crawl policy
+
+Every request in the codebase goes through `src/netpolicy.py`, below the
+adapters, because a guardrail an adapter can forget is not a guardrail.
+
+- **We say who we are.** An honest User-Agent with a contact URL, overridable
+  with `SF_SCOUT_CONTACT`. Checked before it was adopted: OpenGov, Bonfire,
+  MFMP and CivicPlus return byte-identical responses to the honest string, so
+  the browser string is a per-host exception list containing exactly one
+  Akamai-fronted site.
+- **We honor robots.txt**, including `Crawl-delay`, cached an hour per host.
+  A missing or unreadable file means unrestricted, which is what the standard
+  says and what most of Florida serves. `dms.myflorida.com` is refused
+  outright — the data is on VIP, which serves no robots.txt at all.
+- **We rate-limit per host**, one request per second unless robots asks for
+  longer, held across threads. Per *host* matters: 91 OpenGov tenants and 32
+  Bonfire tenants each share one server.
+- **We log every fetch** — URL, time, status, and what robots said at the time
+  — when `SF_SCOUT_FETCH_LOG` is set.
+- **We never create an account to harvest.** Where a portal's detail pages need
+  a login, the adapter reports list-only rather than pretending.
+
+One judgement call is written down rather than hidden: Bonfire serves
+`Disallow: /` across every tenant, and obeying it strictly costs 32 Florida
+agencies including Broward and Hillsborough. The exception lives in one table,
+`ROBOTS_OVERRIDES`, with its reasoning stated out loud, and
+`SF_SCOUT_STRICT_ROBOTS=1` drops it. See `docs/statewide-coverage.md` for the
+per-host policy table.
+
+## The two clocks
+
+Florida law puts a deadline on two events, and both are in the daily digest.
+
+```bash
+python -m src.cli contracts --refresh    # incumbent registers, own cadence
+python -m src.cli contracts --days 120   # who is about to run out
+```
+
+- **72 hours.** A notice of protest is due within 72 hours of an intended
+  decision posting, excluding weekends and state holidays (s. 120.57(3)(b)).
+  Those notices arrive as `award` status — deliberately not `open`, so they
+  never reach a board of things to bid on — and the digest leads with the ones
+  whose window is still open, soonest first.
+- **Day 31.** Sealed bids stop being exempt 30 days after opening when no
+  award has posted (s. 119.071(1)(b)2). The digest reports what crossed that
+  line today, and `src/records.py` writes the request — phrased as a copy of an
+  existing record in the medium the agency keeps it in, never as a compilation,
+  which is the difference between a free copy and a special service charge.

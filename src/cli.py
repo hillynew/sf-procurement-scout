@@ -153,6 +153,53 @@ def history(
 
 
 @app.command()
+def contracts(
+    only: Optional[List[str]] = typer.Option(None, "--only", help="Source id(s) to read."),
+    days: int = typer.Option(365, "--days", help="Expiry horizon."),
+    limit: int = typer.Option(40, "--limit", help="Rows to print."),
+    refresh: bool = typer.Option(
+        False, "--refresh", help="Re-read the portals and store; otherwise read what is stored."
+    ),
+):
+    """Who holds an agency's work, and when their contract runs out.
+
+    A rebid is advertised weeks before it opens and scoped months before that.
+    An incumbent's end date is the earliest warning available, and Bonfire
+    publishes it free — so this is the leading indicator the opportunity feeds
+    cannot give you.
+    """
+    from .contracts import expiring_within, load_stored, summarise
+    from .contracts import refresh as refresh_contracts
+
+    console.rule("[bold]Incumbent contracts[/bold]")
+    if refresh:
+        # A full walk of every register — thousands of rows per tenant, which
+        # is why it runs on its own cadence rather than with the bid fetch.
+        found = refresh_contracts(only=only, quiet=False)
+    else:
+        found = load_stored()
+        if not found:
+            console.print("[dim]Nothing stored yet — run with --refresh first.[/dim]")
+
+    if not found:
+        console.print("[yellow]No configured source published a contract register.[/yellow]")
+        raise typer.Exit(1)
+
+    upcoming = expiring_within(found, days=days)
+    t = Table(title=f"Expiring within {days} days")
+    t.add_column("Ends")
+    t.add_column("Days", justify="right")
+    t.add_column("Contract")
+    t.add_column("Incumbent")
+    t.add_column("Agency")
+    for c in upcoming[:limit]:
+        t.add_row(str(c.end_date), str(c.days_until_expiry()), c.name[:46],
+                  (c.vendor or "?")[:28], c.agency[:22])
+    console.print(t)
+    console.print(f"[green]{summarise(found)}[/green] across {len(found)} contracts")
+
+
+@app.command()
 def health():
     """Show source health from the last saved snapshot."""
     opps, health_rows = load_latest()

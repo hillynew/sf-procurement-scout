@@ -1,0 +1,1411 @@
+sources:
+- id: mfmp-vip
+  name: MyFloridaMarketPlace Vendor Information Portal (all State of Florida agencies)
+  county: statewide
+  agency: MyFloridaMarketPlace Vendor Information Portal (all State of Florida agencies)
+  live_fetch: true
+  adapter: vip
+  portal_url: https://vendor.myfloridamarketplace.com/search/bids
+  platform: mfmp_vip
+  api_url: https://vendor.myfloridamarketplace.com/mfmp/pub/search/bids
+  notes: Single statewide feed covering all executive-branch state agencies (129 MFMP-registered orgs in vip_orgs.json)
+- id: og-alachuacounty
+  name: Alachua County, Florida
+  county: alachua
+  agency: Alachua County, Florida
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/alachuacounty
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/alachuacounty/project/public
+  notes: 'OpenGov tenant code=alachuacounty. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 390 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (b'
+- id: og-bay-k12-fl
+  name: Bay County School District
+  county: bay
+  agency: Bay County School District
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/bay-k12-fl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/bay-k12-fl/project/public
+  notes: 'OpenGov tenant code=bay-k12-fl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pa'
+- id: og-baycountyfl
+  name: Bay County, FL
+  county: bay
+  agency: Bay County, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/baycountyfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/baycountyfl/project/public
+  notes: 'OpenGov tenant code=baycountyfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 124 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-cfxway
+  name: Central Florida Expressway Authority
+  county: brevard-orange-osceola-lake-seminole
+  agency: Central Florida Expressway Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cfxway
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cfxway/project/public
+  notes: 'OpenGov tenant code=cfxway. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 6 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packet'
+- id: og-citrusfl
+  name: Citrus County, Florida
+  county: citrus
+  agency: Citrus County, Florida
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/citrusfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/citrusfl/project/public
+  notes: 'OpenGov tenant code=citrusfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 68 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pac'
+- id: og-apopka
+  name: City of Apopka
+  county: orange
+  agency: City of Apopka
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/apopka
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/apopka/project/public
+  notes: 'OpenGov tenant code=apopka. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 100 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-bartowfl
+  name: City of Bartow, FL
+  county: polk
+  agency: City of Bartow, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/bartowfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/bartowfl/project/public
+  notes: 'OpenGov tenant code=bartowfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 26 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pac'
+- id: og-cityofbradenton
+  name: City of Bradenton
+  county: manatee
+  agency: City of Bradenton
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofbradenton
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofbradenton/project/public
+  notes: 'OpenGov tenant code=cityofbradenton. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 50 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs ('
+- id: og-capecoralfl
+  name: City of Cape Coral, FL
+  county: lee
+  agency: City of Cape Coral, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/capecoralfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/capecoralfl/project/public
+  notes: 'OpenGov tenant code=capecoralfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 30 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-myclearwater
+  name: City of Clearwater
+  county: pinellas
+  agency: City of Clearwater
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/myclearwater
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/myclearwater/project/public
+  notes: 'OpenGov tenant code=myclearwater. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 126 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bi'
+- id: og-clermontfl
+  name: City of Clermont
+  county: lake
+  agency: City of Clermont
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/clermontfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/clermontfl/project/public
+  notes: 'OpenGov tenant code=clermontfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 417 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-coopercity
+  name: City of Cooper City, FL
+  county: broward
+  agency: City of Cooper City, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/coopercity
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/coopercity/project/public
+  notes: 'OpenGov tenant code=coopercity. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 16 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-coralsprings
+  name: City of Coral Springs
+  county: broward
+  agency: City of Coral Springs
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/coralsprings
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/coralsprings/project/public
+  notes: 'OpenGov tenant code=coralsprings. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 37 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-daniabeachfl
+  name: City of Dania Beach
+  county: broward
+  agency: City of Dania Beach
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/daniabeachfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/daniabeachfl/project/public
+  notes: 'OpenGov tenant code=daniabeachfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 73 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-codb
+  name: City of Daytona Beach
+  county: volusia
+  agency: City of Daytona Beach
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/codb
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/codb/project/public
+  notes: 'OpenGov tenant code=codb. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 200 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packet'
+- id: og-edgewater
+  name: City of Edgewater, Florida
+  county: volusia
+  agency: City of Edgewater, Florida
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/edgewater
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/edgewater/project/public
+  notes: 'OpenGov tenant code=edgewater. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 61 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pa'
+- id: og-cityftmyers
+  name: City of Fort Myers
+  county: lee
+  agency: City of Fort Myers
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityftmyers
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityftmyers/project/public
+  notes: 'OpenGov tenant code=cityftmyers. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 248 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-cityofgainesville
+  name: City of Gainesville, FL
+  county: alachua
+  agency: City of Gainesville, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofgainesville
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofgainesville/project/public
+  notes: 'OpenGov tenant code=cityofgainesville. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 37 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs'
+- id: og-greencovesprings
+  name: City of Green Cove Springs
+  county: clay
+  agency: City of Green Cove Springs
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/greencovesprings
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/greencovesprings/project/public
+  notes: 'OpenGov tenant code=greencovesprings. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 18 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs '
+- id: og-groveland
+  name: City of Groveland
+  county: lake
+  agency: City of Groveland
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/groveland
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/groveland/project/public
+  notes: 'OpenGov tenant code=groveland. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 48 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pa'
+- id: og-hainesfl
+  name: City of Haines
+  county: polk
+  agency: City of Haines
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/hainesfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/hainesfl/project/public
+  notes: 'OpenGov tenant code=hainesfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-cityofhialeahfl
+  name: City of Hialeah, FL
+  county: miami-dade
+  agency: City of Hialeah, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofhialeahfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofhialeahfl/project/public
+  notes: 'OpenGov tenant code=cityofhialeahfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 185 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs '
+- id: og-hollywoodfl
+  name: City of Hollywood
+  county: broward
+  agency: City of Hollywood
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/hollywoodfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/hollywoodfl/project/public
+  notes: 'OpenGov tenant code=hollywoodfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 358 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-cityofhomestead
+  name: City of Homestead
+  county: miami-dade
+  agency: City of Homestead
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofhomestead
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofhomestead/project/public
+  notes: 'OpenGov tenant code=cityofhomestead. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 242 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs '
+- id: og-jacksonvillebeachfl
+  name: City of Jacksonville Beach, FL
+  county: duval
+  agency: City of Jacksonville Beach, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/jacksonvillebeachfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/jacksonvillebeachfl/project/public
+  notes: 'OpenGov tenant code=jacksonvillebeachfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URL'
+- id: og-lcfla
+  name: City of Lake City
+  county: columbia
+  agency: City of Lake City
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/lcfla
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/lcfla/project/public
+  notes: 'OpenGov tenant code=lcfla. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 119 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packe'
+- id: og-lakelandgov
+  name: City of Lakeland
+  county: polk
+  agency: City of Lakeland
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/lakelandgov
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/lakelandgov/project/public
+  notes: 'OpenGov tenant code=lakelandgov. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 318 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-lauderdalelakes
+  name: City of Lauderdale Lakes
+  county: broward
+  agency: City of Lauderdale Lakes
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/lauderdalelakes
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/lauderdalelakes/project/public
+  notes: 'OpenGov tenant code=lauderdalelakes. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 22 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs ('
+- id: og-leesburgflorida
+  name: City of Leesburg
+  county: lake
+  agency: City of Leesburg
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/leesburgflorida
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/leesburgflorida/project/public
+  notes: 'OpenGov tenant code=leesburgflorida. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 22 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs ('
+- id: og-naplesgov
+  name: City of Naples
+  county: collier
+  agency: City of Naples
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/naplesgov
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/naplesgov/project/public
+  notes: 'OpenGov tenant code=naplesgov. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 175 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-cityofnsb
+  name: City of New Smyrna Beach
+  county: volusia
+  agency: City of New Smyrna Beach
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofnsb
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofnsb/project/public
+  notes: 'OpenGov tenant code=cityofnsb. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 142 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-citynmb
+  name: City of North Miami Beach
+  county: miami-dade
+  agency: City of North Miami Beach
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/citynmb
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/citynmb/project/public
+  notes: 'OpenGov tenant code=citynmb. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 42 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-northmiamifl
+  name: City of North Miami, FL
+  county: miami-dade
+  agency: City of North Miami, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/northmiamifl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/northmiamifl/project/public
+  notes: 'OpenGov tenant code=northmiamifl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-ocoeefl
+  name: City of Ocoee, FL
+  county: orange
+  agency: City of Ocoee, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/ocoeefl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/ocoeefl/project/public
+  notes: 'OpenGov tenant code=ocoeefl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packe'
+- id: og-orlando
+  name: City of Orlando
+  county: orange
+  agency: City of Orlando
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/orlando
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/orlando/project/public
+  notes: 'OpenGov tenant code=orlando. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 501 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pac'
+- id: og-pbgfl
+  name: City of Palm Beach Gardens
+  county: palm-beach
+  agency: City of Palm Beach Gardens
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/pbgfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/pbgfl/project/public
+  notes: 'OpenGov tenant code=pbgfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 14 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packet'
+- id: og-pembrokepines
+  name: City of Pembroke Pines
+  county: broward
+  agency: City of Pembroke Pines
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/pembrokepines
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/pembrokepines/project/public
+  notes: 'OpenGov tenant code=pembrokepines. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 158 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (b'
+- id: og-plantcitygov
+  name: City of Plant City
+  county: hillsborough
+  agency: City of Plant City
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/plantcitygov
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/plantcitygov/project/public
+  notes: 'OpenGov tenant code=plantcitygov. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 53 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-copbfl
+  name: City of Pompano Beach, FL
+  county: broward
+  agency: City of Pompano Beach, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/copbfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/copbfl/project/public
+  notes: 'OpenGov tenant code=copbfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 1 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packet'
+- id: og-portorangefl
+  name: City of Port Orange
+  county: volusia
+  agency: City of Port Orange
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/portorangefl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/portorangefl/project/public
+  notes: 'OpenGov tenant code=portorangefl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 2 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-cityofpsl
+  name: City of Port St. Lucie
+  county: saint-lucie
+  agency: City of Port St. Lucie
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofpsl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofpsl/project/public
+  notes: 'OpenGov tenant code=cityofpsl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 152 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-sarasotafl
+  name: City of Sarasota
+  county: sarasota
+  agency: City of Sarasota
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/sarasotafl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/sarasotafl/project/public
+  notes: 'OpenGov tenant code=sarasotafl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 19 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-southdaytona
+  name: City of South Daytona, FL
+  county: volusia
+  agency: City of South Daytona, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/southdaytona
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/southdaytona/project/public
+  notes: 'OpenGov tenant code=southdaytona. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 19 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-staugustine
+  name: City of St. Augustine, FL
+  county: saint-johns
+  agency: City of St. Augustine, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/staugustine
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/staugustine/project/public
+  notes: 'OpenGov tenant code=staugustine. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 33 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-stcloud
+  name: City of St. Cloud
+  county: osceola
+  agency: City of St. Cloud
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/stcloud
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/stcloud/project/public
+  notes: 'OpenGov tenant code=stcloud. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 85 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-stpete
+  name: City of St. Petersburg
+  county: pinellas
+  agency: City of St. Petersburg
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/stpete
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/stpete/project/public
+  notes: 'OpenGov tenant code=stpete. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 567 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-stuartfl
+  name: City of Stuart
+  county: martin
+  agency: City of Stuart
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/stuartfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/stuartfl/project/public
+  notes: 'OpenGov tenant code=stuartfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 52 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pac'
+- id: og-cityoftampa
+  name: City of Tampa
+  county: hillsborough
+  agency: City of Tampa
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityoftampa
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityoftampa/project/public
+  notes: 'OpenGov tenant code=cityoftampa. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 818 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-winterhavenfl
+  name: City of Winter Haven, FL
+  county: polk
+  agency: City of Winter Haven, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/winterhavenfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/winterhavenfl/project/public
+  notes: 'OpenGov tenant code=winterhavenfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 36 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bi'
+- id: og-cityofwinterpark
+  name: City of Winter Park
+  county: orange
+  agency: City of Winter Park
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofwinterpark
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofwinterpark/project/public
+  notes: 'OpenGov tenant code=cityofwinterpark. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 104 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs'
+- id: og-zephyrhillsfl
+  name: City of Zephyrhills
+  county: pasco
+  agency: City of Zephyrhills
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/zephyrhillsfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/zephyrhillsfl/project/public
+  notes: 'OpenGov tenant code=zephyrhillsfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 28 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bi'
+- id: og-claycounty
+  name: Clay County
+  county: clay
+  agency: Clay County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/claycounty
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/claycounty/project/public
+  notes: 'OpenGov tenant code=claycounty. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 293 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-clayutility
+  name: Clay County Utility Authority
+  county: bradford-clay-duval
+  agency: Clay County Utility Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/clayutility
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/clayutility/project/public
+  notes: 'OpenGov tenant code=clayutility. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 31 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-collier-county-fl
+  name: County of Collier, FL
+  county: collier
+  agency: County of Collier, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/collier-county-fl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/collier-county-fl/project/public
+  notes: 'OpenGov tenant code=collier-county-fl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 533 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URL'
+- id: og-flaglercounty
+  name: County of Flagler
+  county: flagler
+  agency: County of Flagler
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/flaglercounty
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/flaglercounty/project/public
+  notes: 'OpenGov tenant code=flaglercounty. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 50 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bi'
+- id: og-gadsdencountyfl
+  name: County of Gadsden, FL
+  county: gadsden
+  agency: County of Gadsden, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/gadsdencountyfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/gadsdencountyfl/project/public
+  notes: 'OpenGov tenant code=gadsdencountyfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 3 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (b'
+- id: og-hernandocounty
+  name: County of Hernando
+  county: hernando
+  agency: County of Hernando
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/hernandocounty
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/hernandocounty/project/public
+  notes: 'OpenGov tenant code=hernandocounty. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 214 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs ('
+- id: og-levycounty
+  name: County of Levy
+  county: levy
+  agency: County of Levy
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/levycounty
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/levycounty/project/public
+  notes: 'OpenGov tenant code=levycounty. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 18 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-myokaloosa
+  name: County of Okaloosa
+  county: okaloosa
+  agency: County of Okaloosa
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/myokaloosa
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/myokaloosa/project/public
+  notes: 'OpenGov tenant code=myokaloosa. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 48 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-palmbeachcofl
+  name: County of Palm Beach, FL
+  county: palm-beach
+  agency: County of Palm Beach, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/palmbeachcofl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/palmbeachcofl/project/public
+  notes: 'OpenGov tenant code=palmbeachcofl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-volusia
+  name: County of Volusia
+  county: volusia
+  agency: County of Volusia
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/volusia
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/volusia/project/public
+  notes: 'OpenGov tenant code=volusia. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 622 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pac'
+- id: og-desotobocc
+  name: DeSoto County
+  county: de-soto
+  agency: DeSoto County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/desotobocc
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/desotobocc/project/public
+  notes: 'OpenGov tenant code=desotobocc. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 1 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pa'
+- id: og-escambiacountyfl
+  name: Escambia County
+  county: escambia
+  agency: Escambia County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/escambiacountyfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/escambiacountyfl/project/public
+  notes: 'OpenGov tenant code=escambiacountyfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 1206 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URL'
+- id: og-flaglerschools
+  name: Flagler County School District
+  county: flagler
+  agency: Flagler County School District
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/flaglerschools
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/flaglerschools/project/public
+  notes: 'OpenGov tenant code=flaglerschools. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 27 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (b'
+- id: og-gru
+  name: Gainesville Regional Utilities
+  county: alachua
+  agency: Gainesville Regional Utilities
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/gru
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/gru/project/public
+  notes: 'OpenGov tenant code=gru. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 82 total projects. Detail: GET
+    https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packets '
+- id: og-goaa
+  name: Greater Orlando Aviation Authority
+  county: orange
+  agency: Greater Orlando Aviation Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/goaa
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/goaa/project/public
+  notes: 'OpenGov tenant code=goaa. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 225 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packet'
+- id: og-jaxportfl
+  name: Jacksonville Port Authority
+  county: duval
+  agency: Jacksonville Port Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/jaxportfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/jaxportfl/project/public
+  notes: 'OpenGov tenant code=jaxportfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pac'
+- id: og-jtafla
+  name: Jacksonville Transportation Authority
+  county: duval
+  agency: Jacksonville Transportation Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/jtafla
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/jtafla/project/public
+  notes: 'OpenGov tenant code=jtafla. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 106 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-ridecitrus
+  name: Lakeland Area Mass Transit District, FL
+  county: polk
+  agency: Lakeland Area Mass Transit District, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/ridecitrus
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/ridecitrus/project/public
+  notes: 'OpenGov tenant code=ridecitrus. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 12 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid p'
+- id: og-flylcpa
+  name: Lee County Port Authority
+  county: lee
+  agency: Lee County Port Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/flylcpa
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/flylcpa/project/public
+  notes: 'OpenGov tenant code=flylcpa. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 19 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pack'
+- id: og-leoncounty
+  name: Leon County
+  county: leon
+  agency: Leon County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/leoncounty
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/leoncounty/project/public
+  notes: 'OpenGov tenant code=leoncounty. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 274 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-miamiparking
+  name: Miami Parking Authority
+  county: miami-dade
+  agency: Miami Parking Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/miamiparking
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/miamiparking/project/public
+  notes: 'OpenGov tenant code=miamiparking. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 1 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-keyschools-mcsd
+  name: Monroe County School District, FL
+  county: monroe
+  agency: Monroe County School District, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/keyschools-mcsd
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/keyschools-mcsd/project/public
+  notes: 'OpenGov tenant code=keyschools-mcsd. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 46 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs ('
+- id: og-orangecountyfl
+  name: Orange County, Florida
+  county: orange
+  agency: Orange County, Florida
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/orangecountyfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/orangecountyfl/project/public
+  notes: 'OpenGov tenant code=orangecountyfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 1132 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs '
+- id: og-pinellasfl
+  name: Pinellas County
+  county: pinellas
+  agency: Pinellas County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/pinellasfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/pinellasfl/project/public
+  notes: 'OpenGov tenant code=pinellasfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 765 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-pcsb
+  name: Pinellas County School District
+  county: pinellas
+  agency: Pinellas County School District
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/pcsb
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/pcsb/project/public
+  notes: 'OpenGov tenant code=pcsb. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 30 total projects. Detail: GET
+    https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packets'
+- id: og-myputnamschools
+  name: Putnam County School District
+  county: putnam
+  agency: Putnam County School District
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/myputnamschools
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/myputnamschools/project/public
+  notes: 'OpenGov tenant code=myputnamschools. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 73 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs ('
+- id: og-flysfb
+  name: Sanford Airport Authority
+  county: seminole
+  agency: Sanford Airport Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/flysfb
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/flysfb/project/public
+  notes: 'OpenGov tenant code=flysfb. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 74 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packe'
+- id: og-santarosafl
+  name: Santa Rosa County
+  county: santa-rosa
+  agency: Santa Rosa County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/santarosafl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/santarosafl/project/public
+  notes: 'OpenGov tenant code=santarosafl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 173 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-scgov
+  name: Sarasota County
+  county: sarasota
+  agency: Sarasota County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/scgov
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/scgov/project/public
+  notes: 'OpenGov tenant code=scgov. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 659 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packe'
+- id: og-flysrq
+  name: Sarasota Manatee Airport Authority
+  county: manatee-sarasota
+  agency: Sarasota Manatee Airport Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/flysrq
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/flysrq/project/public
+  notes: 'OpenGov tenant code=flysrq. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packet'
+- id: og-seminolefl
+  name: Seminole County
+  county: seminole
+  agency: Seminole County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/seminolefl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/seminolefl/project/public
+  notes: 'OpenGov tenant code=seminolefl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 416 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-tampaairport
+  name: Tampa International Airport
+  county: hillsborough
+  agency: Tampa International Airport
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/tampaairport
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/tampaairport/project/public
+  notes: 'OpenGov tenant code=tampaairport. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 58 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid'
+- id: og-tampa-xway
+  name: Tampa-Hillsborough County Expressway Authority
+  county: hillsborough
+  agency: Tampa-Hillsborough County Expressway Authority
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/tampa-xway
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/tampa-xway/project/public
+  notes: 'OpenGov tenant code=tampa-xway. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 4 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pa'
+- id: og-cityofdoral
+  name: The City of Doral
+  county: miami-dade
+  agency: The City of Doral
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/cityofdoral
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/cityofdoral/project/public
+  notes: 'OpenGov tenant code=cityofdoral. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 33 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-brevardschools
+  name: The School Board of Brevard County, Florida
+  county: brevard
+  agency: The School Board of Brevard County, Florida
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/brevardschools
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/brevardschools/project/public
+  notes: 'OpenGov tenant code=brevardschools. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 46 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (b'
+- id: og-townofbelleair
+  name: Town of Belleair
+  county: pinellas
+  agency: Town of Belleair
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/townofbelleair
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/townofbelleair/project/public
+  notes: 'OpenGov tenant code=townofbelleair. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 0 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bi'
+- id: og-davie-fl
+  name: Town of Davie
+  county: broward
+  agency: Town of Davie
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/davie-fl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/davie-fl/project/public
+  notes: 'OpenGov tenant code=davie-fl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 157 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid pa'
+- id: og-districtgov
+  name: Villages Community Development Districts, FL
+  county: the-villages
+  agency: Villages Community Development Districts, FL
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/districtgov
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/districtgov/project/public
+  notes: 'OpenGov tenant code=districtgov. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 45 total projects. Detail:
+    GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid '
+- id: og-vcso
+  name: Volusia Sheriff's Office
+  county: deland
+  agency: Volusia Sheriff's Office
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/vcso
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/vcso/project/public
+  notes: 'OpenGov tenant code=vcso. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 1 total projects. Detail: GET
+    https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (bid packets '
+- id: og-waltoncountyfl
+  name: Walton County
+  county: walton
+  agency: Walton County
+  live_fetch: true
+  adapter: opengov
+  portal_url: https://procurement.opengov.com/portal/waltoncountyfl
+  platform: opengov
+  api_url: https://api.procurement.opengov.com/api/v1/government/waltoncountyfl/project/public
+  notes: 'OpenGov tenant code=waltoncountyfl. VERIFIED 2026-08-06: POST {"limit":100,"page":0,"sortField":"releaseProjectDate","sortDirection":"DESC"} to api_url returns HTTP 200 with 98 total projects.
+    Detail: GET https://api.procurement.opengov.com/api/v1/project/{id} returns presigned S3 attachment URLs (b'
+- id: bonfire-broward
+  name: Broward County (BPRO Electronic Procurement System)
+  county: broward
+  agency: Broward County (BPRO Electronic Procurement System)
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://broward.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://broward.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=BPRO Electronic Procurement System; open_opportunities=16
+- id: bonfire-dadeschools
+  name: Miami-Dade County Public School District
+  county: miami-dade
+  agency: Miami-Dade County Public School District
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://dadeschools.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://dadeschools.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: 'VERIFIED live Bonfire tenant; portal title=Miami-Dade County Public School District; open_opportunities=unknown (newer portal build: legacy getOpenPublicOpportunitiesSectionData returns success:0)'
+- id: bonfire-erau
+  name: Embry-Riddle Aeronautical University
+  county: volusia
+  agency: Embry-Riddle Aeronautical University
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://erau.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://erau.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Embry-Riddle Aeronautical University; open_opportunities=0
+- id: bonfire-famu
+  name: Florida A&M University
+  county: leon
+  agency: Florida A&M University
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://famu.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://famu.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Florida A&M University; open_opportunities=2
+- id: bonfire-fau
+  name: Florida Atlantic University
+  county: palm-beach
+  agency: Florida Atlantic University
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://fau.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://fau.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Florida Atlantic University; open_opportunities=1
+- id: bonfire-fgcu
+  name: Florida Gulf Coast University
+  county: lee
+  agency: Florida Gulf Coast University
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://fgcu.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://fgcu.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Florida Gulf Coast University; open_opportunities=2
+- id: bonfire-floridapoly
+  name: Florida Polytechnic University
+  county: polk
+  agency: Florida Polytechnic University
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://floridapoly.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://floridapoly.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Florida Polytechnic University; open_opportunities=0
+- id: bonfire-gohart
+  name: Hillsborough Transit Authority (HART)
+  county: hillsborough
+  agency: Hillsborough Transit Authority (HART)
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://gohart.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://gohart.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Hillsborough Transit Authority; open_opportunities=1
+- id: bonfire-hillsboroughcounty
+  name: Hillsborough County
+  county: hillsborough
+  agency: Hillsborough County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://hillsboroughcounty.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://hillsboroughcounty.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Hillsborough County; open_opportunities=24
+- id: bonfire-indianriver
+  name: Indian River County
+  county: indian-river
+  agency: Indian River County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://indianriver.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://indianriver.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Indian River County; open_opportunities=7
+- id: bonfire-jaxport
+  name: Jacksonville Port Authority (JAXPORT)
+  county: duval
+  agency: Jacksonville Port Authority (JAXPORT)
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://jaxport.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://jaxport.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=JAXPORT; open_opportunities=0
+- id: bonfire-keybiscayne
+  name: Village of Key Biscayne
+  county: miami-dade
+  agency: Village of Key Biscayne
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://keybiscayne.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://keybiscayne.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Village of Key Biscayne, FL; open_opportunities=0
+- id: bonfire-leeschools
+  name: School District of Lee County
+  county: lee
+  agency: School District of Lee County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://leeschools.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://leeschools.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=The School District of Lee County; open_opportunities=2
+- id: bonfire-levycounty
+  name: Levy County
+  county: levy
+  agency: Levy County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://levycounty.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://levycounty.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: 'VERIFIED live Bonfire tenant; portal title=Levy County, FL; open_opportunities=unknown (newer portal build: legacy getOpenPublicOpportunitiesSectionData returns success:0)'
+- id: bonfire-marionfl
+  name: Marion County
+  county: marion
+  agency: Marion County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://marionfl.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://marionfl.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Marion County, FL; open_opportunities=9
+- id: bonfire-monroecounty-fl
+  name: Monroe County
+  county: monroe
+  agency: Monroe County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://monroecounty-fl.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://monroecounty-fl.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Monroe County, FL; open_opportunities=5
+- id: bonfire-ocoee
+  name: City of Ocoee
+  county: orange
+  agency: City of Ocoee
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://ocoee.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://ocoee.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=City of Ocoee, Florida; open_opportunities=2
+- id: bonfire-panamacity
+  name: City of Panama City
+  county: bay
+  agency: City of Panama City
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://panamacity.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://panamacity.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=City of Panama City; open_opportunities=2
+- id: bonfire-pascocountyfl
+  name: Pasco County
+  county: pasco
+  agency: Pasco County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://pascocountyfl.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://pascocountyfl.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Pasco County; open_opportunities=8
+- id: bonfire-plantation
+  name: City of Plantation
+  county: broward
+  agency: City of Plantation
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://plantation.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://plantation.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=City of Plantation; open_opportunities=0
+- id: bonfire-psta
+  name: Pinellas Suncoast Transit Authority
+  county: pinellas
+  agency: Pinellas Suncoast Transit Authority
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://psta.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://psta.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Pinellas Suncoast Transit Authority; open_opportunities=5
+- id: bonfire-stlucieschools
+  name: St. Lucie County School District
+  county: st-lucie
+  agency: St. Lucie County School District
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://stlucieschools.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://stlucieschools.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=St. Lucie School District; open_opportunities=1
+- id: bonfire-suwanneecountyfl
+  name: Suwannee County
+  county: suwannee
+  agency: Suwannee County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://suwanneecountyfl.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://suwanneecountyfl.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Suwannee County; open_opportunities=1
+- id: bonfire-swa
+  name: Solid Waste Authority of Palm Beach County
+  county: palm-beach
+  agency: Solid Waste Authority of Palm Beach County
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://swa.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://swa.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Solid Waste Authority of Palm Beach County; open_opportunities=0
+- id: bonfire-talgov
+  name: City of Tallahassee
+  county: leon
+  agency: City of Tallahassee
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://talgov.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://talgov.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=City of Tallahassee; open_opportunities=8
+- id: bonfire-townofpalmbeach
+  name: Town of Palm Beach
+  county: palm-beach
+  agency: Town of Palm Beach
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://townofpalmbeach.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://townofpalmbeach.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=Town Of Palm Beach; open_opportunities=3
+- id: bonfire-tri-rail
+  name: South Florida Regional Transportation Authority (Tri-Rail)
+  county: broward
+  agency: South Florida Regional Transportation Authority (Tri-Rail)
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://tri-rail.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://tri-rail.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=South Florida Regional Transportation Authority; open_opportunities=1
+- id: bonfire-ucf
+  name: University of Central Florida
+  county: orange
+  agency: University of Central Florida
+  live_fetch: true
+  adapter: bonfire
+  portal_url: https://ucf.bonfirehub.com/portal/?tab=openOpportunities
+  platform: bonfire
+  api_url: https://ucf.bonfirehub.com/PublicPortal/getOpenPublicOpportunitiesSectionData
+  notes: VERIFIED live Bonfire tenant; portal title=University of Central Florida; open_opportunities=3
+- id: vr-central-florida-expressway-authority
+  name: Central Florida Expressway Authority
+  county: orange
+  agency: Central Florida Expressway Authority
+  live_fetch: true
+  adapter: vendor_registry
+  portal_url: https://vrapp.vendorregistry.com/Bids/View/BidsList?BuyerId=7fa678ed-767c-46f1-b88f-2fe8e4853ecc
+  platform: vendor_registry
+  notes: Vendor Registry BuyerId=7fa678ed-767c-46f1-b88f-2fe8e4853ecc; verified HTTP 200 with agency-named title
+- id: vr-okeechobee-county
+  name: Okeechobee County
+  county: okeechobee
+  agency: Okeechobee County
+  live_fetch: true
+  adapter: vendor_registry
+  portal_url: https://vrapp.vendorregistry.com/Bids/View/BidsList?BuyerId=e0c9e138-531c-43ed-bb52-97aa049ceb72
+  platform: vendor_registry
+  notes: Vendor Registry BuyerId=e0c9e138-531c-43ed-bb52-97aa049ceb72; verified HTTP 200 with agency-named title
+- id: vr-santa-rosa-county
+  name: Santa Rosa County
+  county: santa-rosa
+  agency: Santa Rosa County
+  live_fetch: true
+  adapter: vendor_registry
+  portal_url: https://vrapp.vendorregistry.com/Bids/View/BidsList?BuyerId=2a63b069-a1a0-47e8-9417-6007f31792d0
+  platform: vendor_registry
+  notes: Vendor Registry BuyerId=2a63b069-a1a0-47e8-9417-6007f31792d0; verified HTTP 200 with agency-named title
+- id: pp-flhsmv
+  name: Florida Department of Highway Safety and Motor Vehicles (FLHSMV)
+  county: statewide
+  agency: Florida Department of Highway Safety and Motor Vehicles (FLHSMV)
+  live_fetch: true
+  adapter: publicpurchase
+  portal_url: https://www.publicpurchase.com/gems/flhsmv,fl/buyer/public/home
+  platform: publicpurchase
+  notes: Public Purchase GEMS buyer page; free vendor account required to download docs
+- id: pp-lynx
+  name: Central Florida Regional Transportation Authority (LYNX)
+  county: orange
+  agency: Central Florida Regional Transportation Authority (LYNX)
+  live_fetch: true
+  adapter: publicpurchase
+  portal_url: https://www.publicpurchase.com/gems/lynx,fl/buyer/public/home
+  platform: publicpurchase
+  notes: Public Purchase GEMS buyer page; free vendor account required to download docs
+- id: pp-coralgables
+  name: City of Coral Gables
+  county: miami-dade
+  agency: City of Coral Gables
+  live_fetch: true
+  adapter: publicpurchase
+  portal_url: https://www.publicpurchase.com/gems/coralgables,fl/buyer/public/home
+  platform: publicpurchase
+  notes: Public Purchase GEMS buyer page; free vendor account required to download docs
+- id: miamidade-peoplesoft
+  name: Miami-Dade County (Supplier Portal)
+  county: miami-dade
+  agency: Miami-Dade County (Supplier Portal)
+  live_fetch: true
+  adapter: peoplesoft
+  portal_url: https://supplier.miamidade.gov/psc/EXTSUPP/SUPPLIER/ERP/c/SCP_PUBLIC_MENU_FL.SCP_PUB_BID_CMP_FL.GBL
+  platform: peoplesoft
+  notes: Oracle PeopleSoft SCP public bid list; HTTP 200 verified
+- id: coralgables-infor
+  name: City of Coral Gables (Infor CloudSuite)
+  county: miami-dade
+  agency: City of Coral Gables (Infor CloudSuite)
+  live_fetch: true
+  adapter: infor
+  portal_url: https://sms-coralgables-prd.inforcloudsuite.com/fsm/SupplyManagementSupplier/page/EventPage?csk_SupplierGroup=cocg&menu=XiSupplierHome.EventListings
+  platform: infor_fsm
+  notes: SupplierGroup=cocg; URL taken from coralgables.com Supplier Services page; returns HTTP 302 to login (auth required)
+- id: unf-jaggaer
+  name: University of North Florida
+  county: duval
+  agency: University of North Florida
+  live_fetch: true
+  adapter: jaggaer
+  portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=UNF
+  platform: jaggaer
+  notes: JAGGAER/SciQuest public event router; HTTP 200 verified
+- id: fdot-lettings
+  name: Florida Department of Transportation - Construction Lettings
+  county: statewide
+  agency: Florida Department of Transportation - Construction Lettings
+  live_fetch: true
+  adapter: fdot_letting
+  portal_url: https://bidletting.fdot.gov/LettingResults?districtID=99
+  platform: fdot_letting
+  notes: districtID=99 = all districts; separate from MFMP (construction lettings are not advertised in VIP)
+- id: facts-contracts
+  name: Florida Accountability Contract Tracking System (FACTS)
+  county: statewide
+  agency: Florida Accountability Contract Tracking System (FACTS)
+  live_fetch: true
+  adapter: facts
+  portal_url: https://facts.fldfs.com/Search/ContractSearch.aspx
+  platform: facts
+  notes: FL DFS contract/award transparency system - awards & contracts, not open solicitations; useful for incumbent intel
+- id: sam-gov-fl
+  name: SAM.gov Contract Opportunities (federal, Florida place-of-performance)
+  county: statewide
+  agency: SAM.gov Contract Opportunities (federal, Florida place-of-performance)
+  live_fetch: true
+  adapter: sam_gov
+  portal_url: https://sam.gov/search/?index=opp
+  platform: sam_gov
+  api_url: https://api.sam.gov/opportunities/v2/search
+  notes: Requires free api_key query parameter; unauthenticated call returns HTTP 404. Filter state=FL
+- id: flsheriffs-rss
+  name: Florida Sheriffs Association Cooperative Purchasing Program
+  county: statewide
+  agency: Florida Sheriffs Association Cooperative Purchasing Program
+  live_fetch: true
+  adapter: flsheriffs_rss
+  portal_url: https://flsheriffs.org/purchasingprogram/
+  platform: html_custom
+  api_url: https://flsheriffs.org/purchasingprogram/feed/
+  notes: WordPress RSS feed, HTTP 200 application/rss+xml verified

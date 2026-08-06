@@ -82,6 +82,30 @@ class HistoryRecord(Base):
     payload: Mapped[dict] = mapped_column(JSONVariant)
 
 
+class ContractRow(Base):
+    """An executed contract published by an agency's portal.
+
+    Not an opportunity: it is work already awarded, and its value here is the
+    end date — the earliest warning that a rebid is coming. Kept in its own
+    table for the same reason history is, so it never reaches a board of things
+    someone could bid on today.
+    """
+
+    __tablename__ = "contracts"
+
+    contract_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    agency: Mapped[str] = mapped_column(String(256), default="")
+    name: Mapped[str] = mapped_column(Text, default="")
+    vendor: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    vendor_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    status_id: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
+    url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    refreshed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+
 class TrackedBid(Base):
     """The user's workflow layer for one bid."""
 
