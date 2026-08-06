@@ -22,6 +22,7 @@ from .opengov import OpenGovAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
 from .sam_gov import SamGovAdapter
+from .vendorlink import VendorLinkAdapter
 from .catalog import CatalogAdapter
 
 ADAPTERS: Dict[str, Type[SourceAdapter]] = {
@@ -36,6 +37,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "sam_gov": SamGovAdapter,
     "mfmp_vbs": MfmpVbsAdapter,
     "civicplus": CivicPlusAdapter,
+    "vendorlink": VendorLinkAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,
     "catalog": CatalogAdapter,
