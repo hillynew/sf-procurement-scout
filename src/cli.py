@@ -153,6 +153,54 @@ def history(
 
 
 @app.command()
+def contracts(
+    only: Optional[List[str]] = typer.Option(None, "--only", help="Source id(s) to read."),
+    days: int = typer.Option(365, "--days", help="Expiry horizon."),
+    limit: int = typer.Option(40, "--limit", help="Rows to print."),
+):
+    """Who holds an agency's work, and when their contract runs out.
+
+    A rebid is advertised weeks before it opens and scoped months before that.
+    An incumbent's end date is the earliest warning available, and Bonfire
+    publishes it free — so this is the leading indicator the opportunity feeds
+    cannot give you.
+    """
+    from .contracts import expiring_within, summarise
+    from .sources.registry import get_adapters
+
+    console.rule("[bold]Incumbent contracts[/bold]")
+    found = []
+    for adapter in get_adapters(only=only):
+        if not hasattr(adapter, "fetch_contracts"):
+            continue
+        try:
+            rows = adapter.fetch_contracts()
+        except Exception as e:  # noqa: BLE001 — one portal must not stop the rest
+            console.print(f"[yellow]{adapter.source_id}: {type(e).__name__}[/yellow]")
+            continue
+        if rows:
+            console.print(f"  {adapter.source_id}: {len(rows)} contracts")
+            found.extend(rows)
+
+    if not found:
+        console.print("[yellow]No configured source published a contract register.[/yellow]")
+        raise typer.Exit(1)
+
+    upcoming = expiring_within(found, days=days)
+    t = Table(title=f"Expiring within {days} days")
+    t.add_column("Ends")
+    t.add_column("Days", justify="right")
+    t.add_column("Contract")
+    t.add_column("Incumbent")
+    t.add_column("Agency")
+    for c in upcoming[:limit]:
+        t.add_row(str(c.end_date), str(c.days_until_expiry()), c.name[:46],
+                  (c.vendor or "?")[:28], c.agency[:22])
+    console.print(t)
+    console.print(f"[green]{summarise(found)}[/green] across {len(found)} contracts")
+
+
+@app.command()
 def health():
     """Show source health from the last saved snapshot."""
     opps, health_rows = load_latest()

@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from ..auth import bonfire_cookie
 from ..classify import enrich
+from ..contracts import Contract, index_vendors, parse_date
 from ..dates import parse_dt
 from ..http_util import get, get_json, session
 from ..models.opportunity import Opportunity
@@ -26,6 +27,10 @@ from .base import SourceAdapter
 OPEN_ENDPOINT = "getOpenPublicOpportunitiesSectionData"
 PAST_ENDPOINT = "getPastPublicOpportunitiesSectionData"
 MY_ENDPOINT = "getMyOpportunitiesSectionData"
+#: Executed contracts with vendor names and end dates — free, unauthenticated,
+#: and the only source of local incumbent data in the system. Seven of twelve
+#: Florida tenants sampled publish it.
+CONTRACTS_ENDPOINT = "getPublicContractsSectionData"
 
 
 class BonfireAdapter(SourceAdapter):
@@ -45,6 +50,50 @@ class BonfireAdapter(SourceAdapter):
         """
         payload = self._payload(PAST_ENDPOINT)
         return self._from_payload(payload, status="closed")
+
+    def fetch_contracts(self) -> List[Contract]:
+        """Executed contracts this agency has published.
+
+        Not solicitations, so deliberately not Opportunities: a contract is
+        something already awarded, and its value here is the end date. A
+        tenant that does not publish contracts answers `success: 0`, which is
+        an absence rather than a fault — five of the twelve sampled do that.
+        """
+        try:
+            payload = self._payload(CONTRACTS_ENDPOINT)
+        except RuntimeError:
+            return []
+
+        raw = payload.get("publicContracts") or {}
+        # Keyed by ContractID, exactly like `projects` on the other endpoint.
+        rows = list(raw.values()) if isinstance(raw, dict) else raw
+        vendors = index_vendors(payload.get("vendors"))
+        host = self._host()
+
+        out: List[Contract] = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            name = str(row.get("Name") or "").strip()
+            cid = str(row.get("ContractID") or "").strip()
+            if not name or not cid:
+                continue
+            vid = str(row.get("VendorID") or "").strip() or None
+            out.append(
+                Contract(
+                    contract_id=cid,
+                    agency=self.agency,
+                    name=name,
+                    source_id=self.source_id,
+                    vendor=vendors.get(vid or ""),
+                    vendor_id=vid,
+                    status_id=str(row.get("ContractStatusID") or "") or None,
+                    start_date=parse_date(row.get("StartDate")),
+                    end_date=parse_date(row.get("EndDate")),
+                    url=f"https://{host}/portal/",
+                )
+            )
+        return out
 
     # -- internals ---------------------------------------------------------
 
