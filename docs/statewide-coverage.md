@@ -126,6 +126,29 @@ Bonfire's. It is a real tension, not a settled question, and it is your call.
 Rerunning the discovery sweep frequently is the part I would avoid — it is a
 thousand requests to find a handful of tenants, so run it monthly at most.
 
+That call is now written down where it can be seen and reversed rather than
+left implicit in the code. `src/netpolicy.py` honors robots.txt everywhere, and
+`ROBOTS_OVERRIDES` is the single table of hosts crawled anyway, each with its
+reason spelled out. Bonfire is the only entry. Setting
+`SF_SCOUT_STRICT_ROBOTS=1` drops the table and obeys robots everywhere — at the
+cost of all 30 Bonfire tenants, Broward County and Hillsborough among them.
+The point of the table is that turning the exception off is one variable, and
+that nobody has to read the crawler to find out it exists.
+
+**Sixty seconds of policy, for reference.** Every Florida host the scout reads
+was checked on 6 Aug 2026:
+
+| Host | robots.txt | Effect |
+|---|---|---|
+| `*.bonfirehub.com` | `Disallow: /` | overridden, reason recorded |
+| `dms.myflorida.com` | `Disallow: /` bar search engines | **refused outright** — the data is on VIP anyway |
+| `vendor.myfloridamarketplace.com` | none (404) | unrestricted |
+| `api.procurement.opengov.com` | none (404) | unrestricted |
+| `flsheriffs.org` | `Crawl-delay: 10` | honored — 10s between requests |
+| `www.myvendorlink.com` | `Allow: /external/` | our path is explicitly allowed |
+| `vrapp.vendorregistry.com` | blocks Zoominfobot only | unrestricted for us |
+| CivicPlus cities | path rules, none covering `/Bids.aspx` | unrestricted |
+
 ### CivicPlus, Bid Express, SAM.gov
 
 Already wired. CivicPlus is the platform most Florida cities run their bid board

@@ -39,12 +39,12 @@ list is discovered rather than hand-written — see `fl_tenants` and
 from __future__ import annotations
 
 import threading
-import time
 from typing import Any, Dict, List, Optional
 
 from ..classify import enrich
 from ..dates import parse_dt
-from ..http_util import SourceBlocked, session
+from ..http_util import CRAWLER_UA, SourceBlocked, session
+from ..netpolicy import check, log_fetch
 from ..models.opportunity import Document, Opportunity
 from .base import SourceAdapter
 
@@ -63,25 +63,10 @@ MAX_PAGES = 60
 #: closed for submissions and belong in history, not in the live pipeline.
 OPEN_STATUSES = frozenset({"open"})
 
-#: Seconds between requests to the API host — one per second, the ceiling this
-#: project holds itself to for government infrastructure.
-REQUEST_INTERVAL = 1.0
-
-# Pacing is per *host*, not per adapter instance. Ninety-one tenants share one
-# API host, and the runner fetches sources concurrently, so an interval kept on
-# the instance would let a dozen workers hit that host a dozen times a second
-# while each one believed it was being polite.
-_pace_lock = threading.Lock()
-_last_request = 0.0
-
-
-def _pace_host() -> None:
-    global _last_request
-    with _pace_lock:
-        wait = REQUEST_INTERVAL - (time.monotonic() - _last_request)
-        if wait > 0:
-            time.sleep(wait)
-        _last_request = time.monotonic()
+# Pacing lives in `src.netpolicy`, keyed by host rather than by adapter
+# instance. Ninety-one tenants share one API host and the runner fetches
+# sources concurrently, so an interval kept on the instance would let a dozen
+# workers hit that host a dozen times a second while each felt polite.
 
 
 class OpenGovAdapter(SourceAdapter):
@@ -276,16 +261,27 @@ class OpenGovAdapter(SourceAdapter):
             self._s = s
         return s
 
-    def _pace(self) -> None:
-        _pace_host()
+    def _pace(self, url: str = f"{API}/") -> str:
+        """Robots check plus the shared per-host interval; returns the log note.
+
+        This adapter posts through its own session rather than `http_util.get`,
+        so it has to reach the policy layer explicitly — otherwise 91 tenants
+        would share one host with no limiter between them, and none of their
+        requests would reach the fetch log.
+        """
+        return check(url)
 
     def _post(self, url: str, body: Dict[str, Any]):
-        self._pace()
-        return self._decode(self._session().post(url, json=body, timeout=45), url)
+        note = self._pace(url)
+        resp = self._session().post(url, json=body, timeout=45)
+        log_fetch(url, status=resp.status_code, robots_note=note, ua=CRAWLER_UA)
+        return self._decode(resp, url)
 
     def _get(self, url: str):
-        self._pace()
-        return self._decode(self._session().get(url, timeout=45), url)
+        note = self._pace(url)
+        resp = self._session().get(url, timeout=45)
+        log_fetch(url, status=resp.status_code, robots_note=note, ua=CRAWLER_UA)
+        return self._decode(resp, url)
 
     def _decode(self, resp, url: str):
         if resp.status_code in (401, 403):

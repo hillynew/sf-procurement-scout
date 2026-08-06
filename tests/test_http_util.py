@@ -43,8 +43,11 @@ def no_sleeping(monkeypatch):
     monkeypatch.setattr(http_util.time, "sleep", lambda *_: None)
 
 
-def test_session_sets_a_browser_user_agent():
-    assert "Mozilla" in session().headers["User-Agent"]
+def test_the_session_identifies_the_crawler_honestly():
+    """Spoofing Chrome at sites that would have served us anyway is the risk."""
+    ua = session().headers["User-Agent"]
+    assert "sf-procurement-scout" in ua
+    assert "Mozilla" not in ua
 
 
 def test_successful_get_makes_one_request():

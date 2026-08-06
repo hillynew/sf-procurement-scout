@@ -8,10 +8,19 @@ from typing import Optional
 
 import requests
 
-DEFAULT_UA = (
-    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-)
+from .netpolicy import BROWSER_UA, CRAWLER_UA, RobotsDisallowed
+from .netpolicy import check, log_fetch, user_agent_for
+
+# Re-exported so callers keep importing their HTTP vocabulary from one place.
+__all__ = [
+    "BROWSER_UA", "CRAWLER_UA", "DEFAULT_UA", "RobotsDisallowed", "SourceBlocked",
+    "get", "get_h2", "get_json", "session",
+]
+
+#: The crawler identifies itself honestly. `src.netpolicy` keeps the browser
+#: string for the few WAF-fronted hosts that refuse anything else, chosen per
+#: host rather than as a fallback.
+DEFAULT_UA = CRAWLER_UA
 
 # Status codes worth a second attempt: transient server/edge failures and
 # rate limiting. 403 is excluded on purpose — WAF blocks do not clear on retry.
@@ -66,20 +75,36 @@ def get(
         hdrs["Referer"] = referer
         hdrs["Sec-Fetch-Site"] = "same-origin"
 
+    # Identify honestly unless this host is one of the tested exceptions.
+    hdrs.setdefault("User-Agent", user_agent_for(url))
+
     last_exc: Optional[Exception] = None
     for attempt in range(retries + 1):
-        # polite pacing for public government sites
-        time.sleep(0.15)
+        # Refuses the request outright if robots.txt says so, then holds until
+        # this host may be called again. Every fetch in the codebase passes here.
+        robots_note = check(url)
+        started = time.monotonic()
         try:
             resp = client.get(url, timeout=timeout, headers=hdrs or None, **kwargs)
         except requests.RequestException as e:
             last_exc = e
+            log_fetch(url, status=type(e).__name__, robots_note=robots_note,
+                      ua=hdrs["User-Agent"])
             if attempt >= retries:
                 raise
             _sleep_backoff(attempt)
             continue
 
+        log_fetch(
+            url,
+            status=resp.status_code,
+            robots_note=robots_note,
+            ua=hdrs["User-Agent"],
+            elapsed_ms=int((time.monotonic() - started) * 1000),
+        )
         if resp.status_code in (401, 403):
+            # A refusal is not retried and not worked around from another angle;
+            # continued access after one is the fact pattern worth avoiding.
             raise SourceBlocked(f"{resp.status_code} blocked by portal: {url}")
         if resp.status_code in RETRY_STATUS and attempt < retries:
             _sleep_backoff(attempt)
@@ -121,7 +146,10 @@ def get_h2(
     import httpx
 
     hdrs = {
-        "User-Agent": DEFAULT_UA,
+        # This path exists for WAF-fronted hosts, which is exactly the case the
+        # browser string is reserved for — but the host still has to be on the
+        # list, so a new caller cannot quietly acquire a disguise.
+        "User-Agent": user_agent_for(url),
         "Accept": (
             "text/html,application/xhtml+xml,application/xml;q=0.9,"
             "image/avif,image/webp,image/apng,*/*;q=0.8"
@@ -138,11 +166,14 @@ def get_h2(
 
     last_err: Optional[Exception] = None
     for attempt in range(retries):
+        robots_note = check(url)
         try:
             with httpx.Client(
                 http2=True, headers=hdrs, follow_redirects=True, timeout=timeout
             ) as c:
                 resp = c.get(url)
+            log_fetch(url, status=resp.status_code, robots_note=robots_note,
+                      ua=hdrs["User-Agent"])
             denied = resp.status_code in (401, 403) or (
                 "Access Denied" in resp.text[:2000]
             )

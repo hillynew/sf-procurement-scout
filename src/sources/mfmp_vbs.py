@@ -43,7 +43,8 @@ from typing import Any, Dict, List, Optional
 from ..classify import enrich
 from ..dates import parse_dt
 from ..fl_geo import infer_county
-from ..http_util import SourceBlocked, session
+from ..http_util import CRAWLER_UA, SourceBlocked, session
+from ..netpolicy import check, log_fetch
 from ..models.opportunity import Document, Opportunity, SolicitationType
 from .base import SourceAdapter
 
@@ -382,13 +383,15 @@ class MfmpVbsAdapter(SourceAdapter):
             return 0
 
     def _post(self, s, url: str, body: Dict[str, Any], *, expect_json: bool = True):
-        self._pace()
+        note = self._pace(url)
         resp = s.post(url, json=body, timeout=45)
+        log_fetch(url, status=resp.status_code, robots_note=note, ua=CRAWLER_UA)
         return self._decode(resp, url, expect_json)
 
     def _get(self, s, url: str):
-        self._pace()
+        note = self._pace(url)
         resp = s.get(url, timeout=45)
+        log_fetch(url, status=resp.status_code, robots_note=note, ua=CRAWLER_UA)
         return self._decode(resp, url, True)
 
     def _decode(self, resp, url: str, expect_json: bool):
@@ -407,8 +410,13 @@ class MfmpVbsAdapter(SourceAdapter):
             return text
         return resp.json()
 
-    def _pace(self) -> None:
-        """Serialize calls at PACE_SECONDS apart, across threads.
+    def _pace(self, url: str = BASE) -> str:
+        """Robots check, then serialize calls at PACE_SECONDS apart across threads.
+
+        The shared policy layer enforces a one-second floor per host; VIP needs
+        more than that, so the instance lock below stays. It is the stricter of
+        the two that governs, and after a two-second wait the shared limiter has
+        nothing left to hold.
 
         The lock is not decoration. The detail pass runs a thread pool against
         one adapter instance, so an unlocked read-modify-write on the last-call
@@ -419,11 +427,13 @@ class MfmpVbsAdapter(SourceAdapter):
         zero documents. Holding the lock across the sleep is the point: it
         makes the pacing real rather than advisory.
         """
+        note = check(url)
         with self._pace_lock:
             wait = PACE_SECONDS - (time.monotonic() - self._last_call)
             if wait > 0:
                 time.sleep(wait)
             self._last_call = time.monotonic()
+        return note
 
 
 def _strip_html(html: str) -> str:

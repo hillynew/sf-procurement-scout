@@ -305,18 +305,52 @@ def test_fl_tenants_can_include_inactive(monkeypatch):
     assert [t["code"] for t in fl_tenants(include_inactive=True)] == ["retired"]
 
 
-def test_pacing_is_shared_across_adapters_not_per_instance(monkeypatch):
-    """Ninety-one tenants share one API host; per-instance pacing would not hold."""
+def test_the_adapter_defers_pacing_to_the_shared_policy_layer(monkeypatch):
+    """91 tenants share one API host, so the limiter cannot live on the instance."""
     import src.sources.opengov as og
 
-    slept: list = []
-    monkeypatch.setattr(og.time, "sleep", lambda s: slept.append(s))
-    monkeypatch.setattr(og, "_last_request", 0.0)
+    seen: list = []
+    monkeypatch.setattr(og, "check", lambda url: seen.append(url))
 
-    clock = iter([100.0, 100.0, 100.1, 100.1])
-    monkeypatch.setattr(og.time, "monotonic", lambda: next(clock))
+    adapter = OpenGovAdapter(CFG)
+    adapter._pace("https://api.procurement.opengov.com/api/v1/government/x/project/public")
 
-    og._pace_host()  # first call sets the clock, no wait
-    og._pace_host()  # a *different* caller 0.1s later must still be held back
+    assert seen == ["https://api.procurement.opengov.com/api/v1/government/x/project/public"]
 
-    assert slept and slept[-1] == pytest.approx(0.9, abs=0.01)
+
+def test_every_api_call_passes_through_the_policy_gate(monkeypatch):
+    """A request that skips the gate is unpaced and unchecked against robots."""
+    import src.sources.opengov as og
+
+    gated: list = []
+    monkeypatch.setattr(og, "check", lambda url: gated.append(url))
+
+    class _S:
+        headers: dict = {}
+
+        def post(self, url, **kw):
+            return _FakeResp({"count": 0, "rows": []})
+
+        def get(self, url, **kw):
+            return _FakeResp({})
+
+    monkeypatch.setattr(OpenGovAdapter, "_session", lambda self: _S())
+
+    adapter = OpenGovAdapter(CFG)
+    adapter.fetch()
+
+    assert gated, "no request reached the policy layer"
+    assert all(u.startswith("https://api.procurement.opengov.com") for u in gated)
+
+
+class _FakeResp:
+    status_code = 200
+
+    def __init__(self, payload):
+        self._payload = payload
+
+    def raise_for_status(self):
+        return None
+
+    def json(self):
+        return self._payload
