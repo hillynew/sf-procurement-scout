@@ -12,9 +12,14 @@ from src.db import store as db
 from src.fl_geo import ALL_REGIONS
 from src.models.opportunity import Opportunity
 from src.protest import RECORDS_RIPE_DAYS, business_hours_left
+from src.contracts import expiring_within, load_stored
 from src.records import ripe_for_request
 
 RESEND_URL = "https://api.resend.com/emails"
+
+#: Horizon for the incumbent-contract section. Shorter than the module's own
+#: default: a year out is planning, a quarter out is a decision.
+CONTRACT_HORIZON_DAYS = 120
 
 #: Kept as a name for backwards compatibility, but the labels now come from the
 #: statewide geography module — a hard-coded tri-county map would print raw
@@ -207,6 +212,39 @@ def _records_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
     return len(leads), html
 
 
+def _contracts_section() -> Optional[Tuple[int, str]]:
+    """(count, html) for incumbent contracts about to run out.
+
+    The longest-range signal in the email. A rebid is advertised weeks before
+    it opens and scoped months before that, so an incumbent's end date is the
+    earliest warning available — and unlike everything else here it is not
+    perishable, so it is reported as a horizon rather than an alarm.
+    """
+    stored = load_stored()
+    if not stored:
+        return None
+    soon = expiring_within(stored, days=CONTRACT_HORIZON_DAYS)
+    if not soon:
+        return None
+
+    rows = "".join(
+        f'<li style="margin:0 0 8px">{c.name}'
+        f'<br><span style="color:#5A6478;font-size:13px">{c.agency}'
+        f" · incumbent: {c.vendor or 'not named'}"
+        f" · ends {c.end_date:%-d %b %Y} ({c.days_until_expiry()}d)</span></li>"
+        for c in soon[:10]
+    )
+    html = (
+        f'<h3 style="margin:20px 0 8px">Incumbent contracts ending within '
+        f"{CONTRACT_HORIZON_DAYS} days</h3>"
+        '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
+        "A rebid is scoped long before it is advertised. These are the agencies "
+        "whose current supplier is about to run out.</p>"
+        f'<ul style="padding-left:18px;margin:0">{rows}</ul>'
+    )
+    return len(soon), html
+
+
 def build_daily_digest(
     opps: List[Opportunity],
     workflow: Dict[str, dict],
@@ -228,6 +266,10 @@ def build_daily_digest(
     records = _records_section(opps)
     if records:
         sections.append(records[1])
+
+    contracts = _contracts_section()
+    if contracts:
+        sections.append(contracts[1])
 
     total_new = 0
     for wl in watchlists:

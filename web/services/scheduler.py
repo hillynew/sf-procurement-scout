@@ -47,6 +47,13 @@ async def tick(now: datetime | None = None) -> None:
         _deadline_scan(settings)
         db.update_settings({"internal": {"last_deadline_scan_on": today_iso}})
 
+    # The contract register is deliberately *not* refreshed here. It is a full
+    # walk of several thousand rows per tenant, and this tick runs on the event
+    # loop — doing it inline stalls the interval fetch, the deadline scan and
+    # the digest behind minutes of blocking HTTP. Bid history has the same
+    # shape and is refreshed the same way: `python -m src.cli contracts
+    # --refresh`, on its own cadence.
+
     # Daily digest at the configured hour (UTC).
     digest_cfg = settings["digest"]
     if (

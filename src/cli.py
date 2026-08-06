@@ -157,6 +157,9 @@ def contracts(
     only: Optional[List[str]] = typer.Option(None, "--only", help="Source id(s) to read."),
     days: int = typer.Option(365, "--days", help="Expiry horizon."),
     limit: int = typer.Option(40, "--limit", help="Rows to print."),
+    refresh: bool = typer.Option(
+        False, "--refresh", help="Re-read the portals and store; otherwise read what is stored."
+    ),
 ):
     """Who holds an agency's work, and when their contract runs out.
 
@@ -165,22 +168,18 @@ def contracts(
     publishes it free — so this is the leading indicator the opportunity feeds
     cannot give you.
     """
-    from .contracts import expiring_within, summarise
-    from .sources.registry import get_adapters
+    from .contracts import expiring_within, load_stored, summarise
+    from .contracts import refresh as refresh_contracts
 
     console.rule("[bold]Incumbent contracts[/bold]")
-    found = []
-    for adapter in get_adapters(only=only):
-        if not hasattr(adapter, "fetch_contracts"):
-            continue
-        try:
-            rows = adapter.fetch_contracts()
-        except Exception as e:  # noqa: BLE001 — one portal must not stop the rest
-            console.print(f"[yellow]{adapter.source_id}: {type(e).__name__}[/yellow]")
-            continue
-        if rows:
-            console.print(f"  {adapter.source_id}: {len(rows)} contracts")
-            found.extend(rows)
+    if refresh:
+        # A full walk of every register — thousands of rows per tenant, which
+        # is why it runs on its own cadence rather than with the bid fetch.
+        found = refresh_contracts(only=only, quiet=False)
+    else:
+        found = load_stored()
+        if not found:
+            console.print("[dim]Nothing stored yet — run with --refresh first.[/dim]")
 
     if not found:
         console.print("[yellow]No configured source published a contract register.[/yellow]")

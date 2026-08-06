@@ -13,12 +13,15 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import delete, select
 
 from ..models.opportunity import Opportunity, SourceHealth
 from .engine import init_db, session_scope
+
+if TYPE_CHECKING:  # pragma: no cover — import cycle at runtime, fine for typing
+    from ..contracts import Contract
 from .models import (
     AiSummary,
     BidResult,
@@ -941,3 +944,65 @@ def put_pdf_text(url_hash: str, text: str) -> None:
         else:
             row.text = text
             row.created_at = datetime.utcnow()
+
+
+# ---------------------------------------------------------------------------
+# Contracts
+# ---------------------------------------------------------------------------
+
+
+def save_contracts(contracts: Iterable["Contract"]) -> int:
+    """Upsert the contract register for whichever sources published one.
+
+    Upsert rather than replace: portals publish per-tenant, so a refresh that
+    only reached three of nine agencies must not delete the other six.
+    """
+    from datetime import datetime as _dt
+
+    from ..db.models import ContractRow
+
+    count = 0
+    now = _dt.utcnow()
+    with session_scope() as s:
+        for c in contracts:
+            key = f"{c.source_id}:{c.contract_id}"
+            row = s.get(ContractRow, key)
+            if row is None:
+                row = ContractRow(contract_id=key)
+                s.add(row)
+            row.source_id = c.source_id
+            row.agency = c.agency or ""
+            row.name = c.name or ""
+            row.vendor = c.vendor
+            row.vendor_id = c.vendor_id
+            row.status_id = c.status_id
+            row.start_date = c.start_date
+            row.end_date = c.end_date
+            row.url = c.url
+            row.refreshed_at = now
+            count += 1
+    return count
+
+
+def load_contracts() -> List["Contract"]:
+    from ..contracts import Contract
+    from ..db.models import ContractRow
+
+    with session_scope() as s:
+        rows = s.execute(select(ContractRow)).scalars().all()
+    return [
+        Contract(
+            # Strip the source prefix the primary key carries.
+            contract_id=row.contract_id.split(":", 1)[-1],
+            agency=row.agency,
+            name=row.name,
+            source_id=row.source_id,
+            vendor=row.vendor,
+            vendor_id=row.vendor_id,
+            status_id=row.status_id,
+            start_date=row.start_date,
+            end_date=row.end_date,
+            url=row.url,
+        )
+        for row in rows
+    ]

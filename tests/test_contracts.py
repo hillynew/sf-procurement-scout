@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 import pytest
 
@@ -185,3 +186,83 @@ def test_the_summary_flags_the_imminent_ones():
 
 def test_the_summary_says_so_when_there_is_nothing():
     assert summarise([], today=TODAY) == "no contracts expiring in the next year"
+
+
+# -- storage and the digest ------------------------------------------------
+
+
+def test_contracts_round_trip_through_the_store():
+    from src.db import store as dbstore
+    from src.db.engine import init_db
+
+    init_db()
+    dbstore.save_contracts([_contract("Mowing", "2026-12-01", cid="7")])
+    (loaded,) = dbstore.load_contracts()
+
+    assert loaded.contract_id == "7"
+    assert loaded.name == "Mowing"
+    assert loaded.end_date == date(2026, 12, 1)
+
+
+def test_a_refresh_updates_rather_than_duplicates():
+    """Portals publish per tenant; a partial refresh must not delete the rest."""
+    from src.db import store as dbstore
+    from src.db.engine import init_db
+
+    init_db()
+    dbstore.save_contracts([_contract("Mowing", "2026-12-01", cid="7")])
+    dbstore.save_contracts([_contract("Mowing (amended)", "2027-01-01", cid="7")])
+    rows = dbstore.load_contracts()
+
+    assert len(rows) == 1
+    assert rows[0].name == "Mowing (amended)"
+
+
+def test_two_agencies_can_share_a_contract_id():
+    """ContractID is per-portal, so the key has to carry the source."""
+    from src.db import store as dbstore
+    from src.db.engine import init_db
+
+    init_db()
+    a = _contract("Theirs", "2026-12-01", cid="1")
+    b = Contract(contract_id="1", agency="Marion County", name="Ours",
+                 source_id="bf_marion", end_date=date(2026, 12, 1))
+    dbstore.save_contracts([a, b])
+
+    assert len(dbstore.load_contracts()) == 2
+
+
+def test_the_digest_lists_contracts_about_to_run_out(monkeypatch):
+    from web.services import digest
+
+    monkeypatch.setattr(digest, "load_stored", lambda: [
+        _contract("Janitorial Services", "2026-09-05", vendor="ACME INC"),
+        _contract("Fleet Fuel", "2030-01-01", vendor="LATER LLC"),
+    ])
+    result = digest._contracts_section()
+    count, html = result
+
+    assert count == 1
+    assert "Janitorial Services" in html
+    assert "ACME INC" in html
+    assert "Fleet Fuel" not in html, "a contract years out is not a lead"
+
+
+def test_the_digest_stays_quiet_with_no_register(monkeypatch):
+    from web.services import digest
+
+    monkeypatch.setattr(digest, "load_stored", lambda: [])
+    assert digest._contracts_section() is None
+
+
+def test_the_scheduler_does_not_walk_registers_on_the_event_loop():
+    """A full register walk is minutes of blocking HTTP; tick() is async.
+
+    Doing it inline stalls the interval fetch, the deadline scan and the daily
+    digest behind it — and made the scheduler tests hit the network. Contracts
+    refresh from the CLI, on their own cadence, exactly as bid history does.
+    """
+    source = (Path(__file__).resolve().parents[1] / "web/services/scheduler.py").read_text()
+
+    assert "refresh_contracts" not in source
+    assert "src.contracts" not in source

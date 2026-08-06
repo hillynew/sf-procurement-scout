@@ -137,3 +137,47 @@ def summarise(contracts: Sequence[Contract], *, today: Optional[date] = None) ->
     if imminent:
         line += f", {len(imminent)} within {IMMINENT_DAYS} days"
     return line
+
+
+def refresh(*, only: Optional[Sequence[str]] = None, quiet: bool = True) -> List[Contract]:
+    """Re-read every source that publishes a contract register, and store it.
+
+    Runs on its own cadence rather than with the opportunity fetch. Contracts
+    change on the timescale of contract terms — a weekly pass is generous —
+    and this walks the whole register for each tenant, which is several
+    thousand rows nobody needs re-downloaded every four hours.
+    """
+    from .db.store import save_contracts
+    from .sources.registry import get_adapters
+
+    collected: List[Contract] = []
+    for adapter in get_adapters(only=list(only) if only else None):
+        if not hasattr(adapter, "fetch_contracts"):
+            continue
+        try:
+            rows = adapter.fetch_contracts()
+        except Exception as e:  # noqa: BLE001 — one portal must not stop the rest
+            if not quiet:
+                print(f"  {adapter.source_id}: {type(e).__name__}: {e}")
+            continue
+        if rows:
+            collected.extend(rows)
+            if not quiet:
+                print(f"  {adapter.source_id}: {len(rows)} contracts")
+
+    if collected:
+        try:
+            save_contracts(collected)
+        except Exception:  # noqa: BLE001 — the register is a bonus, never the run
+            pass
+    return collected
+
+
+def load_stored() -> List[Contract]:
+    """Everything previously refreshed, or nothing if the store is unavailable."""
+    try:
+        from .db.store import load_contracts
+
+        return load_contracts()
+    except Exception:  # noqa: BLE001
+        return []
