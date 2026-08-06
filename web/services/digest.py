@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 
 import httpx
@@ -11,7 +11,8 @@ import httpx
 from src.db import store as db
 from src.fl_geo import ALL_REGIONS
 from src.models.opportunity import Opportunity
-from src.protest import business_hours_left
+from src.protest import RECORDS_RIPE_DAYS, business_hours_left
+from src.records import ripe_for_request
 
 RESEND_URL = "https://api.resend.com/emails"
 
@@ -176,6 +177,36 @@ def _award_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
     return len(live), html
 
 
+def _records_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
+    """(count, html) for tabulations that crossed day 31 today.
+
+    Only the ones that became requestable *today*. The backlog is real and
+    worth working, but a digest that repeats it every morning is a digest
+    nobody finishes reading — the daily email's job is to report what changed.
+    """
+    leads = [lead for lead in ripe_for_request(opps) if lead.ripe_for_days == 0]
+    if not leads:
+        return None
+
+    rows = "".join(
+        f'<li style="margin:0 0 8px"><a href="{lead.opportunity.url}" '
+        f'style="color:#1849A9">{lead.opportunity.title}</a>'
+        f'<br><span style="color:#5A6478;font-size:13px">{lead.opportunity.agency}'
+        f" · opened {lead.ripe_on - timedelta(days=RECORDS_RIPE_DAYS):%-d %b}"
+        " · no award posted</span></li>"
+        for lead in leads[:10]
+    )
+    html = (
+        '<h3 style="margin:20px 0 8px">Bid tabulations now requestable</h3>'
+        '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
+        "Sealed bids stop being exempt 30 days after opening when no intended "
+        "decision has been posted (s. 119.071(1)(b)2, F.S.), so these can be "
+        "requested as of today.</p>"
+        f'<ul style="padding-left:18px;margin:0">{rows}</ul>'
+    )
+    return len(leads), html
+
+
 def build_daily_digest(
     opps: List[Opportunity],
     workflow: Dict[str, dict],
@@ -193,6 +224,10 @@ def build_daily_digest(
     awards = _award_section(opps)
     if awards:
         sections.append(awards[1])
+
+    records = _records_section(opps)
+    if records:
+        sections.append(records[1])
 
     total_new = 0
     for wl in watchlists:
@@ -236,6 +271,8 @@ def build_daily_digest(
     bits = []
     if awards:
         bits.append(f"{awards[0]} protest window{'s' if awards[0] != 1 else ''} open")
+    if records:
+        bits.append(f"{records[0]} tabulation{'s' if records[0] != 1 else ''} requestable")
     if total_new:
         bits.append(f"{total_new} new match{'es' if total_new != 1 else ''}")
     if deadlines:
