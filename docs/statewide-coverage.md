@@ -21,8 +21,8 @@ free, and what it costs when we cannot.
 |---|---|
 | Florida public entities that buy things | ~2,600 (67 counties, 411 cities, 67 school districts, 40 colleges/universities, ~2,000 special districts) |
 | Platforms they post on | ~10 cover the overwhelming majority |
-| Free and already working | MyFloridaMarketPlace, Bonfire, CivicPlus, Bid Express, SAM.gov |
-| Free but needs a vendor account | Public Purchase, BidNet Direct, OpenGov, Ionwave, Periscope |
+| Free and already working | MyFloridaMarketPlace, OpenGov, Bonfire, CivicPlus, Bid Express, SAM.gov |
+| Free but needs a vendor account | Public Purchase, BidNet Direct, Ionwave, Periscope |
 | Worth paying for | VendorLink ($175/yr statewide), Euna Pro ($50/yr) |
 | Do not scrape | DemandStar — their terms explicitly prohibit it |
 | **Realistic all-in cost** | **$225–$400/yr, versus $60/county/yr on DemandStar alone** |
@@ -73,6 +73,42 @@ every state bid look like it had no documents, so deep dives on them read the
 listing alone and concluded — wrongly — that the package had to be fetched by
 hand from VIP.
 
+### OpenGov — 91 Florida agencies, and the lesson about which host you probe
+
+This platform was in the "needs a vendor account, and a headless browser to get
+past Cloudflare" column right up until someone checked the second host.
+
+`procurement.opengov.com/portal/*` is the Cloudflare-challenged SPA, and it does
+403 a scraper — which is where the write-off came from. The API that SPA calls,
+`api.procurement.opengov.com`, has no challenge, no auth and no cookie. The
+platform publishes its own tenant directory there, so the Florida source list is
+derived rather than curated: `scripts/discover_opengov_tenants.py` reads
+`/api/v1/government`, filters to Florida and active, and writes
+`config/sources.opengov.yaml`. **91 active Florida tenants**, ~14,000 projects
+between them — Orange County, Escambia, Tampa, Pinellas, Sarasota, Volusia,
+St. Petersburg, Collier, Orlando, GOAA, JAXPORT, JTA, and several school
+districts.
+
+Two things to know:
+
+- **The project list is a POST.** A GET of the same path returns 404, and a 404
+  reads as "this tenant has no public portal." That single wrong verb is most of
+  why the platform looked closed.
+- **Documents are pre-signed S3 URLs, live in the anonymous response**, carrying
+  `X-Amz-Expires=72000`. Twenty hours from when the URL was minted, not from
+  when it is read: it is a fetch-now token, not an address. Verified end to end
+  — one Orange County project returned 21 attachments and the packet downloaded
+  as a 318 KB `application/pdf` with no session at all.
+
+The tenant list is only as current as its last run. Three Florida migrations
+were observed during a single week of research, so re-run the discovery script
+weekly; `--check` reports drift without writing.
+
+A note on what this displaced: six of the tri-county CivicPlus sources
+(Davie, Hollywood, Pembroke Pines, Homestead, Dania Beach, Lauderdale Lakes)
+had been returning zero bids because those cities moved to OpenGov. The scout
+was reporting them as healthy and empty rather than as migrated.
+
 ### Bonfire — 23 Florida agencies, free JSON
 
 Bonfire publishes open opportunities through an unauthenticated JSON endpoint.
@@ -101,7 +137,7 @@ platform in this space, and SAM.gov is a documented free federal API.
 ## 2. The bid mailbox — for portals that only tell registered vendors
 
 Several platforms show nothing useful without a login: Public Purchase (228
-Florida agencies), OpenGov, BidNet, Ionwave, Periscope. Registering is free.
+Florida agencies), BidNet, Ionwave, Periscope. Registering is free.
 The catch is that a human then has to read a lot of email.
 
 The clean version of "get every deal from every agency" is therefore:
@@ -209,9 +245,11 @@ geography, agency discovery, 358 sources.
 parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
-**Phase 3 — the remaining platforms.** OpenGov (needs a headless browser to get
-past Cloudflare), Ionwave (needs a session-cookie handshake), Vendor Registry,
-Jaggaer for the universities, FDOT's letting pages for construction.
+**Phase 3 — the remaining platforms.** Ionwave (needs a session-cookie
+handshake), Vendor Registry, VendorLink (156 agencies in a public dropdown),
+Jaggaer for the universities, FDOT's letting pages for construction. OpenGov
+was on this list and is now done — the lesson being to probe the API host
+before concluding a platform needs a browser.
 
 **Phase 4 — the long tail.** The ~410 cities on CivicPlus and similar CMS bid
 boards, driven off the Florida League of Cities directory, and the special

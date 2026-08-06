@@ -119,9 +119,10 @@ the same recurring buy while "Roof Repairs Fire Station 12" and "Roof Repairs
 Water Plant" stay distinct. Matches show as `prior_cycles` and
 `last_cycle_closed`, and as a 🔁 badge in the UI.
 
-Coverage is limited to agencies whose portal exposes an archive — currently the
-Bonfire ones (Broward County, Town of Palm Beach, FAU, Tri-Rail), about 945
-past solicitations.
+Coverage is limited to agencies whose portal exposes an archive — the Bonfire
+ones (Broward County, Town of Palm Beach, FAU, Tri-Rail), about 945 past
+solicitations, plus the 91 OpenGov tenants, whose public project list carries
+closed and awarded projects alongside open ones.
 
 ## Bid alerts by email
 

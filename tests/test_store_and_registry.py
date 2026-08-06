@@ -11,7 +11,12 @@ import yaml
 from src.models.opportunity import HealthStatus, SourceHealth
 from src.pipeline import store
 from src.fl_geo import COUNTY_NAMES, PSEUDO_COUNTIES
-from src.sources.registry import ADAPTERS, get_adapters, load_source_config
+from src.sources.registry import (
+    ADAPTERS,
+    _superseded_catalog_ids,
+    get_adapters,
+    load_source_config,
+)
 
 
 @pytest.fixture
@@ -113,7 +118,116 @@ def test_shipped_config_has_no_duplicate_ids():
 
 
 def test_every_shipped_source_builds():
-    assert len(get_adapters(strict=True)) == len(load_source_config())
+    """Every configured entry becomes an adapter, bar the superseded pointers."""
+    configs = load_source_config()
+    built = get_adapters(strict=True)
+    assert len(built) == len(configs) - len(_superseded_catalog_ids(configs))
+
+
+def test_a_catalog_pointer_yields_to_a_live_source_for_the_same_agency(tmp_path):
+    """Otherwise "go register at this portal" sits next to that portal's bids."""
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(
+        yaml.safe_dump(
+            {
+                "sources": [
+                    {
+                        "id": "davie_pointer",
+                        "name": "Town of Davie (Public Purchase)",
+                        "county": "broward",
+                        "agency": "Town of Davie",
+                        "adapter": "catalog",
+                        "live_fetch": False,
+                        "portal_url": "https://publicpurchase.com/davie",
+                    },
+                    {
+                        "id": "og_davie",
+                        "name": "Davie (OpenGov)",
+                        "county": "broward",
+                        "agency": "Davie",
+                        "adapter": "opengov",
+                        "opengov_code": "davie-fl",
+                        "portal_url": "https://procurement.opengov.com/portal/davie-fl",
+                    },
+                ]
+            }
+        )
+    )
+    assert [a.source_id for a in get_adapters(config_path=cfg)] == ["og_davie"]
+
+
+def test_a_catalog_pointer_survives_when_nothing_else_covers_the_agency(tmp_path):
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(
+        yaml.safe_dump(
+            {
+                "sources": [
+                    {
+                        "id": "lonely_pointer",
+                        "name": "City of Nowhere (Public Purchase)",
+                        "county": "broward",
+                        "agency": "City of Nowhere",
+                        "adapter": "catalog",
+                        "live_fetch": False,
+                        "portal_url": "https://publicpurchase.com/nowhere",
+                    },
+                    {
+                        "id": "og_elsewhere",
+                        "name": "Elsewhere (OpenGov)",
+                        "county": "broward",
+                        "agency": "City of Elsewhere",
+                        "adapter": "opengov",
+                        "opengov_code": "elsewhere",
+                        "portal_url": "https://procurement.opengov.com/portal/elsewhere",
+                    },
+                ]
+            }
+        )
+    )
+    assert {a.source_id for a in get_adapters(config_path=cfg)} == {
+        "lonely_pointer",
+        "og_elsewhere",
+    }
+
+
+def test_a_disabled_live_source_does_not_supersede_its_pointer(tmp_path):
+    """A source someone switched off covers nothing, so the pointer still earns its place."""
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(
+        yaml.safe_dump(
+            {
+                "sources": [
+                    {
+                        "id": "pointer",
+                        "name": "City of Ocoee (Public Purchase)",
+                        "county": "orange",
+                        "agency": "City of Ocoee",
+                        "adapter": "catalog",
+                        "live_fetch": False,
+                        "portal_url": "https://publicpurchase.com/ocoee",
+                    },
+                    {
+                        "id": "og_ocoee",
+                        "name": "Ocoee (OpenGov)",
+                        "county": "orange",
+                        "agency": "Ocoee",
+                        "adapter": "opengov",
+                        "live_fetch": False,
+                        "opengov_code": "ocoeefl",
+                        "portal_url": "https://procurement.opengov.com/portal/ocoeefl",
+                    },
+                ]
+            }
+        )
+    )
+    assert "pointer" in {a.source_id for a in get_adapters(config_path=cfg)}
+
+
+def test_the_shipped_config_supersedes_only_catalog_entries():
+    configs = load_source_config()
+    by_id = {c["id"]: c for c in configs if isinstance(c, dict) and c.get("id")}
+    for sid in _superseded_catalog_ids(configs):
+        assert by_id[sid]["adapter"] == "catalog"
 
 
 def test_unknown_adapter_is_skipped_not_fatal(tmp_path):
