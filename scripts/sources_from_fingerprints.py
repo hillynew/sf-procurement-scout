@@ -48,6 +48,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.fl_geo import COUNTY_NAMES, infer_county  # noqa: E402
+from src.terms import GRANDFATHERED, may_build_adapter, verdict_for  # noqa: E402
 
 FINGERPRINTS = Path("data/registry/fingerprints.jsonl")
 OUT = Path("config/sources.fingerprinted.yaml")
@@ -85,7 +86,6 @@ PLATFORM_ADAPTERS: Dict[str, tuple] = {
 #: and in one case a JavaScript file.
 DISCOVERED_ELSEWHERE = {
     "vendorlink": "scripts/discover_vendorlink.py owns these — it reads the agency dropdown",
-    "vendor_registry": "config/sources.vendor_registry.yaml is built from the buyer list",
 }
 
 HEADER = (
@@ -288,6 +288,16 @@ def main() -> int:
             continue
         if row["platform"] in DISCOVERED_ELSEWHERE:
             skipped[f"{row['platform']} ({DISCOVERED_ELSEWHERE[row['platform']]})"] += 1
+            continue
+        if not may_build_adapter(row["platform"]) and row["platform"] not in GRANDFATHERED:
+            # The terms decide, not the endpoint. `src/terms.py` carries the
+            # verdict and the clause behind it; a platform that forbids reading
+            # never becomes a configured source, however easy it looks. This is
+            # the second route into the fetcher — an adapter is the first — and
+            # 36 DemandStar fingerprints sit in the registry waiting for it.
+            verdict = verdict_for(row["platform"])
+            reason = verdict.status if verdict else "no recorded terms verdict"
+            skipped[f"{row['platform']} (terms: {reason})"] += 1
             continue
         if row["platform"] not in PLATFORM_ADAPTERS:
             skipped[f"{row['platform']} (no adapter in this build)"] += 1
