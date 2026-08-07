@@ -389,7 +389,6 @@ tractable. Counts are what is configured and answering today.
 | **CivicPlus Bids** | 89 | One parser for byte-identical markup across hundreds of city bid boards |
 | **VendorLink** | 66 | Florida-native ASP.NET grid, paged via ViewState postbacks. List-only: detail is behind a login |
 | **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
-| **DemandStar** | 14 | **List only.** `api.demandstar.com/contents/agency/search?id=<guid>` — the base the app itself calls `urlNoAuth` — returns the agency's most recent 100 solicitations as open JSON. Every detail endpoint answers 401, so the row links the public bid page rather than being enriched |
 | **Ionwave** | 4 | Four public lists the tenant's own login page links to, no cookie needed. Cloudflare challenges the fourth request on a session, so `fetch` costs exactly one |
 | **Vendor Registry** | 5 | **Archive only.** The platform's current list reports no open solicitations for any buyer in any state; these agencies post on OpenGov, Bonfire and BidNet now. 1,098 past solicitations that back-fill recurrence for the feeds that replaced them |
 | **Workday Strategic Sourcing** | 3 | UNF, St. Johns County and Hillsborough Community College, all arrived here in 2026. Apollo GraphQL behind an `X-XSRF-TOKEN` handshake; only the public-portal host is read, never the authenticated one |
