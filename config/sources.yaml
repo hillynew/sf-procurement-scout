@@ -172,14 +172,20 @@ sources:
     portal_url: https://www.davie-fl.gov/bids.aspx
     register_url: https://www.davie-fl.gov/bids.aspx
 
+  # Moved to Ionwave. The CivicPlus board still resolves and still renders,
+  # and says "There are no open bid postings at this time" while the city has
+  # six open on Ionwave — so the old config read as a quiet agency rather than
+  # a migrated one. Same trap as Solid Waste Authority's move to Bonfire.
+  # The id is kept so stored opportunities and history stay attached to it.
   - id: deerfield_beach
     name: City of Deerfield Beach
     county: broward
     agency: City of Deerfield Beach
     live_fetch: true
-    adapter: civicplus
-    portal_url: https://www.deerfield-beach.com/bids.aspx
-    register_url: https://www.deerfield-beach.com/bids.aspx
+    adapter: ionwave
+    ionwave_host: deerfield-beach.ionwave.net
+    portal_url: https://deerfield-beach.ionwave.net/SourcingEvents.aspx?SourceType=1
+    register_url: https://deerfield-beach.ionwave.net/VendorRegistration/Register.aspx
 
   - id: tamarac
     name: City of Tamarac

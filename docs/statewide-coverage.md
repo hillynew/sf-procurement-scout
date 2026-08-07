@@ -21,8 +21,8 @@ free, and what it costs when we cannot.
 |---|---|
 | Florida public entities that buy things | ~2,600 (67 counties, 411 cities, 67 school districts, 40 colleges/universities, ~2,000 special districts) |
 | Platforms they post on | ~10 cover the overwhelming majority |
-| Free and already working | MyFloridaMarketPlace, OpenGov, Bonfire, CivicPlus, Bid Express, SAM.gov |
-| Free but needs a vendor account | Public Purchase, BidNet Direct, Ionwave, Periscope |
+| Free and already working | MyFloridaMarketPlace, OpenGov, Bonfire, CivicPlus, Bid Express, SAM.gov, VendorLink, Ionwave |
+| Free but needs a vendor account | Public Purchase, BidNet Direct, Periscope |
 | Worth paying for | VendorLink ($175/yr statewide), Euna Pro ($50/yr) |
 | Do not scrape | DemandStar — their terms explicitly prohibit it |
 | **Realistic all-in cost** | **$225–$400/yr, versus $60/county/yr on DemandStar alone** |
@@ -160,7 +160,7 @@ platform in this space, and SAM.gov is a documented free federal API.
 ## 2. The bid mailbox — for portals that only tell registered vendors
 
 Several platforms show nothing useful without a login: Public Purchase (228
-Florida agencies), BidNet, Ionwave, Periscope. Registering is free.
+Florida agencies), BidNet, Periscope. Registering is free.
 The catch is that a human then has to read a lot of email.
 
 The clean version of "get every deal from every agency" is therefore:
@@ -268,11 +268,15 @@ geography, agency discovery, 358 sources.
 parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
-**Phase 3 — the remaining platforms.** Ionwave (needs a session-cookie
-handshake), Vendor Registry, VendorLink (156 agencies in a public dropdown),
-Jaggaer for the universities, FDOT's letting pages for construction. OpenGov
-was on this list and is now done — the lesson being to probe the API host
-before concluding a platform needs a browser.
+**Phase 3 — the remaining platforms.** Vendor Registry, Jaggaer for the
+universities, FDOT's letting pages for construction. OpenGov, VendorLink and
+Ionwave were all on this list and are now done, and all three came off it the
+same way: the route that had been checked was not the route that is public.
+OpenGov's list endpoint is a POST on the API host, not a GET on the portal.
+Ionwave was filed here as "needs a session-cookie handshake" — it needs no
+cookie at all; `/` redirects to a login and `SourcingEvents.aspx?SourceType=1`,
+which the login page itself links to, does not. Probe the whole surface before
+concluding a platform needs a browser or an account.
 
 **Phase 4 — the long tail.** The ~410 cities on CivicPlus and similar CMS bid
 boards, driven off the Florida League of Cities directory, and the special

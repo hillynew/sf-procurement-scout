@@ -1,0 +1,46 @@
+# Ionwave Florida agencies.
+#
+# Small on purpose: these are the four Florida entities the fingerprint sweep
+# (scripts/fingerprint_agencies.py) matched on the `.ionwave.net` signature,
+# and the platform publishes no tenant directory to enumerate — its own
+# supplier-login page lists none. New tenants arrive the same way these did,
+# by re-running the sweep, rather than by guessing subdomains at the platform.
+#
+# Each is list-only: the row click that opens a bid needs a signed-in session.
+# The list carries the reference number, type, issue date and close date/time,
+# and — on the awarded list — the award date the 72-hour protest clock runs on.
+#
+# Verified 2026-08-07: all four serve SourcingEvents.aspx?SourceType=1 to an
+# anonymous session with no handshake. 18 current bids between them.
+#
+# Deerfield Beach is the fourth and is not here: it already had a hand-written
+# entry in sources.yaml pointing at its old CivicPlus board, so that entry was
+# moved to this adapter in place rather than duplicated under a new id.
+sources:
+- id: iw_coconut_creek
+  name: City of Coconut Creek (Ionwave)
+  county: broward
+  agency: City of Coconut Creek
+  live_fetch: true
+  adapter: ionwave
+  platform: ionwave
+  ionwave_host: coconutcreek.ionwave.net
+  portal_url: https://coconutcreek.ionwave.net/SourcingEvents.aspx?SourceType=1
+- id: iw_lee_county
+  name: Lee County (Ionwave)
+  county: lee
+  agency: Lee County Board of County Commissioners
+  live_fetch: true
+  adapter: ionwave
+  platform: ionwave
+  ionwave_host: leegov.ionwave.net
+  portal_url: https://leegov.ionwave.net/SourcingEvents.aspx?SourceType=1
+- id: iw_pasco_schools
+  name: Pasco County School District (Ionwave)
+  county: pasco
+  agency: Pasco County School District
+  live_fetch: true
+  adapter: ionwave
+  platform: ionwave
+  ionwave_host: pascok12.ionwave.net
+  portal_url: https://pascok12.ionwave.net/SourcingEvents.aspx?SourceType=1

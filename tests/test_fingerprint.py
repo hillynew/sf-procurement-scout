@@ -232,3 +232,17 @@ def test_the_signature_table_keeps_the_platforms_we_actually_fetch(platform, nee
     """These three back live adapters; losing their signature would be silent."""
     table = {name: strong for name, strong, _weak in fp.PLATFORM_SIGNATURES}
     assert needle in table[platform]
+
+
+def test_an_entity_encoded_href_still_yields_a_portal_url():
+    """SharePoint sites write `https&#58;//host/...`, and every pattern missed it.
+
+    Lee County's row went out with `portal_url: null` for exactly this reason —
+    the platform matched on the page, but the host had to be read off by hand.
+    """
+    from src.pipeline.fingerprint import portal_url_for
+
+    html = '<a href="https&#58;//leegov.ionwave.net/HomePage.aspx">Bids</a>'
+    assert portal_url_for("ionwave", html, "https://www.leegov.com") == (
+        "https://leegov.ionwave.net/HomePage.aspx"
+    )

@@ -1,14 +1,14 @@
 # SF Procurement Scout
 
 Live aggregator for government procurement across **Florida** — every state
-agency through MyFloridaMarketPlace, plus **289 live local sources** on five
-platforms (OpenGov, CivicPlus, VendorLink, Bonfire, and a handful of bespoke
-portals), **federal bids in Florida** via SAM.gov, and a catalog of the portals
-that cannot be read without an account.
+agency through MyFloridaMarketPlace, plus **292 live local sources** on six
+platforms (OpenGov, CivicPlus, VendorLink, Bonfire, Ionwave, and a handful of
+bespoke portals), **federal bids in Florida** via SAM.gov, and a catalog of the
+portals that cannot be read without an account.
 
 It started as a tri-county tool. The county field now takes any of Florida's 67,
 and coverage grew by writing one adapter per *platform* rather than per agency:
-one OpenGov adapter serves 91 agencies, one CivicPlus parser serves 90.
+one OpenGov adapter serves 91 agencies, one CivicPlus parser serves 89.
 
 **GitHub:** [hillynew/sf-procurement-scout](https://github.com/hillynew/sf-procurement-scout)
 
@@ -342,13 +342,14 @@ tractable. Counts are what is configured and answering today.
 | Platform | Sources | How |
 |---|---:|---|
 | **OpenGov Procurement** | 91 | Open JSON API on `api.procurement.opengov.com`. The portal host is Cloudflare-challenged; the API host is not. Documents arrive as pre-signed S3 URLs. |
-| **CivicPlus Bids** | 90 | One parser for byte-identical markup across hundreds of city bid boards |
+| **CivicPlus Bids** | 89 | One parser for byte-identical markup across hundreds of city bid boards |
 | **VendorLink** | 66 | Florida-native ASP.NET grid, paged via ViewState postbacks. List-only: detail is behind a login |
 | **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
+| **Ionwave** | 4 | Four public lists the tenant's own login page links to, no cookie needed. Cloudflare challenges the fourth request on a session, so `fetch` costs exactly one |
 | **MyFloridaMarketPlace (VIP)** | 1 | Every state agency, university, college and water management district in one adapter, with anonymous PDF downloads |
 | **SAM.gov** | 1 | Federal solicitations with a Florida place of performance (free API key) |
 | Bespoke portals | 8 | Miami-Dade INFORMS and construction, West Palm Beach, MDC, Palm Beach Schools, notice links, the bid mailbox |
-| Catalog pointers | 227 | Portals that need an account — recorded so the gap is visible, and superseded automatically once an adapter can read the agency for real |
+| Catalog pointers | 226 | Portals that need an account — recorded so the gap is visible, and superseded automatically once an adapter can read the agency for real |
 
 Two registries drive this rather than hand-editing:
 
@@ -496,11 +497,19 @@ adapters, because a guardrail an adapter can forget is not a guardrail.
   — when `SF_SCOUT_FETCH_LOG` is set.
 - **We never create an account to harvest.** Where a portal's detail pages need
   a login, the adapter reports list-only rather than pretending.
+- **A bot challenge is a refusal, not backpressure.** Cloudflare's "Just a
+  moment" interstitial arrives with status 429, which reads as "slow down" and
+  is not: it counts requests per session, so waiting does not clear it and
+  retrying spends another. `http_util` raises `SourceBlocked` for it instead of
+  retrying into it. Ionwave serves it from about the fourth request, and a
+  *fresh* session is let straight through — so rotating sessions would walk
+  past it, and that is deliberately not done.
 
-One judgement call is written down rather than hidden: Bonfire serves
+Two judgement calls are written down rather than hidden. Bonfire serves
 `Disallow: /` across every tenant, and obeying it strictly costs 32 Florida
-agencies including Broward and Hillsborough. The exception lives in one table,
-`ROBOTS_OVERRIDES`, with its reasoning stated out loud, and
+agencies including Broward and Hillsborough; Ionwave — same vendor, Euna —
+serves the same file, for four more. Both exceptions live in one table,
+`ROBOTS_OVERRIDES`, with their reasoning stated out loud, and
 `SF_SCOUT_STRICT_ROBOTS=1` drops it. See `docs/statewide-coverage.md` for the
 per-host policy table.
 
