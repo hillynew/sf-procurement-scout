@@ -54,7 +54,13 @@ from ..netpolicy import RobotsDisallowed
 #: missed Osceola, whose VendorLink runs on the county's own subdomain rather
 #: than the vendor's.
 PLATFORM_SIGNATURES: List[Tuple[str, Tuple[str, ...], Tuple[str, ...]]] = [
-    ("bonfire", ("bonfirehub.com", "/PublicPortal/"), ("bonfire portal",)),
+    # `/PublicPortal/` was a second needle here, because that is the path
+    # Bonfire's own API lives under. It is not Bonfire's alone: JustFOIA serves
+    # public *records request* portals at `<agency>.justfoia.com/publicportal/`,
+    # and 15 Florida agencies linking one were recorded as strong Bonfire
+    # tenants with no Bonfire host to show for it. A signature that a second
+    # vendor also serves is not a signature.
+    ("bonfire", ("bonfirehub.com",), ("bonfire portal",)),
     ("opengov", ("procurement.opengov.com/portal/", "api.procurement.opengov.com"),
      ("opengov procurement",)),
     ("civicplus", ("/Common/Modules/Bids/RWDBids.css",), ()),

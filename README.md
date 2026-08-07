@@ -418,6 +418,12 @@ python scripts/sources_from_fingerprints.py    # strong matches → live sources
 Each one prints what it *skipped* and why. The gap between "verified" and
 "fetched" is the number worth watching, so none of them hide it.
 
+A source is identified by its **tenant**, not its hostname. CivicPlus and
+Bonfire give each agency its own host, so for them the two are the same thing;
+Jaggaer, VendorLink and BidNet put every agency in Florida behind one hostname,
+and treating the host as the identity meant that once one university was
+configured, every other one read as an already-configured duplicate.
+
 ### When the sweep says "unknown"
 
 `unknown` is the sweep's most useful output — it is the queue of things worth a
@@ -452,10 +458,17 @@ entities swept. Among them: the University of Florida and the University of
 South Florida, the two largest buyers in the state university system, neither
 of which was reachable by following links from a homepage.
 
-The 588 that are still unknown are mostly not a fingerprinting problem: 261 are
+A later pass removed one signature rather than adding one. `/PublicPortal/` is
+where Bonfire's API lives, and it was treated as proof of Bonfire — but
+JustFOIA serves public *records request* portals at the same path, so 15
+agencies linking one were recorded as Bonfire tenants. Rechecking them found
+their real platforms: CivicPlus, OpenGov, PlanetBids, DemandStar. A signature a
+second vendor also serves is not a signature.
+
+The 593 that are still unknown are mostly not a fingerprinting problem: 261 are
 special districts and small towns with no bid board to find, 207 are sites that
 cannot be reached from here at all — a bot wall, a bad certificate, a dead host
-— and 146 have a purchasing page that names no platform and lists no live work.
+— and 151 have a purchasing page that names no platform and lists no live work.
 
 ### Adding a city
 

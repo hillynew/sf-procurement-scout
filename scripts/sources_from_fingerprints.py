@@ -10,7 +10,7 @@ and deciding to crawl it every day are different decisions, and the second one
 should be reviewable: this writes one generated file, prints what it skipped
 and why, and can be re-run without touching anything a human tuned by hand.
 
-Three rules the output depends on:
+Four rules the output depends on:
 
 * **Strong matches only.** A weak fingerprint means the platform's name appeared
   in prose — usually "go register over there" — which is a lead, not a tenant.
@@ -19,7 +19,13 @@ Three rules the output depends on:
   can read the board. Every candidate is fetched once, and only the ones that
   answer are written. This is where the CivicPlus pointer pages fall out.
 * **Never shadow an existing source.** Anything already configured by hand or by
-  another generator wins, matched on both source id and portal host.
+  another generator wins, matched on source id and on tenant.
+* **The tenant is the identity, not the host.** CivicPlus and Bonfire give each
+  agency its own hostname, so for them the two are the same thing. Jaggaer,
+  VendorLink and BidNet put every agency in Florida behind one hostname, and
+  matching prior art on the host alone meant that once Florida State was
+  configured, every other university read as a duplicate — the University of
+  Florida included, silently, with no line in the report to say so.
 
 Usage::
 
@@ -47,12 +53,39 @@ FINGERPRINTS = Path("data/registry/fingerprints.jsonl")
 OUT = Path("config/sources.fingerprinted.yaml")
 CONFIG_DIR = Path("config")
 
-#: Fingerprint platform -> the adapter that reads it. Only platforms in this
-#: map can become sources; everything else is reported as an outstanding gap.
-PLATFORM_ADAPTERS = {
-    "civicplus": "civicplus",
-    "bonfire": "bonfire",
-    "opengov": "opengov",
+#: Fingerprint platform -> (adapter, the config key naming the tenant, a regex
+#: recovering that key from the portal URL). Only platforms in this map can
+#: become sources; everything else is reported as an outstanding gap.
+#:
+#: The tenant key is what makes a shared-host platform configurable at all.
+#: CivicPlus and Bonfire give each agency its own host, so the host *is* the
+#: tenant; Jaggaer, VendorLink and BidNet put every agency in the state behind
+#: one hostname, and without the key there is nothing to tell two of them apart.
+PLATFORM_ADAPTERS: Dict[str, tuple] = {
+    "civicplus": ("civicplus", None, None),
+    "bonfire": ("bonfire", "bonfire_host", r"https?://([a-z0-9-]+\.bonfirehub\.com)"),
+    "opengov": ("opengov", "opengov_code", r"/portal/([a-z0-9_-]+)"),
+    "ionwave": ("ionwave", "ionwave_host", r"https?://([a-z0-9-]+\.ionwave\.net)"),
+    "jaggaer": ("jaggaer", "jaggaer_org", r"[?&]CustomerOrg=([A-Za-z0-9_-]+)"),
+    # Either host carries the tenant as its first label. The auth host is the
+    # one fingerprints usually land on, and the one this must never configure —
+    # see `_portal_for`.
+    "workday_sourcing": (
+        "workday_sourcing", "workday_tenant",
+        r"https?://([a-z0-9-]+)\.(?:public-portal\.)?us\.workdayspend\.com",
+    ),
+}
+
+#: Platforms with an adapter that this generator still leaves alone, and why.
+#: Both have a dedicated discoverer that reads the platform's own agency list,
+#: which yields the tenant key directly; a fingerprint lands on whatever page
+#: the agency happened to link, and for these two that is almost never a URL
+#: carrying the key. Measured: of 15 VendorLink fingerprints, *none* carried the
+#: `a=` agency id — they point at login pages, home pages, an agency-named path,
+#: and in one case a JavaScript file.
+DISCOVERED_ELSEWHERE = {
+    "vendorlink": "scripts/discover_vendorlink.py owns these — it reads the agency dropdown",
+    "vendor_registry": "config/sources.vendor_registry.yaml is built from the buyer list",
 }
 
 HEADER = (
@@ -78,10 +111,23 @@ def load_fingerprints(path: Path) -> List[Dict]:
     return list(recorded(path).values())
 
 
+#: Every config key that names a tenant, whatever platform it belongs to. A
+#: hand-written source is claimed by its tenant the same way a generated one
+#: is, or the two would not recognise each other.
+_TENANT_KEYS = tuple(
+    entry[1] for entry in PLATFORM_ADAPTERS.values() if entry[1]
+) + ("vendorlink_agency", "vendor_registry_buyer")
+
+
 def existing() -> tuple[set, set]:
-    """(source ids, portal hosts) already configured, from every config file."""
+    """(source ids, identities) already configured, from every config file.
+
+    An identity is a host, or a host and a tenant where the platform has one —
+    see `identity`. Both forms are recorded for a configured source, because a
+    platform that gives each agency its own host is claimed by that host alone.
+    """
     ids: set = set()
-    hosts: set = set()
+    claimed: set = set()
     for path in sorted(CONFIG_DIR.glob("sources*.yaml")):
         if path.resolve() == OUT.resolve():
             continue
@@ -91,22 +137,46 @@ def existing() -> tuple[set, set]:
                 continue
             if cfg.get("id"):
                 ids.add(cfg["id"])
+            tenants = [str(cfg[k]).lower() for k in _TENANT_KEYS if cfg.get(k)]
             for key in ("portal_url", "bonfire_host"):
                 value = cfg.get(key)
-                if value:
-                    hosts.add(urlsplit(str(value)).netloc.lower() or str(value).lower())
-    return ids, hosts
+                if not value:
+                    continue
+                host = urlsplit(str(value)).netloc.lower() or str(value).lower()
+                # A shared-host platform is claimed per tenant; a one-host-per-
+                # agency platform is claimed by the host. Recording both is what
+                # lets one function answer for either.
+                claimed.update(f"{host}#{t}" for t in tenants)
+                if not tenants:
+                    claimed.add(host)
+    return ids, claimed
 
 
 def _slug(entity_id: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", entity_id.lower()).strip("_")
 
 
+def _portal_for(platform: str, tenant: str, portal: str) -> str:
+    """The URL a configured source should carry, given its tenant.
+
+    Only Workday needs rewriting, and it needs it badly:
+    `<tenant>.us.workdayspend.com` is the authenticated supplier app and serves
+    `Disallow: /`, while `<tenant>.public-portal.us.workdayspend.com` is the
+    open board. A fingerprint almost always lands on the first — the agency
+    links its registration page — and configuring that URL would point a
+    crawler at a host we are not allowed to read.
+    """
+    if platform == "workday_sourcing":
+        return f"https://{tenant}.public-portal.us.workdayspend.com/opportunities"
+    return portal
+
+
 def to_source(row: Dict) -> Optional[Dict]:
-    adapter = PLATFORM_ADAPTERS.get(row["platform"])
+    entry = PLATFORM_ADAPTERS.get(row["platform"])
     portal = row.get("portal_url") or row.get("checked_url")
-    if not adapter or not portal:
+    if not entry or not portal:
         return None
+    adapter, key, pattern = entry
 
     # Roster URLs are frequently http://, and the fingerprint records wherever
     # it actually landed. A configured source must not fetch a government bid
@@ -115,6 +185,16 @@ def to_source(row: Dict) -> Optional[Dict]:
     # which is the right outcome either way.
     if portal.startswith("http://"):
         portal = "https://" + portal[len("http://"):]
+
+    tenant = None
+    if key is not None:
+        m = re.search(pattern, portal, re.I)
+        if not m:
+            # The signature proved the platform; this URL does not name the
+            # tenant. Nothing configurable, and inventing one would be a guess.
+            return None
+        tenant = m.group(1)
+        portal = _portal_for(row["platform"], tenant, portal)
 
     name = row["name"]
     cfg = {
@@ -129,18 +209,26 @@ def to_source(row: Dict) -> Optional[Dict]:
     }
     if cfg["county"] not in COUNTY_NAMES:
         cfg["county"] = cfg["county"] or "unknown"
-
-    if adapter == "bonfire":
-        m = re.search(r"https?://([a-z0-9-]+)\.bonfirehub\.com", portal)
-        if not m:
-            return None
-        cfg["bonfire_host"] = f"{m.group(1)}.bonfirehub.com"
-    if adapter == "opengov":
-        m = re.search(r"/portal/([a-z0-9_-]+)", portal)
-        if not m:
-            return None
-        cfg["opengov_code"] = m.group(1)
+    if key is not None:
+        cfg[key] = tenant
     return cfg
+
+
+def identity(cfg: Dict) -> str:
+    """What makes this source the same source as one already configured.
+
+    The host alone is wrong, and wrong in the direction that hides work. Every
+    Jaggaer tenant in Florida lives on `bids.sciquest.com`, so once one
+    university was configured, matching on host silently dropped every other
+    one as "already configured" — the University of Florida included. Where a
+    platform names its tenant, the tenant is the identity.
+    """
+    entry = PLATFORM_ADAPTERS.get(cfg.get("platform") or "")
+    key = entry[1] if entry else None
+    host = urlsplit(cfg["portal_url"]).netloc.lower()
+    if key and cfg.get(key):
+        return f"{host}#{str(cfg[key]).lower()}"
+    return host
 
 
 def probe(candidates: List[Dict]) -> List[Dict]:
@@ -181,7 +269,7 @@ def main() -> int:
         return 1
 
     print(f"fingerprints: {len(rows)}")
-    known_ids, known_hosts = existing()
+    known_ids, known_hosts = existing()  # ids and identities — see `identity`
     skipped: Counter = Counter()
     candidates: List[Dict] = []
 
@@ -198,22 +286,25 @@ def main() -> int:
         if row.get("confidence") != "strong":
             skipped[f"{row['platform']} (weak match — a lead, not a tenant)"] += 1
             continue
+        if row["platform"] in DISCOVERED_ELSEWHERE:
+            skipped[f"{row['platform']} ({DISCOVERED_ELSEWHERE[row['platform']]})"] += 1
+            continue
         if row["platform"] not in PLATFORM_ADAPTERS:
             skipped[f"{row['platform']} (no adapter in this build)"] += 1
             continue
 
         cfg = to_source(row)
         if cfg is None:
-            skipped[f"{row['platform']} (no usable portal URL)"] += 1
+            skipped[f"{row['platform']} (the URL does not name the tenant)"] += 1
             continue
         if cfg["id"] in known_ids:
             skipped["already configured (id)"] += 1
             continue
-        host = urlsplit(cfg["portal_url"]).netloc.lower()
-        if host in known_hosts:
-            skipped["already configured (host)"] += 1
+        who = identity(cfg)
+        if who in known_hosts:
+            skipped["already configured (same tenant)"] += 1
             continue
-        known_hosts.add(host)
+        known_hosts.add(who)
         candidates.append(cfg)
 
     print(f"candidates on a platform we can fetch: {len(candidates)}")

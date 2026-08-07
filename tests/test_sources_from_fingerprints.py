@@ -95,6 +95,112 @@ def test_a_platform_with_no_adapter_yields_nothing():
     assert mod.to_source(_fp(platform="demandstar")) is None
 
 
+# -- platforms that put every agency behind one hostname -------------------
+
+
+def test_a_jaggaer_match_carries_its_customer_org():
+    cfg = mod.to_source(_fp(
+        platform="jaggaer", name="University of Florida",
+        portal_url="https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=Florida",
+    ))
+
+    assert cfg["adapter"] == "jaggaer"
+    assert cfg["jaggaer_org"] == "Florida"
+
+
+def test_two_jaggaer_universities_are_two_sources(workspace, capsys):
+    """The bug this table change exists for. Every Jaggaer tenant in Florida
+    lives on `bids.sciquest.com`, so matching prior art on the host alone meant
+    that once FSU was configured, every other university read as a duplicate —
+    the University of Florida included, silently, with no line in the report.
+    """
+    _config(workspace, "sources.yaml", [{
+        "id": "jaggaer_fsu", "name": "FSU", "county": "leon", "agency": "Florida State University",
+        "adapter": "jaggaer", "platform": "jaggaer", "jaggaer_org": "FSU",
+        "portal_url": "https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FSU",
+    }])
+    _write_fps(workspace, [
+        _fp(entity_id="uni-fsu", name="Florida State University", platform="jaggaer",
+            portal_url="https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FSU"),
+        _fp(entity_id="uni-uf", name="University of Florida", platform="jaggaer",
+            portal_url="https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=Florida"),
+    ])
+    sys.argv = ["x", "--check", "--no-probe"]
+    mod.main()
+
+    out = capsys.readouterr().out
+    assert "candidates on a platform we can fetch: 1" in out, "UF is new; FSU is not"
+    assert "already configured (same tenant)" in out
+
+
+def test_an_ionwave_match_carries_its_host():
+    cfg = mod.to_source(_fp(
+        platform="ionwave", name="Lee County",
+        portal_url="https://leegov.ionwave.net/HomePage.aspx",
+    ))
+
+    assert cfg["ionwave_host"] == "leegov.ionwave.net"
+
+
+def test_a_workday_match_is_pointed_at_the_public_portal():
+    """The host a fingerprint lands on is the agency's registration page, on
+    `<tenant>.us.workdayspend.com` — the authenticated app, which serves
+    `Disallow: /`. Configuring that URL would point a crawler at a host we are
+    not allowed to read; the tenant is the same, the host is not.
+    """
+    cfg = mod.to_source(_fp(
+        platform="workday_sourcing", name="Hillsborough Community College",
+        portal_url="https://hillsborough-community-college.us.workdayspend.com/supplier_self_registration",
+    ))
+
+    assert cfg["workday_tenant"] == "hillsborough-community-college"
+    assert cfg["portal_url"] == (
+        "https://hillsborough-community-college.public-portal.us.workdayspend.com/opportunities"
+    )
+
+
+def test_a_workday_fingerprint_on_the_public_host_reads_the_same_tenant():
+    cfg = mod.to_source(_fp(
+        platform="workday_sourcing", name="UNF",
+        portal_url="https://unf.public-portal.us.workdayspend.com/opportunities",
+    ))
+
+    assert cfg["workday_tenant"] == "unf"
+
+
+def test_a_shared_host_row_that_names_no_tenant_is_dropped(workspace, capsys):
+    """Not one of the 15 VendorLink fingerprints carried the agency id: they
+    point at login pages, home pages, and in one case a JavaScript file. A
+    signature proves the platform; it does not always name which agency, and
+    there is nothing to configure without that."""
+    assert mod.to_source(_fp(
+        platform="jaggaer", portal_url="https://bids.sciquest.com/apps/Router/Login",
+    )) is None
+
+
+def test_the_platforms_with_their_own_discoverer_are_left_to_it(workspace, capsys):
+    """VendorLink's agency ids come from the platform's own dropdown, which
+    yields the key directly. Guessing at it from whatever page an agency
+    happened to link is worse information about the same thing."""
+    _write_fps(workspace, [_fp(platform="vendorlink",
+                               portal_url="https://www.myvendorlink.com/external/home")])
+    sys.argv = ["x", "--check", "--no-probe"]
+    mod.main()
+
+    out = capsys.readouterr().out
+    assert "discover_vendorlink.py" in out
+    assert "candidates on a platform we can fetch: 0" in out
+
+
+def test_every_mapped_platform_has_an_adapter_that_exists():
+    """The map said "no adapter in this build" for four platforms this build
+    had already grown adapters for. A stale map is a silent gap."""
+    from src.sources.registry import ADAPTERS
+
+    for platform, (adapter, _key, _pattern) in mod.PLATFORM_ADAPTERS.items():
+        assert adapter in ADAPTERS, f"{platform} -> {adapter}"
+
+
 # -- what must not become a source -----------------------------------------
 
 
@@ -127,7 +233,7 @@ def test_an_already_configured_host_is_not_duplicated(workspace, capsys):
     mod.main()
 
     out = capsys.readouterr().out
-    assert "already configured (host)" in out
+    assert "already configured (same tenant)" in out
     assert "candidates on a platform we can fetch: 0" in out
 
 
@@ -203,4 +309,4 @@ def test_every_generated_source_satisfies_the_shipped_config_invariants():
     for cfg in (yaml.safe_load(path.read_text()) or {}).get("sources") or []:
         assert cfg["portal_url"].startswith("https://"), cfg["id"]
         assert cfg["county"] in valid, f"{cfg['id']}: {cfg['county']}"
-        assert cfg["adapter"] in {"civicplus", "bonfire", "opengov"}, cfg["id"]
+        assert cfg["adapter"] in {a for a, _k, _p in mod.PLATFORM_ADAPTERS.values()}, cfg["id"]
