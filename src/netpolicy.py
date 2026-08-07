@@ -185,6 +185,15 @@ ROBOTS_OVERRIDES: Dict[str, str] = {
     # one request per second. It remains a judgement call, not a settled one —
     # see docs/statewide-coverage.md.
     "*.bonfirehub.com": "public agency postings; agency's records, not the vendor's",
+    # Ionwave — same vendor family as Bonfire (both Euna), and the same
+    # blanket `Disallow: /` on every tenant subdomain. Same reasoning applies,
+    # and two further facts specific to it: the tenant's own login page links
+    # these lists to the public unauthenticated, and its site terms bind on
+    # registration rather than on reading, with no clause about automated
+    # access at all — checked 2026-08-07 against Coconut Creek's SiteTerms.
+    # The adapter reads one page per agency per cycle, and stops rather than
+    # working around the bot challenge that sits behind it.
+    "*.ionwave.net": "public agency postings; agency's records, not the vendor's",
 }
 
 

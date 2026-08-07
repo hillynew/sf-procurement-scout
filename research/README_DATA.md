@@ -402,3 +402,47 @@ tenant-discovery sweeps that treat it that way will under-count.
 through OpenGov (`og_levycounty`), so the unreadable Bonfire portal costs
 nothing. Miami-Dade County Public Schools is the one real gap from that pair,
 and it already has a catalog pointer (`mdcps_demandstar`).
+
+**5. Ionwave needs no vendor account and no session-cookie handshake.**
+
+The report's platform table has the signature right (`.ionwave.net`,
+`ctl00_mainContent_rgBidList`), and `docs/statewide-coverage.md` filed the
+platform under "free but needs a vendor account", Phase 3, "needs a
+session-cookie handshake". Both descriptions are wrong, and wrong the same way
+the OpenGov note was: the route that was checked is not the route that is
+public.
+
+`/` and `/CurrentSourcingEvents.aspx` do redirect to `Login.aspx`. The login
+page then links, unauthenticated, to five public lists — `SourcingEvents.aspx`
+with `SourceType=1..4` (current, closed, awarded, non-awarded) and
+`ActiveContractList.aspx`. Verified 7 Aug 2026 on a session with no cookies at
+all, so there is no handshake to perform:
+
+* Coconut Creek 2 current bids, Deerfield Beach 6, Lee County 9, Pasco County
+  Schools 1 — 18 open between the four Florida tenants.
+* The awarded list carries a real **Bid Award Date**, which is what puts an
+  Ionwave award on the s. 120.57(3)(b) 72-hour clock.
+* Lee County's `ActiveContractList.aspx` publishes **1,671 active contracts**
+  with supplier names and end dates.
+
+**The constraint is a bot challenge, not a login and not a rate limit.**
+Cloudflare serves its "Just a moment" interstitial — with status 429 — from
+about the fourth request on one session, identically at 1.5s, 3s and 5s
+spacing. Pacing does not move it. A *fresh* session is served immediately,
+which means rotating sessions would walk straight past it; `src/sources/ionwave.py`
+deliberately does not, and stops on the challenge instead. What fits inside
+that budget is one list page per agency per cycle, which is exactly what the
+routine fetch costs. The contract register does not fit — 67 pages for Lee
+County alone — and is not read rather than stored as a 1.5% sample.
+
+**6. Deerfield Beach had migrated off CivicPlus.** It was configured against
+`deerfield-beach.com/bids.aspx`, which still resolves, still renders, and says
+"There are no open bid postings at this time" while the city has six open on
+Ionwave. Same failure mode as Solid Waste Authority's move to Bonfire: a live
+page returning zero rows reads as a quiet agency rather than a moved one.
+
+**7. `portal_url` extraction missed entity-encoded hrefs.** SharePoint-built
+sites write `https&#58;//host/...`, which no pattern in
+`src/pipeline/fingerprint.py` matched. It cost Lee County's portal URL — the
+platform matched, the row went out with `portal_url: null`, and the host had to
+be read off the page by hand. The HTML is unescaped before matching now.

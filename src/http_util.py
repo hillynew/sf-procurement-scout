@@ -13,8 +13,9 @@ from .netpolicy import check, log_fetch, user_agent_for
 
 # Re-exported so callers keep importing their HTTP vocabulary from one place.
 __all__ = [
-    "BROWSER_UA", "CRAWLER_UA", "DEFAULT_UA", "RobotsDisallowed", "SourceBlocked",
-    "get", "get_h2", "get_json", "session",
+    "BROWSER_UA", "CHALLENGE_MARKERS", "CRAWLER_UA", "DEFAULT_UA",
+    "RobotsDisallowed", "SourceBlocked",
+    "get", "get_h2", "get_json", "is_challenge", "session",
 ]
 
 #: The crawler identifies itself honestly. `src.netpolicy` keeps the browser
@@ -27,6 +28,13 @@ DEFAULT_UA = CRAWLER_UA
 RETRY_STATUS = {429, 500, 502, 503, 504}
 DEFAULT_RETRIES = 2
 DEFAULT_BACKOFF = 1.5
+
+#: Fragments of Cloudflare's managed-challenge interstitial. It arrives with
+#: status 429, which reads as "slow down" and is not: the challenge counts
+#: requests per session, so waiting does not clear it and retrying only spends
+#: another request against the same limit. Ionwave serves this from about the
+#: fourth request on one session, at any spacing.
+CHALLENGE_MARKERS = ("just a moment", "challenges.cloudflare.com", "cf-chl")
 
 
 class SourceBlocked(RuntimeError):
@@ -106,6 +114,11 @@ def get(
             # A refusal is not retried and not worked around from another angle;
             # continued access after one is the fact pattern worth avoiding.
             raise SourceBlocked(f"{resp.status_code} blocked by portal: {url}")
+        if is_challenge(resp):
+            # Same rule, different disguise. A bot challenge is the operator
+            # asking us to prove we are not a crawler, and we are one, so this
+            # is a refusal rather than the backpressure its 429 implies.
+            raise SourceBlocked(f"bot challenge served instead of the page: {url}")
         if resp.status_code in RETRY_STATUS and attempt < retries:
             _sleep_backoff(attempt)
             continue
@@ -114,6 +127,23 @@ def get(
 
     # Only reachable when the final attempt raised a RequestException.
     raise last_exc  # pragma: no cover
+
+
+def is_challenge(resp) -> bool:
+    """True when the response is a bot-challenge interstitial, not the page.
+
+    Checked on the body rather than the status alone: 429 is also honest
+    backpressure from portals that mean it, and those are worth retrying.
+    Only the head of the body is read — the challenge declares itself in its
+    `<title>` and CSP, and a real page can be megabytes.
+    """
+    try:
+        if getattr(resp, "status_code", None) not in (403, 429, 503):
+            return False
+        head = (resp.text or "")[:4000].lower()
+    except Exception:  # noqa: BLE001 — an unreadable body is not a challenge
+        return False
+    return any(marker in head for marker in CHALLENGE_MARKERS)
 
 
 def get_json(url: str, **kwargs):

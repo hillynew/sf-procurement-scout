@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from html import unescape
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlsplit
 
@@ -171,7 +172,12 @@ def portal_url_for(platform: str, html: str, base: str) -> Optional[str]:
     }
     pattern = patterns.get(platform)
     if pattern:
-        m = re.search(pattern, html, re.I)
+        # SharePoint-generated sites write their hrefs entity-encoded —
+        # `https&#58;//leegov.ionwave.net/...` — so every one of these patterns
+        # misses on them. It cost Lee County's portal URL: the platform was
+        # matched, the row went out with `portal_url: null`, and the host had
+        # to be read off the page by hand later.
+        m = re.search(pattern, unescape(html), re.I)
         if m:
             return m.group(0).rstrip("\"'")
     return base if platform == "civicplus" else None
