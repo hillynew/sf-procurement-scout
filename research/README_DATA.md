@@ -734,3 +734,40 @@ DemandStar, now no signature), City of Palm Coast (was Bonfire, now HTTPError)
 and City of Sanford (was VendorLink, procurement page HTTPError) are almost
 certainly a slow site and two transient errors. Reporting them alongside real
 migrations would cry wolf on every sweep.
+
+**18. Workday Strategic Sourcing is readable, and the header is the trick.**
+Correction 17 catalogued it as login-gated. Half right: it has two hosts one
+word apart and opposite in what they permit.
+
+| host | what it is | robots.txt |
+|---|---|---|
+| `<tenant>.us.workdayspend.com` | authenticated supplier app | `Disallow: /` |
+| `<tenant>.public-portal.us.workdayspend.com` | public opportunity portal | none |
+
+The public portal needs no account. It is a Vite/React SPA on Apollo GraphQL,
+and the route is:
+
+1. `GET /opportunities` — sets the `_pp_xsrf` cookie.
+2. `POST /graphql` with **`X-XSRF-TOKEN: <url-decoded cookie>`**.
+3. Operation `BidOpportunitiesQuery`, variables `first`, `after`, and a
+   **non-null** `input: EventInput!` — an empty object means "no filter".
+
+**`X-CSRF-Token` and `X-Csrf-Token` both answer `422 Unprocessable Content`
+with an empty error body.** Only `X-XSRF-TOKEN` works. An empty-bodied 422
+reads as a malformed query rather than a missing header, which is what makes
+this expensive to find. Introspection is disabled, so the field set has to come
+from the app's own compiled query rather than the schema:
+
+    id · projectId · title · bidSubmissionDeadline · publishedAt · requestType
+    state · translatedState · restricted · commodityCodes · bidUrl
+
+Verified 7 Aug 2026: UNF publishes one open RFQ (*RFQ-27-01 Wellness Center
+Phase II A&E Services*, closing 1 Sep), and St. Johns County publishes one
+record — a `requestType: "TEST"` event titled *"Testing Solicitation for
+Suppliers"* left over from its migration. Test events and `restricted: true`
+(invitation-only) events are both filtered out; a tenant whose whole output was
+filtered says so, so mid-migration is distinguishable from broken.
+
+`bidUrl` points at the authenticated host, so it is carried as a link and never
+fetched. Handing a person a URL their own browser will open is not the same act
+as crawling it.

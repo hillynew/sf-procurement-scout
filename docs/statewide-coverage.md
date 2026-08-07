@@ -368,14 +368,46 @@ platform UNF left Jaggaer for. Three Florida agencies on a platform this
 document had never heard of, now a fingerprint signature and two catalog
 pointers.
 
-Workday is login-gated in two shapes: the tenant host redirects to
-`auth.workdayspend.com/sign-in` and publishes only a supplier self-registration
-link, while UNF's `public-portal.*` host answers 200 to every path with the
-same 1,489-byte SPA shell — so there is an opportunity API there, unmapped.
+Workday has two hosts one word apart and opposite in what they permit, and
+that distinction is the whole story — see its section below. Both tenants are
+now fetched live.
 
 The mode reports "known → unknown" separately from a real move. Palm Coast and
 Sanford went unreadable on that run and are almost certainly transient; folding
 them in with migrations would cry wolf every sweep.
+
+### Workday Strategic Sourcing — two hosts, one of them ours to read
+
+Nothing in the research names this platform. It turned up twice in a week: UNF
+left Jaggaer for it on 1 July 2026, and the first `--recheck` sweep caught
+St. Johns County and its Anastasia Sanitary District leaving DemandStar for it.
+
+**The two hosts matter more than anything else here.**
+
+| host | what it is | robots | read? |
+|---|---|---|---|
+| `<tenant>.us.workdayspend.com` | authenticated supplier app | `Disallow: /` | **never** |
+| `<tenant>.public-portal.us.workdayspend.com` | public opportunity portal | none at all | yes |
+
+They are one word apart. Every row's `bidUrl` points at the *first* one, so it
+is carried as a link for a person's browser and never fetched — handing someone
+a URL is not the same act as crawling it. No override is needed or taken.
+
+The portal is a Vite/React SPA on Apollo GraphQL, and the route took five steps
+to work out and two requests to use: the shell names its entry bundle, a lazy
+chunk holds `BidOpportunitiesQuery`, its AST gives the field set and a non-null
+`input: EventInput!`, Apollo posts to `/graphql` on the same host — and **the
+CSRF header is `X-XSRF-TOKEN`**. `X-CSRF-Token` and `X-Csrf-Token` both return
+`422 Unprocessable Content` with an empty body, which reads as a malformed
+query rather than a missing header. The token is the `_pp_xsrf` cookie,
+URL-decoded, set by any page load. Introspection is disabled, so the field set
+comes from the app's own query rather than the schema.
+
+Two filters keep the board honest. `requestType: "TEST"` events are dropped —
+St. Johns County's portal currently holds exactly one record, *"Testing
+Solicitation for Suppliers"*, from their migration. And `restricted: true`
+means invitation-only, which is not an opportunity. Both are counted, so a
+tenant that published only a test says so rather than looking broken.
 
 ### Jaggaer — three universities, and the one the research named has left
 
