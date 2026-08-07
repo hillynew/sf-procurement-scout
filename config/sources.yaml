@@ -665,3 +665,77 @@ sources:
     platform: fdot_pda
     fdot_procurement_path: D-B
     portal_url: https://pdaexternal.fdot.gov/Pub/AdvertisementPublic/AllAdDetail/D-B/A
+
+  # Jaggaer public events. Three Florida state universities; the tenant code is
+  # the `CustomerOrg` parameter.
+  #
+  # UNF is deliberately absent. Its page carries a dated notice — "Beginning
+  # July 1, 2026, all University of North Florida solicitations will be posted
+  # through the University's new Bid Portal" — and both live tabs return no
+  # events. It moved to Workday Strategic Sourcing. A source that can only ever
+  # return zero reads as a quiet agency rather than a departed one.
+  #
+  # USF is a tenant with nothing in any tab, which is a shell, not a source.
+  - id: jaggaer_fsu
+    name: Florida State University (Jaggaer)
+    county: leon
+    agency: Florida State University
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: FSU
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FSU
+
+  - id: jaggaer_fau
+    name: Florida Atlantic University (Jaggaer)
+    county: palm-beach
+    agency: Florida Atlantic University
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: FAU
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FAU
+
+  - id: jaggaer_fiu
+    name: Florida International University (Jaggaer)
+    county: miami-dade
+    agency: Florida International University
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: FIU
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FIU
+
+  # Workday Strategic Sourcing. Found by `fingerprint_agencies.py --recheck` on
+  # 7 Aug 2026: St. Johns County and the Anastasia Sanitary District both moved
+  # off DemandStar, and UNF moved here off Jaggaer the same summer.
+  #
+  # Catalog rather than live, because the bids are behind a free account. The
+  # tenant host redirects to auth.workdayspend.com/sign-in, and what the county
+  # publishes is a supplier self-registration link rather than a bid list. The
+  # separate `public-portal.*` host UNF uses serves a client-rendered shell —
+  # 1,489 bytes for every path including robots.txt — so there is an API to
+  # find there, and that is the next pass rather than this one.
+  - id: wss_st_johns_county
+    name: St. Johns County (Workday Strategic Sourcing)
+    county: st-johns
+    agency: St. Johns County
+    live_fetch: false
+    adapter: catalog
+    platform: workday_sourcing
+    portal_url: https://st-johns-county-florida.us.workdayspend.com/supplier_self_registration
+    register_url: https://st-johns-county-florida.us.workdayspend.com/supplier_self_registration
+    access_note: Moved off DemandStar in 2026. Bids require a free supplier account.
+
+  - id: wss_unf
+    name: University of North Florida (Workday Strategic Sourcing)
+    county: duval
+    agency: University of North Florida
+    live_fetch: false
+    adapter: catalog
+    platform: workday_sourcing
+    portal_url: https://university-of-north-florida-board-of-trustees.public-portal.us.workdayspend.com/opportunities
+    register_url: https://www.unf.edu/procurement/
+    access_note: >-
+      Left Jaggaer on 1 July 2026 by its own notice. The public portal is a
+      client-rendered shell; its opportunity API has not been mapped yet.

@@ -111,13 +111,13 @@ def test_the_seeder_does_not_eat_its_own_output(registry_dir):
 def test_a_platform_with_no_adapter_is_reported_not_dropped(registry_dir):
     rows = [
         _row(platform="planetbids", adapter="planetbids", name="Bradford County"),
-        _row(platform="jaggaer", adapter="jaggaer", name="University of North Florida"),
+        _row(platform="peoplesoft", adapter="peoplesoft", name="City of St. Petersburg"),
     ]
     fresh, skipped = _run(registry_dir, rows)
 
     assert fresh == []
     assert skipped["planetbids (no planetbids adapter)"] == 1
-    assert skipped["jaggaer (no jaggaer adapter)"] == 1
+    assert skipped["peoplesoft (no peoplesoft adapter)"] == 1
 
 
 def test_a_platform_that_gains_an_adapter_stops_being_reported_as_missing(registry_dir):
@@ -129,11 +129,14 @@ def test_a_platform_that_gains_an_adapter_stops_being_reported_as_missing(regist
     write config the adapter cannot use.
     """
     rows = [_row(platform="vendor_registry", adapter="vendor_registry",
-                 name="Okeechobee County")]
+                 name="Okeechobee County"),
+            _row(platform="jaggaer", adapter="jaggaer",
+                 name="Florida State University")]
     fresh, skipped = _run(registry_dir, rows)
 
     assert fresh == []
     assert skipped["vendor_registry (already configured by hand)"] == 1
+    assert skipped["jaggaer (already configured by hand)"] == 1
 
 
 def test_opengov_rows_defer_to_the_native_discovery_file(registry_dir):

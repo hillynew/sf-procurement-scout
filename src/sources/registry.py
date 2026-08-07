@@ -21,6 +21,7 @@ from .mfmp_vbs import MfmpVbsAdapter
 from .facts import FactsAdapter
 from .fdot_ads import FdotAdsAdapter
 from .ionwave import IonwaveAdapter
+from .jaggaer import JaggaerAdapter
 from .opengov import OpenGovAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
@@ -35,6 +36,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "ionwave": IonwaveAdapter,
     "facts": FactsAdapter,
     "fdot_ads": FdotAdsAdapter,
+    "jaggaer": JaggaerAdapter,
     "miami_dade_informs": MiamiDadeInformsAdapter,
     "miami_dade_construction": MiamiDadeConstructionAdapter,
     "miami_dade_future": MiamiDadeFutureAdapter,

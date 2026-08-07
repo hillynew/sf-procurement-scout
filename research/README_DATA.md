@@ -654,3 +654,83 @@ St. Lucie, Indian River and Okeechobee; District 6 is Miami-Dade and Monroe.
 Okeechobee is in two districts. `county` holds one value, so it stays
 `statewide` and the district goes in `department`, with the district's counties
 added to the keywords so a county search still finds them.
+
+**16. Jaggaer: the tenant the research names has left, and the live one is not
+in it.** The report gives `bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=UNF`
+and lists FIU "at `bids.fiu.edu`". The URL template is correct. The tenants are
+not, checked 7 Aug 2026:
+
+* **UNF has left the platform.** Its Jaggaer page carries a dated notice —
+  *"Beginning July 1, 2026, all University of North Florida solicitations will
+  be posted through the University's new Bid Portal"* — and Open and Upcoming
+  both return "No Events". It moved to **Workday Strategic Sourcing**
+  (`public-portal.us.workdayspend.com`), a platform absent from the research
+  table entirely. Added as a fingerprint signature so the next move is caught
+  by the sweep rather than by hand.
+* **`bids.fiu.edu` is FIU's own procurement page**, not a Jaggaer portal. FIU
+  *does* have a Jaggaer tenant, but it answers as "myFIUmarket System
+  Administrator" and holds only an archive.
+* **FSU is the live tenant and the research never mentions it** — seven open
+  solicitations, found by fingerprinting `procurement.fsu.edu` rather than by
+  guessing tenant codes.
+
+Probing all twelve state universities' `CustomerOrg` codes gives the real map.
+Seven answer `400 System Error` and are not tenants (UF, UCF, FGCU, UWF, FAMU,
+Florida Poly, New College). USF is a tenant with nothing in any tab.
+
+| tenant | open | closed | awarded |
+|---|---:|---:|---:|
+| FSU | 7 | 20 | 20 |
+| FAU | 0 | 20 | 20 |
+| FIU | 0 | 16 | 20 |
+| UNF | 0 | 20 | 20 |
+| USF | 0 | 0 | 0 |
+
+Two shapes worth knowing. The row has **no columns** — the whole solicitation
+is one `<td>` holding a nested block, so the fields have to be read from the
+portal's own label/value pairs (`Open`, `Close`, `Type`, `Number`, `Contact`)
+rather than by position. And the archive tabs stop at **twenty rows with no
+pager**, which is a page rather than a total.
+
+**A note on the state universities generally.** MyFloridaMarketPlace carries
+them, but thinly: 3 of its 115 open solicitations on 7 Aug 2026 were from a
+university or college. Universities post most of their own work on their own
+portals, and their homepages do not link procurement — all twelve came back
+`no procurement link found` from the standard two-hop fingerprint. They need
+their procurement subdomain fed in directly (`procurement.fsu.edu`,
+`purchasing.ucf.edu`), which is how FSU was found.
+
+**17. The first recheck sweep, and what it found.** Re-running
+`fingerprint_agencies.py` to catch migrations does nothing — it is additive and
+skips everything already in the file, so a re-run reports `to do now 0`. The
+property that makes it resumable makes it blind to change. `--recheck` re-reads
+only the 183 entities already placed on a platform and diffs the answers.
+
+First run, 7 Aug 2026, against fingerprints taken 6 Aug:
+
+    183 rechecked · 178 unchanged · 2 moved · 3 no longer readable
+
+**Both moves are to the same platform, and it is one the research table does
+not contain.**
+
+* **St. Johns County** — DemandStar → **Workday Strategic Sourcing**
+* **Anastasia Sanitary District** (also St. Johns) — DemandStar → the same tenant
+
+Together with UNF leaving Jaggaer for Workday the same summer, that is three
+Florida agencies on a platform nobody had catalogued. It is worth watching.
+
+**Workday Strategic Sourcing is login-gated, in two different shapes.** The
+tenant host (`st-johns-county-florida.us.workdayspend.com`) redirects to
+`auth.workdayspend.com/sign-in`, and what the county publishes is a supplier
+self-registration link rather than a bid list. UNF's separate `public-portal.*`
+host answers 200 to every path — including `/robots.txt` — with the same 1,489
+bytes, which is an SPA catch-all: there is an opportunity API behind it that
+has not been mapped. Both hosts serve `Disallow: /`. Catalogued rather than
+adapted, and recorded here so the next attempt starts from what is known.
+
+**The three that went unreadable are separated from the two that moved**, and
+that separation is the point of the mode. City of North Bay Village (was
+DemandStar, now no signature), City of Palm Coast (was Bonfire, now HTTPError)
+and City of Sanford (was VendorLink, procurement page HTTPError) are almost
+certainly a slow site and two transient errors. Reporting them alongside real
+migrations would cry wolf on every sweep.
