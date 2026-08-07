@@ -496,3 +496,34 @@ It matters more than cosmetics: bid history joins on agency name, so that one
 word cost Indian River County every prior cycle it had. With the name fixed and
 the Vendor Registry archive loaded, 4 of its 7 open bids carry prior cycles, one
 reaching back to 2020.
+
+**11. FACTS exports the whole result set as CSV, in one postback.** The report
+lists FACTS as Phase 3 "intelligence layer" and gives the search URL. What it
+does not say is that the search pages ten rows at a time — 6,352 requests for
+the 63,515 contracts a statewide query matches — and that a **Download Results**
+link on the results page returns all of them as a 52-column CSV in a single
+POST. A refresh is therefore two requests, about 53 MB and fifty seconds.
+
+Verified 7 Aug 2026: **12,377 state contracts with a live end date, 10,192
+expiring within a year**, across 31 agencies, with vendor names on 99.98% of
+them. The entire local register, every Bonfire tenant combined, is 4,403.
+
+Four things the data does that the documentation does not mention:
+
+* **The two date fields are begin ≥ B and end ≤ E**, not a window on the end
+  date. Asking for 08/07/2026–08/07/2027 returns 17 contracts statewide — the
+  ones that both start and finish inside twelve months. There is no server-side
+  way to ask for "ending after today".
+* **`New End Date` supersedes `Original End Date` on 21% of rows** (2,146 of
+  10,295). An amendment writes the new column and leaves the original alone.
+* **516 contract ids are used by more than one agency.** AHCA and Justice
+  Administration both number things `SF030`. Any store keyed on the id alone
+  loses one of each pair.
+* **177 agency/id pairs appear twice**, entered against a truncated FLAIR id
+  ("WC052" beside "WC116", " P044" beside "P0448"). Only 29 are identical; the
+  other 148 usually differ by one copy having no vendor and sometimes an older
+  end date, so which copy survives changes the answer.
+
+The export's quoting is also not reliable — at least one row carries a stray
+`""` that shifts its remaining fields — so a parser has to skip a bad row rather
+than let it abort a 63,000-row read.

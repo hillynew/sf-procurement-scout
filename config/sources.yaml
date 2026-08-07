@@ -621,3 +621,16 @@ sources:
     adapter: mfmp_vbs
     portal_url: https://vendor.myfloridamarketplace.com/search/bids
     register_url: https://vendor.myfloridamarketplace.com/
+
+  # The state contract register (s. 215.985(14)). Not a bid feed — it publishes
+  # contracts already executed, and its value is the end date on each one.
+  # Walked by `python -m src.cli contracts --refresh`, never by the scheduler:
+  # the export is ~53 MB and about fifty seconds of server time.
+  - id: facts
+    name: FACTS — Florida state contract register
+    county: statewide
+    agency: State of Florida
+    live_fetch: true
+    adapter: facts
+    platform: facts
+    portal_url: https://facts.fldfs.com/Search/ContractSearch.aspx

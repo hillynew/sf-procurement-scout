@@ -269,8 +269,8 @@ parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
 **Phase 3 — the remaining platforms.** Jaggaer for the universities, FDOT's
-letting pages for construction. OpenGov, VendorLink and Ionwave were all on
-this list and are now done, and all three came off it the same way: the route
+letting pages for construction. FACTS is done, and has its own section below.
+OpenGov, VendorLink and Ionwave were all on this list and are now done, and all three came off it the same way: the route
 that had been checked was not the route that is public. OpenGov's list endpoint
 is a POST on the API host, not a GET on the portal. Ionwave was filed here as
 "needs a session-cookie handshake" — it needs no cookie at all; `/` redirects
@@ -280,6 +280,48 @@ a browser or an account.
 
 Vendor Registry also came off this list, but the other way — it is **not worth
 an adapter**, and that is a finding rather than a deferral. See below.
+
+### FACTS — the state contract register
+
+`src/sources/facts.py`. Every executed state contract, posted under
+**s. 215.985(14)** within 30 days of execution with its parties, dates,
+procurement method and total compensation. The same statute at s. 215.985(2)(d)
+requires the site be "easily accessible to the public at no cost" and not
+"require the user to provide information" — an anti-registration wall written
+into law. No robots.txt; the search page's own terms are a scope note with
+nothing about access.
+
+**12,377 contracts with a live end date, 10,192 expiring within a year**, across
+31 agencies. The whole local register — every Bonfire tenant combined — is 4,403.
+
+Three things about getting it:
+
+- **The search pages ten rows at a time**, which for 63,515 matching contracts
+  would be 6,352 requests. There is a **Download Results** postback that returns
+  the entire result set as CSV: 52 columns, ~53 MB, about fifty seconds. So a
+  refresh is two POSTs. It runs from `python -m src.cli contracts --refresh`, on
+  a weekly cadence, never from the scheduler.
+- **The date fields are begin ≥ B and end ≤ E**, not a window on the end date —
+  asking for the next twelve months returns 17 contracts statewide, which is the
+  number that both start and finish inside a year. There is no way to ask the
+  server for "ending after today", so the already-expired rows are dropped
+  locally and `DEFAULT_BEGIN_YEAR` bounds the download. 2020 was picked by
+  measuring: it loses one contract in ten thousand against 2016 and halves the
+  transfer.
+- **`New End Date` supersedes `Original End Date`, on 21% of rows.** An
+  amendment writes the new column and leaves the old one alone, so reading the
+  original raises a rebid alert for a date already renegotiated.
+
+Two data-quality facts worth knowing: 516 contract ids are used by more than one
+agency, so the key has to carry the agency; and 177 agency/id pairs appear twice
+under a truncated FLAIR id, 148 of them differing, usually with one copy missing
+the vendor and sometimes carrying an older end date. The more complete record
+wins — a named vendor first, then the later end date.
+
+Not carried over: `Total Amount` and `Method of Procurement`, which are the best
+way to rank a rebid. The `contracts` table has no column for either and this
+schema is additive-only with no migration step, so that is a schema decision
+rather than an adapter one.
 
 ### Vendor Registry — checked, and deliberately not adapted
 
