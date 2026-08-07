@@ -351,6 +351,32 @@ package online via the VendorLink bid system by September 1, 2026."* And
 13 archived. The duplicate `pp_flsheriffs` catalog pointer is already
 suppressed. There is nothing to build.
 
+### Watching for migrations
+
+Re-running the fingerprint sweep does not find one. It is additive by design
+and skips everything already swept, so a re-run prints `to do now 0`. Use:
+
+```bash
+python scripts/fingerprint_agencies.py --recheck
+```
+
+which re-reads only the entities already placed on a platform — 183 of 815 —
+and diffs. First run, 7 Aug 2026: **178 unchanged, 2 moved, 3 no longer
+readable**. Both moves were St. Johns County and its Anastasia Sanitary
+District, off DemandStar and onto **Workday Strategic Sourcing** — the same
+platform UNF left Jaggaer for. Three Florida agencies on a platform this
+document had never heard of, now a fingerprint signature and two catalog
+pointers.
+
+Workday is login-gated in two shapes: the tenant host redirects to
+`auth.workdayspend.com/sign-in` and publishes only a supplier self-registration
+link, while UNF's `public-portal.*` host answers 200 to every path with the
+same 1,489-byte SPA shell — so there is an opportunity API there, unmapped.
+
+The mode reports "known → unknown" separately from a real move. Palm Coast and
+Sanford went unreadable on that run and are almost certainly transient; folding
+them in with migrations would cry wolf every sweep.
+
 ### Jaggaer — three universities, and the one the research named has left
 
 The research gives `bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=UNF`

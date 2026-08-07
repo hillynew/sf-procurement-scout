@@ -699,3 +699,38 @@ portals, and their homepages do not link procurement — all twelve came back
 `no procurement link found` from the standard two-hop fingerprint. They need
 their procurement subdomain fed in directly (`procurement.fsu.edu`,
 `purchasing.ucf.edu`), which is how FSU was found.
+
+**17. The first recheck sweep, and what it found.** Re-running
+`fingerprint_agencies.py` to catch migrations does nothing — it is additive and
+skips everything already in the file, so a re-run reports `to do now 0`. The
+property that makes it resumable makes it blind to change. `--recheck` re-reads
+only the 183 entities already placed on a platform and diffs the answers.
+
+First run, 7 Aug 2026, against fingerprints taken 6 Aug:
+
+    183 rechecked · 178 unchanged · 2 moved · 3 no longer readable
+
+**Both moves are to the same platform, and it is one the research table does
+not contain.**
+
+* **St. Johns County** — DemandStar → **Workday Strategic Sourcing**
+* **Anastasia Sanitary District** (also St. Johns) — DemandStar → the same tenant
+
+Together with UNF leaving Jaggaer for Workday the same summer, that is three
+Florida agencies on a platform nobody had catalogued. It is worth watching.
+
+**Workday Strategic Sourcing is login-gated, in two different shapes.** The
+tenant host (`st-johns-county-florida.us.workdayspend.com`) redirects to
+`auth.workdayspend.com/sign-in`, and what the county publishes is a supplier
+self-registration link rather than a bid list. UNF's separate `public-portal.*`
+host answers 200 to every path — including `/robots.txt` — with the same 1,489
+bytes, which is an SPA catch-all: there is an opportunity API behind it that
+has not been mapped. Both hosts serve `Disallow: /`. Catalogued rather than
+adapted, and recorded here so the next attempt starts from what is known.
+
+**The three that went unreadable are separated from the two that moved**, and
+that separation is the point of the mode. City of North Bay Village (was
+DemandStar, now no signature), City of Palm Coast (was Bonfire, now HTTPError)
+and City of Sanford (was VendorLink, procurement page HTTPError) are almost
+certainly a slow site and two transient errors. Reporting them alongside real
+migrations would cry wolf on every sweep.
