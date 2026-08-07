@@ -280,3 +280,33 @@ def test_filters_select_subsets():
         a.cfg.get("adapter") == "catalog" for a in get_adapters(include_catalog=False)
     )
     assert [a.source_id for a in get_adapters(only=["broward_bpro"])] == ["broward_bpro"]
+
+
+def test_the_sheriffs_co_op_is_covered_by_vendorlink_not_its_own_feed():
+    """FSA needs no adapter, and this is the fact that makes that true.
+
+    The research scored `flsheriffs.org/purchasingprogram/feed/` as a bid feed
+    worth two hours. It is a WordPress *product* catalog — ten equipment
+    categories, all dated October 2024. FSA's real solicitations are bid
+    through VendorLink, which its own announcement letter says outright, and
+    `vl_296` has carried them since the VendorLink sweep.
+
+    If that source ever disappears the co-op goes uncovered silently, because
+    nothing else in this build looks at flsheriffs.org.
+    """
+    from src.sources.registry import load_source_config
+
+    configs = {c["id"]: c for c in load_source_config() if isinstance(c, dict)}
+
+    fsa = configs.get("vl_296")
+    assert fsa is not None, "the Florida Sheriffs Association co-op lost its source"
+    assert fsa["adapter"] == "vendorlink"
+    assert "sheriffs association" in fsa["agency"].lower()
+
+
+def test_the_duplicate_sheriffs_pointer_stays_suppressed():
+    """`pp_flsheriffs` says "go register at Public Purchase" for an agency whose
+    bids are already on the board."""
+    from src.sources.registry import _superseded_catalog_ids, load_source_config
+
+    assert "pp_flsheriffs" in _superseded_catalog_ids(load_source_config())

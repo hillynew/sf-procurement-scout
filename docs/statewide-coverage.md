@@ -268,8 +268,10 @@ geography, agency discovery, 358 sources.
 parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
-**Phase 3 — the remaining platforms.** Jaggaer for the universities, FDOT's
-letting pages for construction. FACTS is done, and has its own section below.
+**Phase 3 — the remaining platforms.** Jaggaer for the universities, and FDOT's
+advertisements — which are *not* on the letting host the research names; see
+below. FACTS is done, and has its own section below. The Florida Sheriffs
+Association co-op came off this list without an adapter, also below.
 OpenGov, VendorLink and Ionwave were all on this list and are now done, and all three came off it the same way: the route
 that had been checked was not the route that is public. OpenGov's list endpoint
 is a POST on the API host, not a GET on the portal. Ionwave was filed here as
@@ -322,6 +324,36 @@ Not carried over: `Total Amount` and `Method of Procurement`, which are the best
 way to rank a rebid. The `contracts` table has no column for either and this
 schema is additive-only with no migration step, so that is a schema decision
 rather than an adapter one.
+
+### Florida Sheriffs Association — already covered, by VendorLink
+
+The research scores the FSA co-op as an RSS feed worth two hours. The feed at
+`flsheriffs.org/purchasingprogram/feed/` is real and returns
+`application/rss+xml`, which is what got it verified — but it is a WordPress
+*product* catalog of ten equipment categories, every one dated October 2024. It
+is not a bid feed.
+
+FSA's actual solicitations are bid through VendorLink, which its own
+announcement letter says outright: *"All bidders must submit a complete bid
+package online via the VendorLink bid system by September 1, 2026."* And
+`vl_296` has been in this build since the VendorLink sweep — it returns
+`FSA26-EQU24.0 Equipment` open, due 2 Sep 2026, questions closing 24 Jul, plus
+13 archived. The duplicate `pp_flsheriffs` catalog pointer is already
+suppressed. There is nothing to build.
+
+### FDOT — the letting host is the wrong host
+
+`bidletting.fdot.gov/LettingResults` is what its name says: bid openings that
+have already happened, back to August 2024. No advertisements.
+
+Open work is at **`pdaexternal.fdot.gov/Pub/AdvertisementPublic/`**, split by
+procurement path (`PS` professional services, `D-B` design-build) and view
+(`C` current, `P` planned, `S` results, `A` all). Both hosts are crawlable —
+`bidletting` serves `Allow: /`, `pdaexternal` serves no robots.txt.
+
+Not built yet: PDA is an AngularJS app that embeds its data in a
+`window.InitParams` blob reached after a district selection, with a signed
+`akey` token attached. That is an adapter, not a URL.
 
 ### Vendor Registry — checked, and deliberately not adapted
 
