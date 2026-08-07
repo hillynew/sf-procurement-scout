@@ -59,6 +59,11 @@ class Contract:
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     url: Optional[str] = None
+    #: Total compensation, when the portal publishes it. Bonfire's register does
+    #: not; FACTS does, for every state contract.
+    amount: Optional[float] = None
+    #: Method of procurement, same caveat.
+    method: Optional[str] = None
 
     def days_until_expiry(self, today: Optional[date] = None) -> Optional[int]:
         if self.end_date is None:

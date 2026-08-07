@@ -405,3 +405,94 @@ def test_distinct_contracts_are_not_merged(monkeypatch):
     a, _ = _adapter(monkeypatch, _csv(_row(cid="A1", original=future),
                                       _row(cid="A2", original=future)))
     assert len(a.fetch_contracts()) == 2
+
+
+# -- the ranking signal ----------------------------------------------------
+
+
+def test_the_dollar_amount_is_carried(monkeypatch):
+    """A date alone cannot rank ten thousand contracts."""
+    future = (date.today() + timedelta(days=100)).strftime("%m/%d/%Y")
+    a, _ = _adapter(monkeypatch, _csv(_row(original=future)))
+    (contract,) = a.fetch_contracts()
+
+    assert contract.amount == 6_000_000.00
+
+
+def test_the_total_amount_beats_the_original(monkeypatch):
+    """Same shape as the two end-date columns: an amendment writes the total
+    and leaves the original alone."""
+    future = (date.today() + timedelta(days=100)).strftime("%m/%d/%Y")
+    row = _row(original=future)
+    row["Original Contract Amount"] = "600000.00"
+    row["Total Amount"] = "720000.00"
+    a, _ = _adapter(monkeypatch, _csv(row))
+    (contract,) = a.fetch_contracts()
+
+    assert contract.amount == 720_000.00
+
+
+def test_the_original_amount_is_the_fallback(monkeypatch):
+    future = (date.today() + timedelta(days=100)).strftime("%m/%d/%Y")
+    row = _row(original=future)
+    row["Total Amount"] = ""
+    row["Original Contract Amount"] = "600000.00"
+    a, _ = _adapter(monkeypatch, _csv(row))
+    (contract,) = a.fetch_contracts()
+
+    assert contract.amount == 600_000.00
+
+
+def test_the_procurement_method_is_carried(monkeypatch):
+    """A rebid that was competitively bid is an opening; a legislative
+    authorization is mostly a formality."""
+    future = (date.today() + timedelta(days=100)).strftime("%m/%d/%Y")
+    row = _row(original=future)
+    row["Method of Procurement"] = "Competitive Solicitation"
+    a, _ = _adapter(monkeypatch, _csv(row))
+    (contract,) = a.fetch_contracts()
+
+    assert contract.method == "Competitive Solicitation"
+
+
+def test_an_unreadable_amount_is_absent_not_zero(monkeypatch):
+    """Zero would sort a real contract to the bottom of a list ranked by size,
+    which is worse than admitting the figure is missing."""
+    from src.sources.facts import _money
+
+    assert _money("") is None
+    assert _money(None) is None
+    assert _money("n/a") is None
+    assert _money("0.00") is None
+    assert _money(" Design Elevator Modernization") is None
+
+
+def test_a_formatted_amount_still_parses():
+    """The export writes plain decimals, but not always."""
+    from src.sources.facts import _money
+
+    assert _money("$1,250,000.50") == 1_250_000.50
+    assert _money("720000.00") == 720_000.00
+
+
+def test_a_long_statutory_method_is_not_truncated(monkeypatch):
+    """9% of FACTS methods exceed 128 characters and the longest is 300.
+
+    What overflows is the statutory citation on the end — the part that says
+    *why* it was not competitively bid, which is the whole reason to keep the
+    field. The column only ever gets added, never widened, so the room has to
+    be right the first time.
+    """
+    future = (date.today() + timedelta(days=100)).strftime("%m/%d/%Y")
+    long_method = (
+        "Request for Application, method of competitively awarding State Federal "
+        "grants to non-profits and other governmental entities pursuant to "
+        "s. 287.057(3)(e)4., Florida Statutes and Rule 60A-1.045, F.A.C."
+    )
+    assert len(long_method) > 128
+    row = _row(original=future)
+    row["Method of Procurement"] = long_method
+    a, _ = _adapter(monkeypatch, _csv(row))
+    (contract,) = a.fetch_contracts()
+
+    assert contract.method == long_method

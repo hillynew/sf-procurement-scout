@@ -11,6 +11,7 @@ from datetime import date, datetime
 from typing import Any, List, Optional
 
 from sqlalchemy import (
+    Float,
     BigInteger,
     Boolean,
     Date,
@@ -103,6 +104,17 @@ class ContractRow(Base):
     start_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
     end_date: Mapped[Optional[date]] = mapped_column(Date, nullable=True, index=True)
     url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    #: Total compensation, where the portal publishes it. The ranking signal a
+    #: date alone cannot give: a $40M highway contract and a $4,000 canine
+    #: agreement expire on the same day and are not the same lead.
+    amount: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    #: How it was bought — competitive, sole source, state term contract. Tells
+    #: you whether the rebid is a real opening or a formality. Wide because
+    #: FACTS writes the statutory citation into it: 9% of its values exceed 128
+    #: characters and the longest is 300, and the citation is the tail that
+    #: would be lost. This column only ever gets added, never widened, so the
+    #: room has to be there from the start.
+    method: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
     refreshed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
