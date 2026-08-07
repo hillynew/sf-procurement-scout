@@ -391,8 +391,8 @@ tractable. Counts are what is configured and answering today.
 | **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
 | **Ionwave** | 4 | Four public lists the tenant's own login page links to, no cookie needed. Cloudflare challenges the fourth request on a session, so `fetch` costs exactly one |
 | **Vendor Registry** | 5 | **Archive only.** The platform's current list reports no open solicitations for any buyer in any state; these agencies post on OpenGov, Bonfire and BidNet now. 1,098 past solicitations that back-fill recurrence for the feeds that replaced them |
-| **Workday Strategic Sourcing** | 2 | UNF and St. Johns County, both arrived here in 2026. Apollo GraphQL behind an `X-XSRF-TOKEN` handshake; only the public-portal host is read, never the authenticated one |
-| **Jaggaer** | 3 | Florida State, Florida Atlantic and FIU. Four GET-addressable tabs; the row is one `<td>` of nested markup, read by the portal's own field labels |
+| **Workday Strategic Sourcing** | 3 | UNF, St. Johns County and Hillsborough Community College, all arrived here in 2026. Apollo GraphQL behind an `X-XSRF-TOKEN` handshake; only the public-portal host is read, never the authenticated one |
+| **Jaggaer** | 5 | Florida State, Florida Atlantic, FIU, and — found by the fingerprint sweep — Florida and South Florida, the two largest buyers in the state system. Four GET-addressable tabs; the row is one `<td>` of nested markup, read by the portal's own field labels |
 | **FDOT advertisements** | 2 | Professional services and design-build, from the PDA REST host behind a page-minted token. Carries Notices of Planned Advertisement — 124 jobs FDOT has scheduled but not yet advertised, as `upcoming` |
 | **FACTS** | 1 | **Contract register, not a bid feed.** Every executed state contract under s. 215.985(14) — 12,377 with a live end date, 10,192 expiring within a year, with dollar values and procurement method. Two POSTs: run the search, download the CSV |
 | **MyFloridaMarketPlace (VIP)** | 1 | Every state agency, university, college and water management district in one adapter, with anonymous PDF downloads |
@@ -417,6 +417,45 @@ python scripts/sources_from_fingerprints.py    # strong matches → live sources
 
 Each one prints what it *skipped* and why. The gap between "verified" and
 "fetched" is the number worth watching, so none of them hide it.
+
+### When the sweep says "unknown"
+
+`unknown` is the sweep's most useful output — it is the queue of things worth a
+human minute — but it is not one thing. Of the 635 unknowns in the first pass:
+
+| | |
+|---|---|
+| 271 | the homepage linked nothing we recognised |
+| 151 | we read a procurement page and it named no platform |
+| 198 | we could not reach the site at all |
+| 15 | robots refused |
+
+Only the first two are fingerprinting problems, and they needed different
+answers. A homepage aimed at students does not link purchasing, so procurement
+**subdomains** are probed — `procurement.fsu.edu` and `bids.fiu.edu` are both
+Jaggaer and both read as "no procurement link found" while this only followed
+links. A procurement landing page is often only a signpost, so **one more hop**
+is taken off it, which is what separates UF and USF from a dead end. And an
+agency that runs no platform at all, keeping the table on its own website, is
+recorded as `selfhosted` rather than filed beside the sites that timed out —
+those need a page-level reader, not an adapter, and the distinction is the
+difference between a queue and a shrug.
+
+After the fingerprinter learns a new way to look, re-ask the ones it missed:
+
+```bash
+python scripts/fingerprint_agencies.py --retry-unknown
+```
+
+Re-asking all 635 identified 47 of them and lost none — 180 → 227 of the 815
+entities swept. Among them: the University of Florida and the University of
+South Florida, the two largest buyers in the state university system, neither
+of which was reachable by following links from a homepage.
+
+The 588 that are still unknown are mostly not a fingerprinting problem: 261 are
+special districts and small towns with no bid board to find, 207 are sites that
+cannot be reached from here at all — a bot wall, a bad certificate, a dead host
+— and 146 have a purchasing page that names no platform and lists no live work.
 
 ### Adding a city
 

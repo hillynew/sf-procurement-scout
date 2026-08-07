@@ -120,12 +120,21 @@ def roster_rows(entity_ids: set, path: Path = ROSTER) -> List[Dict]:
         ]
 
 
+#: `selfhosted` is the one verdict that rests on page *content* rather than on
+#: a platform's signature: it means "this page lists live solicitations". A
+#: small town whose two open bids both closed drops back to `unknown` and
+#: returns the month after, which is a board going quiet and filling up again,
+#: not an agency changing platform. So this pair flickers by design and is not
+#: reported either way.
+_FLICKERS = {"selfhosted", "unknown"}
+
+
 def compare(baseline: Dict[str, Dict], results: Sequence[Fingerprint]) -> Result:
     """Sort fresh fingerprints into moved, no-longer-readable, and unchanged."""
     out = Result(checked=len(results))
     for fp in results:
         was = (baseline.get(fp.entity_id) or {}).get("platform", "unknown")
-        if was == fp.platform:
+        if was == fp.platform or {was, fp.platform} <= _FLICKERS:
             out.unchanged += 1
             continue
         move = Move(

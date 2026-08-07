@@ -58,6 +58,24 @@ def test_becoming_unreadable_is_kept_apart_from_moving():
     assert result.lost[0].note == "blocked (WAF)"
 
 
+def test_a_self_hosted_board_going_quiet_is_not_a_migration():
+    """`selfhosted` rests on page content — "this page lists live
+    solicitations" — so a town whose two open bids both closed drops to
+    unknown and returns the month after. That is a board emptying, not a move.
+    """
+    empty = compare(_baseline(mun_x="selfhosted"), [_fp(entity_id="mun_x", platform="unknown")])
+    refilled = compare(_baseline(mun_x="unknown"), [_fp(entity_id="mun_x", platform="selfhosted")])
+
+    assert empty.unchanged == 1 and empty.lost == [] and empty.moved == []
+    assert refilled.unchanged == 1 and refilled.moved == []
+
+
+def test_a_self_hosted_agency_adopting_a_platform_is_still_a_move():
+    result = compare(_baseline(mun_x="selfhosted"), [_fp(entity_id="mun_x", platform="bonfire")])
+
+    assert [m.describe() for m in result.moved] == ["City of X: selfhosted -> bonfire"]
+
+
 def test_an_entity_with_no_baseline_reads_as_newly_identified():
     result = compare({}, [_fp(entity_id="new_one", platform="bonfire")])
 

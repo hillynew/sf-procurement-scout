@@ -241,9 +241,23 @@ def test_unf_is_not_configured():
     orgs = {c.get("jaggaer_org") for c in load_source_config()
             if isinstance(c, dict) and c.get("adapter") == "jaggaer"}
 
-    assert orgs == {"FSU", "FAU", "FIU"}
+    assert orgs == {"FSU", "FAU", "FIU", "Florida", "USFlorida"}
     assert "UNF" not in orgs
-    assert "USF" not in orgs, "a tenant with nothing in any tab is a shell"
+
+
+def test_usf_is_configured_under_the_key_its_own_page_links():
+    """It was recorded here as "a tenant with nothing in any tab, a shell, not a
+    source". That was the wrong key: `CustomerOrg=USF` is empty, and
+    `CustomerOrg=USFlorida` — which USF's own purchasing page links — returns 25
+    archived solicitations. The same lesson as every other platform here.
+    """
+    from src.sources.registry import load_source_config
+
+    orgs = {c.get("jaggaer_org") for c in load_source_config()
+            if isinstance(c, dict) and c.get("adapter") == "jaggaer"}
+
+    assert "USFlorida" in orgs
+    assert "USF" not in orgs, "the empty tenant key, kept out on purpose"
 
 
 def test_the_robots_override_is_declared_with_its_reason():

@@ -675,7 +675,13 @@ sources:
   # events. It moved to Workday Strategic Sourcing. A source that can only ever
   # return zero reads as a quiet agency rather than a departed one.
   #
-  # USF is a tenant with nothing in any tab, which is a shell, not a source.
+  # USF was recorded here as "a tenant with nothing in any tab, a shell, not a
+  # source". That was the wrong tenant key. `CustomerOrg=USF` is empty;
+  # `CustomerOrg=USFlorida`, which USF's own purchasing page links, returns 25
+  # archived solicitations. The key came from the fingerprint sweep following
+  # one more hop off `usf.edu/business-finance/purchasing` — the same lesson as
+  # every other platform in this build, which is that an empty portal usually
+  # means the wrong address rather than a quiet agency.
   - id: jaggaer_fsu
     name: Florida State University (Jaggaer)
     county: leon
@@ -705,6 +711,33 @@ sources:
     platform: jaggaer
     jaggaer_org: FIU
     portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FIU
+
+  # The two largest buyers in the state university system, and neither was
+  # reachable by following links: UF's homepage links nothing, and USF's
+  # purchasing page names no platform. Both came out of the fingerprint sweep
+  # after it learned to probe `procurement.` subdomains and take one more hop
+  # off a landing page.
+  - id: jaggaer_uf
+    name: University of Florida (Jaggaer)
+    county: alachua
+    agency: University of Florida
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: Florida
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=Florida
+    register_url: https://procurement.ufl.edu/vendors/schedule-of-bids/
+
+  - id: jaggaer_usf
+    name: University of South Florida (Jaggaer)
+    county: hillsborough
+    agency: University of South Florida
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: USFlorida
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=USFlorida
+    register_url: https://www.usf.edu/business-finance/purchasing/public-bids/index.aspx
 
   # Workday Strategic Sourcing. Found by watching for migrations rather than in
   # any platform table: UNF left Jaggaer for it on 1 July 2026, and
@@ -737,3 +770,14 @@ sources:
     workday_tenant: st-johns-county-florida
     portal_url: https://st-johns-county-florida.public-portal.us.workdayspend.com/opportunities
     register_url: https://st-johns-county-florida.us.workdayspend.com/supplier_self_registration
+
+  - id: wss_hcc
+    name: Hillsborough Community College (Workday Strategic Sourcing)
+    county: hillsborough
+    agency: Hillsborough Community College
+    live_fetch: true
+    adapter: workday_sourcing
+    platform: workday_sourcing
+    workday_tenant: hillsborough-community-college
+    portal_url: https://hillsborough-community-college.public-portal.us.workdayspend.com/opportunities
+    register_url: https://hillsborough-community-college.us.workdayspend.com/supplier_self_registration

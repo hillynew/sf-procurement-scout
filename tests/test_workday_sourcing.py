@@ -304,6 +304,23 @@ def test_an_event_without_a_bid_url_falls_back_to_the_public_board(monkeypatch):
     assert opp.url.endswith(".public-portal.us.workdayspend.com/opportunities")
 
 
+def test_every_configured_tenant_points_at_the_public_portal():
+    """One word apart, opposite in what they permit — so the config is checked
+    rather than trusted. HCC came out of the fingerprint sweep; it publishes 16
+    archived solicitations and nothing open today.
+    """
+    from src.sources.registry import load_source_config
+
+    rows = [c for c in load_source_config()
+            if isinstance(c, dict) and c.get("adapter") == "workday_sourcing"]
+    tenants = {c["workday_tenant"] for c in rows}
+
+    assert "hillsborough-community-college" in tenants
+    for cfg in rows:
+        assert ".public-portal.us.workdayspend.com" in cfg["portal_url"]
+        assert cfg["portal_url"].startswith(f"https://{cfg['workday_tenant']}.")
+
+
 def test_the_public_portal_is_not_in_the_override_table():
     """It needs no override — it serves no robots.txt at all. An entry here
     would be an exception taken for a host that never restricted us."""

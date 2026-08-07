@@ -30,7 +30,6 @@ Usage::
 from __future__ import annotations
 
 import argparse
-import json
 import re
 import sys
 from collections import Counter
@@ -67,9 +66,16 @@ HEADER = (
 
 
 def load_fingerprints(path: Path) -> List[Dict]:
-    if not path.exists():
-        return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    """The current answer for each entity, not every answer ever recorded.
+
+    The file is append-only — a recheck or a retry writes a new line rather
+    than editing the old one — so reading it line by line would hand a stale
+    verdict to the generator alongside the fresh one, and configure a source
+    for a platform the agency has already left.
+    """
+    from src.pipeline.platform_watch import recorded
+
+    return list(recorded(path).values())
 
 
 def existing() -> tuple[set, set]:
@@ -182,6 +188,12 @@ def main() -> int:
     for row in rows:
         if row["platform"] == "unknown":
             skipped["unknown platform"] += 1
+            continue
+        if row["platform"] == "selfhosted":
+            # A real, readable board with no platform behind it. Not a weak
+            # match and not a miss — it is waiting on a page-level reader, and
+            # no adapter in this build will ever fit it.
+            skipped["selfhosted (their own page — needs a reader, not an adapter)"] += 1
             continue
         if row.get("confidence") != "strong":
             skipped[f"{row['platform']} (weak match — a lead, not a tenant)"] += 1
