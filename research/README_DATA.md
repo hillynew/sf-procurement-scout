@@ -654,3 +654,48 @@ St. Lucie, Indian River and Okeechobee; District 6 is Miami-Dade and Monroe.
 Okeechobee is in two districts. `county` holds one value, so it stays
 `statewide` and the district goes in `department`, with the district's counties
 added to the keywords so a county search still finds them.
+
+**16. Jaggaer: the tenant the research names has left, and the live one is not
+in it.** The report gives `bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=UNF`
+and lists FIU "at `bids.fiu.edu`". The URL template is correct. The tenants are
+not, checked 7 Aug 2026:
+
+* **UNF has left the platform.** Its Jaggaer page carries a dated notice —
+  *"Beginning July 1, 2026, all University of North Florida solicitations will
+  be posted through the University's new Bid Portal"* — and Open and Upcoming
+  both return "No Events". It moved to **Workday Strategic Sourcing**
+  (`public-portal.us.workdayspend.com`), a platform absent from the research
+  table entirely. Added as a fingerprint signature so the next move is caught
+  by the sweep rather than by hand.
+* **`bids.fiu.edu` is FIU's own procurement page**, not a Jaggaer portal. FIU
+  *does* have a Jaggaer tenant, but it answers as "myFIUmarket System
+  Administrator" and holds only an archive.
+* **FSU is the live tenant and the research never mentions it** — seven open
+  solicitations, found by fingerprinting `procurement.fsu.edu` rather than by
+  guessing tenant codes.
+
+Probing all twelve state universities' `CustomerOrg` codes gives the real map.
+Seven answer `400 System Error` and are not tenants (UF, UCF, FGCU, UWF, FAMU,
+Florida Poly, New College). USF is a tenant with nothing in any tab.
+
+| tenant | open | closed | awarded |
+|---|---:|---:|---:|
+| FSU | 7 | 20 | 20 |
+| FAU | 0 | 20 | 20 |
+| FIU | 0 | 16 | 20 |
+| UNF | 0 | 20 | 20 |
+| USF | 0 | 0 | 0 |
+
+Two shapes worth knowing. The row has **no columns** — the whole solicitation
+is one `<td>` holding a nested block, so the fields have to be read from the
+portal's own label/value pairs (`Open`, `Close`, `Type`, `Number`, `Contact`)
+rather than by position. And the archive tabs stop at **twenty rows with no
+pager**, which is a page rather than a total.
+
+**A note on the state universities generally.** MyFloridaMarketPlace carries
+them, but thinly: 3 of its 115 open solicitations on 7 Aug 2026 were from a
+university or college. Universities post most of their own work on their own
+portals, and their homepages do not link procurement — all twelve came back
+`no procurement link found` from the standard two-hop fingerprint. They need
+their procurement subdomain fed in directly (`procurement.fsu.edu`,
+`purchasing.ucf.edu`), which is how FSU was found.

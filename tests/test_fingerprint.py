@@ -246,3 +246,24 @@ def test_an_entity_encoded_href_still_yields_a_portal_url():
     assert portal_url_for("ionwave", html, "https://www.leegov.com") == (
         "https://leegov.ionwave.net/HomePage.aspx"
     )
+
+
+def test_workday_strategic_sourcing_is_recognised():
+    """Where UNF went when it left Jaggaer on 1 July 2026.
+
+    Found by hand while checking whether Jaggaer still had Florida tenants.
+    The signature exists so the next university to move is found by the sweep
+    instead.
+    """
+    from src.pipeline.fingerprint import identify, portal_url_for
+
+    html = (
+        '<a href="https://university-of-north-florida-board-of-trustees'
+        '.public-portal.us.workdayspend.com/opportunities">BID OPPORTUNITIES</a>'
+    )
+    strong, weak = identify(html)
+
+    assert strong == ["workday_sourcing"]
+    assert portal_url_for("workday_sourcing", html, "https://www.unf.edu").endswith(
+        "/opportunities"
+    )

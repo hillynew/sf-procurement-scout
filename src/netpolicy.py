@@ -194,6 +194,11 @@ ROBOTS_OVERRIDES: Dict[str, str] = {
     # The adapter reads one page per agency per cycle, and stops rather than
     # working around the bot challenge that sits behind it.
     "*.ionwave.net": "public agency postings; agency's records, not the vendor's",
+    # Jaggaer's public-event host, same blanket `Disallow: /`. Three Florida
+    # state universities publish their competitive solicitations here and
+    # nowhere else public; the records are the university's, and this reads
+    # four pages per tenant per cycle.
+    "bids.sciquest.com": "public university solicitations; the university's records",
 }
 
 

@@ -1,9 +1,9 @@
 # SF Procurement Scout
 
 Live aggregator for government procurement across **Florida** — every state
-agency through MyFloridaMarketPlace, plus **300 live local sources** on nine
+agency through MyFloridaMarketPlace, plus **303 live local sources** on ten
 platforms (OpenGov, CivicPlus, VendorLink, Bonfire, Ionwave, Vendor Registry,
-FACTS, FDOT, and a handful of bespoke portals), **federal bids in Florida** via
+FACTS, FDOT, Jaggaer, and a handful of bespoke portals), **federal bids in Florida** via
 SAM.gov, and a catalog of the portals that cannot be read without an account.
 
 It started as a tri-county tool. The county field now takes any of Florida's 67,
@@ -347,12 +347,13 @@ tractable. Counts are what is configured and answering today.
 | **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
 | **Ionwave** | 4 | Four public lists the tenant's own login page links to, no cookie needed. Cloudflare challenges the fourth request on a session, so `fetch` costs exactly one |
 | **Vendor Registry** | 5 | **Archive only.** The platform's current list reports no open solicitations for any buyer in any state; these agencies post on OpenGov, Bonfire and BidNet now. 1,098 past solicitations that back-fill recurrence for the feeds that replaced them |
+| **Jaggaer** | 3 | Florida State, Florida Atlantic and FIU. Four GET-addressable tabs; the row is one `<td>` of nested markup, read by the portal's own field labels |
 | **FDOT advertisements** | 2 | Professional services and design-build, from the PDA REST host behind a page-minted token. Carries Notices of Planned Advertisement — 124 jobs FDOT has scheduled but not yet advertised, as `upcoming` |
 | **FACTS** | 1 | **Contract register, not a bid feed.** Every executed state contract under s. 215.985(14) — 12,377 with a live end date, 10,192 expiring within a year, with dollar values and procurement method. Two POSTs: run the search, download the CSV |
 | **MyFloridaMarketPlace (VIP)** | 1 | Every state agency, university, college and water management district in one adapter, with anonymous PDF downloads |
 | **SAM.gov** | 1 | Federal solicitations with a Florida place of performance (free API key) |
 | Bespoke portals | 8 | Miami-Dade INFORMS and construction, West Palm Beach, MDC, Palm Beach Schools, notice links, the bid mailbox |
-| Catalog pointers | 225 | Portals that need an account — recorded so the gap is visible, and superseded automatically once an adapter can read the agency for real |
+| Catalog pointers | 223 | Portals that need an account — recorded so the gap is visible, and superseded automatically once an adapter can read the agency for real |
 
 Two registries drive this rather than hand-editing:
 
@@ -508,10 +509,11 @@ adapters, because a guardrail an adapter can forget is not a guardrail.
   *fresh* session is let straight through — so rotating sessions would walk
   past it, and that is deliberately not done.
 
-Two judgement calls are written down rather than hidden. Bonfire serves
+Three judgement calls are written down rather than hidden. Bonfire serves
 `Disallow: /` across every tenant, and obeying it strictly costs 32 Florida
 agencies including Broward and Hillsborough; Ionwave — same vendor, Euna —
-serves the same file, for four more. Both exceptions live in one table,
+serves the same file, for four more; Jaggaer's `bids.sciquest.com` serves it
+for three state universities. All three exceptions live in one table,
 `ROBOTS_OVERRIDES`, with their reasoning stated out loud, and
 `SF_SCOUT_STRICT_ROBOTS=1` drops it. See `docs/statewide-coverage.md` for the
 per-host policy table.

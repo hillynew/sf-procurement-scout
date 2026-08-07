@@ -665,3 +665,43 @@ sources:
     platform: fdot_pda
     fdot_procurement_path: D-B
     portal_url: https://pdaexternal.fdot.gov/Pub/AdvertisementPublic/AllAdDetail/D-B/A
+
+  # Jaggaer public events. Three Florida state universities; the tenant code is
+  # the `CustomerOrg` parameter.
+  #
+  # UNF is deliberately absent. Its page carries a dated notice — "Beginning
+  # July 1, 2026, all University of North Florida solicitations will be posted
+  # through the University's new Bid Portal" — and both live tabs return no
+  # events. It moved to Workday Strategic Sourcing. A source that can only ever
+  # return zero reads as a quiet agency rather than a departed one.
+  #
+  # USF is a tenant with nothing in any tab, which is a shell, not a source.
+  - id: jaggaer_fsu
+    name: Florida State University (Jaggaer)
+    county: leon
+    agency: Florida State University
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: FSU
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FSU
+
+  - id: jaggaer_fau
+    name: Florida Atlantic University (Jaggaer)
+    county: palm-beach
+    agency: Florida Atlantic University
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: FAU
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FAU
+
+  - id: jaggaer_fiu
+    name: Florida International University (Jaggaer)
+    county: miami-dade
+    agency: Florida International University
+    live_fetch: true
+    adapter: jaggaer
+    platform: jaggaer
+    jaggaer_org: FIU
+    portal_url: https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FIU

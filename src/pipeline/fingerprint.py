@@ -69,6 +69,10 @@ PLATFORM_SIGNATURES: List[Tuple[str, Tuple[str, ...], Tuple[str, ...]]] = [
     ("oracle_ebs", ("OA_HTML/OA.jsp?OAFunc=PON_",), ()),
     ("infor_fsm", ("inforcloudsuite.com/fsm/SupplyManagementSupplier",), ()),
     ("jaggaer", ("bids.sciquest.com/apps/Router/PublicEvent", "sciquest.com"), ("jaggaer",)),
+    # Where UNF went when it left Jaggaer on 1 July 2026. Added because the
+    # move was found by hand and the next one should not have to be.
+    ("workday_sourcing", ("public-portal.us.workdayspend.com", "workdayspend.com"),
+     ("workday strategic sourcing",)),
     ("bids_and_tenders", (".bidsandtenders.net/Module/Tenders/",), ("bids&tenders",)),
     ("planetbids", ("planetbids.com",), ("planetbids",)),
     ("publicpurchase", ("publicpurchase.com/gems/", "publicpurchase.com"), ("public purchase",)),
@@ -168,6 +172,7 @@ def portal_url_for(platform: str, html: str, base: str) -> Optional[str]:
         "jaggaer": r"https?://bids\.sciquest\.com/apps/Router/PublicEvent[^\"'\s<>]*",
         "planetbids": r"https?://[^\"'\s<>]*planetbids\.com/[^\"'\s<>]*",
         "ionwave": r"https?://[a-z0-9-]+\.ionwave\.net[^\"'\s<>]*",
+        "workday_sourcing": r"https?://[^\"'\s<>]*workdayspend\.com[^\"'\s<>]*",
         "infor_fsm": r"https?://[^\"'\s<>]*inforcloudsuite\.com/fsm/[^\"'\s<>]*",
     }
     pattern = patterns.get(platform)

@@ -268,9 +268,10 @@ geography, agency discovery, 358 sources.
 parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
-**Phase 3 — the remaining platforms.** Jaggaer for the universities. FACTS and
-FDOT are both done and have their own sections below; the Florida Sheriffs
-Association co-op came off this list without an adapter, also below.
+**Phase 3 — done.** FACTS, FDOT and Jaggaer all have their own sections below;
+the Florida Sheriffs Association co-op came off this list without an adapter,
+also below. What is left of the original plan is the bid mailbox, which needs
+platform registrations and a real inbox rather than code.
 OpenGov, VendorLink and Ionwave were all on this list and are now done, and all three came off it the same way: the route
 that had been checked was not the route that is public. OpenGov's list endpoint
 is a POST on the API host, not a GET on the portal. Ionwave was filed here as
@@ -349,6 +350,44 @@ package online via the VendorLink bid system by September 1, 2026."* And
 `FSA26-EQU24.0 Equipment` open, due 2 Sep 2026, questions closing 24 Jul, plus
 13 archived. The duplicate `pp_flsheriffs` catalog pointer is already
 suppressed. There is nothing to build.
+
+### Jaggaer — three universities, and the one the research named has left
+
+The research gives `bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=UNF`
+and says FIU is "at `bids.fiu.edu`". The URL template is right; the tenants
+were not.
+
+- **UNF has left.** Its own page carries a dated notice: *"Beginning July 1,
+  2026, all University of North Florida solicitations will be posted through
+  the University's new Bid Portal."* Both live tabs return no events. It moved
+  to **Workday Strategic Sourcing** — a platform this document had never heard
+  of, now a fingerprint signature so the next move is found by the sweep.
+- **`bids.fiu.edu` is FIU's own procurement page**, not a Jaggaer portal. FIU
+  does have a Jaggaer tenant, but it answers as "myFIUmarket System
+  Administrator" and carries only an archive.
+- **FSU is the live one, and the research never mentions it** — seven open
+  solicitations on 7 Aug 2026, found by fingerprinting `procurement.fsu.edu`.
+
+Probing all twelve state universities' tenant codes gives the real map. Seven
+answer `400 System Error` and are not tenants at all (UF, UCF, FGCU, UWF, FAMU,
+Florida Poly, New College).
+
+| tenant | open | closed | awarded | |
+|---|---:|---:|---:|---|
+| FSU | 7 | 20 | 20 | configured |
+| FAU | 0 | 20 | 20 | configured — between solicitations |
+| FIU | 0 | 16 | 20 | configured |
+| UNF | 0 | 20 | 20 | left the platform; **not** configured |
+| USF | 0 | 0 | 0 | empty tenant; **not** configured |
+
+UNF is deliberately absent. A source that can only ever return zero reads as a
+quiet agency rather than a departed one — the mistake this project has made
+three times.
+
+`bids.sciquest.com` serves the same blanket `Disallow: /` Bonfire and Ionwave
+do, and it is in `ROBOTS_OVERRIDES` with the same reasoning: these are Florida
+public universities' competitive solicitations, and the records are the
+university's.
 
 ### FDOT — the letting host was the wrong host
 
