@@ -422,6 +422,40 @@ def test_settings_get_put_and_capabilities(client):
     assert out["settings"]["ai"]["model"] == "claude-sonnet-5"
 
 
+def test_maintenance_cadence_is_settable_and_its_last_run_is_not(client):
+    """A cadence is something you set; a last-run date is something you are
+    told. Without the second the UI can only offer to schedule work it cannot
+    say has ever happened."""
+    data = client.get("/api/settings").json()
+    assert data["settings"]["maintenance"]["enabled"] is False
+    assert data["maintenance_status"] == {
+        "last_contracts_refresh_on": None, "last_platform_check_on": None, "running": None,
+    }
+
+    out = client.put("/api/settings", json={
+        "maintenance": {"enabled": True, "platform_check_days": 90},
+    }).json()
+    assert out["settings"]["maintenance"] == {
+        "enabled": True, "contracts_days": 7, "platform_check_days": 90,
+    }
+    assert "last_platform_check_on" not in out["settings"]["maintenance"]
+
+
+def test_an_unknown_maintenance_job_is_refused(client):
+    assert client.post("/api/settings/maintenance/run", json={"job": "everything"}).status_code == 422
+
+
+def test_a_maintenance_run_answers_before_the_walk_finishes(client, monkeypatch):
+    """Both walks take minutes; a request that waited would time out first."""
+    from web.services import maintenance
+
+    ran = []
+    monkeypatch.setattr(maintenance, "_JOBS", {"contracts": lambda: ran.append(1)})
+    body = client.post("/api/settings/maintenance/run", json={"job": "contracts"}).json()
+
+    assert body == {"started": True, "running": "contracts"}
+
+
 def test_digest_test_email_without_key(client, monkeypatch):
     monkeypatch.delenv("RESEND_API_KEY", raising=False)
     body = client.post("/api/settings/digest/test").json()

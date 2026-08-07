@@ -67,11 +67,33 @@ def _capabilities() -> dict:
     }
 
 
+def _maintenance_status(settings: dict) -> dict:
+    """When the slow walks last ran, and whether one is running now.
+
+    Read-only, and separate from the `maintenance` settings section: a cadence
+    is something you set, a last-run date is something you are told. Without it
+    the UI can only offer to schedule work it cannot say has ever happened.
+    """
+    from web.services import maintenance
+
+    internal = settings.get("internal") or {}
+    return {
+        "last_contracts_refresh_on": internal.get("last_contracts_refresh_on"),
+        "last_platform_check_on": internal.get("last_platform_check_on"),
+        "running": maintenance.running(),
+    }
+
+
 @router.get("/settings")
 def get_settings():
     settings = db.get_settings()
+    status = _maintenance_status(settings)
     settings.pop("internal", None)
-    return {"settings": settings, "capabilities": _capabilities()}
+    return {
+        "settings": settings,
+        "capabilities": _capabilities(),
+        "maintenance_status": status,
+    }
 
 
 class SettingsPatch(BaseModel):
@@ -79,14 +101,45 @@ class SettingsPatch(BaseModel):
     notifications: Optional[dict] = None
     digest: Optional[dict] = None
     ai: Optional[dict] = None
+    maintenance: Optional[dict] = None
 
 
 @router.put("/settings")
 def put_settings(body: SettingsPatch):
     patch = {k: v for k, v in body.model_dump().items() if v is not None}
     settings = db.update_settings(patch)
+    status = _maintenance_status(settings)
     settings.pop("internal", None)
-    return {"settings": settings, "capabilities": _capabilities()}
+    return {
+        "settings": settings,
+        "capabilities": _capabilities(),
+        "maintenance_status": status,
+    }
+
+
+class MaintenanceBody(BaseModel):
+    job: str  # contracts | platforms
+
+
+@router.post("/settings/maintenance/run")
+async def run_maintenance(body: MaintenanceBody):
+    """Run a maintenance job now, without waiting for its cadence.
+
+    Returns as soon as the job is handed to a worker thread — both jobs take
+    minutes, and a request that waited for one would time out long before it
+    finished. The result arrives as a notification, the same way the scheduled
+    run reports it.
+    """
+    import asyncio
+
+    from web.services import maintenance
+
+    if body.job not in ("contracts", "platforms"):
+        raise HTTPException(status_code=422, detail=f"unknown job: {body.job}")
+    if maintenance.running():
+        return {"started": False, "running": maintenance.running()}
+    asyncio.create_task(asyncio.to_thread(maintenance.run, body.job))
+    return {"started": True, "running": body.job}
 
 
 @router.post("/settings/digest/test")

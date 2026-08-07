@@ -6,6 +6,7 @@ import {
   useLoadDemo,
   useOpportunities,
   usePurge,
+  useRunMaintenance,
   useSettings,
   useSettingsMutation,
   useTestDigestEmail,
@@ -52,19 +53,33 @@ function Toggle({ checked, onChange, disabled }: {
   );
 }
 
+/** Both walks take minutes, so this reports "started", not "done". */
+function RunNow({ job, running, onRun }: {
+  job: string; running: string | null; onRun: (job: string) => void;
+}) {
+  const busy = running === job;
+  return (
+    <button onClick={() => onRun(job)} disabled={running !== null}
+            className="rounded-[10px] border border-line px-3 py-2 text-xs font-bold text-ink-soft hover:border-accent hover:text-accent disabled:opacity-40">
+      {busy ? "Running…" : "Run now"}
+    </button>
+  );
+}
+
 export default function SettingsScreen() {
   const { data, isLoading } = useSettings();
   const save = useSettingsMutation();
   const purge = usePurge();
   const demo = useLoadDemo();
   const testEmail = useTestDigestEmail();
+  const runMaintenance = useRunMaintenance();
   const { data: snapshot } = useOpportunities();
   const [confirmTarget, setConfirmTarget] = useState<string | null>(null);
 
   if (isLoading || !data) {
     return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
   }
-  const { settings, capabilities } = data;
+  const { settings, capabilities, maintenance_status } = data;
 
   const patch = (section: string, values: Record<string, unknown>) =>
     save.mutate({ [section]: values }, {
@@ -79,6 +94,15 @@ export default function SettingsScreen() {
           ? toast.success(`Test email sent to ${r.recipient}`)
           : toast.error(r.error ?? "Resend didn't accept the message"),
       onError: (e) => toast.error(`Couldn't send: ${e.message}`),
+    });
+
+  const runJob = (job: string) =>
+    runMaintenance.mutate(job, {
+      onSuccess: (r) =>
+        r.started
+          ? toast.success("Started — it'll post a notification when it finishes")
+          : toast.error(`Already running: ${r.running}`),
+      onError: (e) => toast.error(`Couldn't start: ${e.message}`),
     });
 
   const doPurge = (target: string) => {
@@ -233,6 +257,55 @@ export default function SettingsScreen() {
           <Toggle checked={settings.ai.auto_summarize_tracked}
                   disabled={!capabilities.ai_available}
                   onChange={(v) => patch("ai", { auto_summarize_tracked: v })} />
+        </Row>
+      </Card>
+
+      <Card title="Background upkeep">
+        <div className="my-3 rounded-[10px] bg-bg px-3 py-2.5 text-xs text-ink-soft">
+          Two slow walks that don't belong in a bid fetch. The contract register
+          says when an incumbent's term ends — the only warning you get before a
+          rebid is advertised. The platform check asks each agency whether it
+          still runs the portal we read; when one moves, its feed goes quiet
+          rather than breaking, and nothing else would notice.
+        </div>
+        <Row label="Run them in the background"
+             hint="One at a time, never during a fetch. Findings arrive as notifications.">
+          <Toggle checked={settings.maintenance.enabled}
+                  onChange={(v) => patch("maintenance", { enabled: v })} />
+        </Row>
+        <Row label="Contract register"
+             hint={maintenance_status.last_contracts_refresh_on
+               ? `Last run ${maintenance_status.last_contracts_refresh_on}`
+               : "Never run"}>
+          <div className="flex items-center gap-2">
+            <SegmentedControl
+              value={String(settings.maintenance.contracts_days)}
+              onChange={(v) => patch("maintenance", { contracts_days: parseInt(v, 10) })}
+              options={[
+                { value: "7", label: "Weekly" },
+                { value: "30", label: "Monthly" },
+                { value: "0", label: "Off" },
+              ]}
+            />
+            <RunNow job="contracts" running={maintenance_status.running} onRun={runJob} />
+          </div>
+        </Row>
+        <Row label="Platform check"
+             hint={maintenance_status.last_platform_check_on
+               ? `Last run ${maintenance_status.last_platform_check_on}`
+               : "Never run"}>
+          <div className="flex items-center gap-2">
+            <SegmentedControl
+              value={String(settings.maintenance.platform_check_days)}
+              onChange={(v) => patch("maintenance", { platform_check_days: parseInt(v, 10) })}
+              options={[
+                { value: "30", label: "Monthly" },
+                { value: "90", label: "Quarterly" },
+                { value: "0", label: "Off" },
+              ]}
+            />
+            <RunNow job="platforms" running={maintenance_status.running} onRun={runJob} />
+          </div>
         </Row>
       </Card>
 

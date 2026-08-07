@@ -408,6 +408,19 @@ export function useTestDigestEmail() {
   });
 }
 
+/** Kick off a maintenance walk now. It answers as soon as the thread starts —
+ *  the result of the walk itself arrives as a notification. */
+export function useRunMaintenance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (job: string) =>
+      api.post<{ started: boolean; running: string | null }>(
+        "/api/settings/maintenance/run", { job },
+      ),
+    onSuccess: () => qc.invalidateQueries({ queryKey: keys.settings }),
+  });
+}
+
 export function usePurge() {
   const qc = useQueryClient();
   return useMutation({

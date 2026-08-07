@@ -46,6 +46,7 @@ from typing import Dict, List
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.pipeline.fingerprint import fingerprint_agency  # noqa: E402
+from src.pipeline.platform_watch import compare, identified, recorded  # noqa: E402
 
 ROSTER = Path("data/registry/fl_agencies.csv")
 SOURCES = Path("data/registry/fl_procurement_sources.csv")
@@ -88,64 +89,35 @@ def already_mapped(path: Path) -> set:
     }
 
 
-def previous(path: Path) -> Dict[str, Dict]:
-    """entity_id -> its last fingerprint, latest line winning.
-
-    Latest wins because the file is append-only: a recheck writes a new line
-    rather than editing the old one, so the history of a migration stays
-    readable in the file itself.
-    """
-    out: Dict[str, Dict] = {}
-    if not path.exists():
-        return out
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            row = json.loads(line)
-        except Exception:  # noqa: BLE001
-            continue
-        if row.get("entity_id"):
-            out[row["entity_id"]] = row
-    return out
-
-
 def report_changes(before: Dict[str, Dict], after: List) -> int:
     """Print what moved, and return how many did.
 
-    A platform that goes *from* known *to* unknown is reported too, and
-    separately: it is usually a site being slow or a WAF, not a migration, and
-    conflating the two would cry wolf every sweep.
+    The comparison itself lives in `src.pipeline.platform_watch`, because the
+    scheduler runs the same recheck monthly and turns each move into a
+    notification. Two copies of "has this agency moved" would drift.
+
+    A platform that goes *from* known *to* unknown is reported separately: it is
+    usually a site being slow or a WAF, not a migration, and conflating the two
+    would cry wolf every sweep.
     """
-    moved, lost, same = [], [], 0
-    for fp in after:
-        was = (before.get(fp.entity_id) or {}).get("platform", "unknown")
-        now = fp.platform
-        if was == now:
-            same += 1
-        elif now == "unknown":
-            lost.append((fp, was))
-        else:
-            moved.append((fp, was))
+    result = compare(before, after)
+    print("\n" + result.summary())
 
-    print(f"\n{len(after)} rechecked · {same} unchanged · "
-          f"{len(moved)} moved · {len(lost)} no longer readable")
-
-    if moved:
+    if result.moved:
         print("\nMIGRATED — these need their source config revisited:")
-        for fp, was in sorted(moved, key=lambda m: m[0].name):
-            print(f"  {fp.name[:38]:40} {was:18} -> {fp.platform} ({fp.confidence})")
-            if fp.portal_url:
-                print(f"  {'':40} {fp.portal_url[:88]}")
+        for m in sorted(result.moved, key=lambda m: m.name):
+            print(f"  {m.name[:38]:40} {m.was:18} -> {m.now} ({m.confidence})")
+            if m.portal_url:
+                print(f"  {'':40} {m.portal_url[:88]}")
 
-    if lost:
+    if result.lost:
         print("\nno longer identifiable (usually a slow site or a WAF, not a move):")
-        for fp, was in sorted(lost, key=lambda m: m[0].name)[:20]:
-            print(f"  {fp.name[:38]:40} was {was:18} {fp.note[:40]}")
-        if len(lost) > 20:
-            print(f"  ... and {len(lost) - 20} more")
+        for m in sorted(result.lost, key=lambda m: m.name)[:20]:
+            print(f"  {m.name[:38]:40} was {m.was:18} {m.note[:40]}")
+        if len(result.lost) > 20:
+            print(f"  ... and {len(result.lost) - 20} more")
 
-    return len(moved)
+    return len(result.moved)
 
 
 def report(path: Path) -> int:
@@ -193,14 +165,14 @@ def main() -> int:
         return 2
 
     roster = load_roster(args.roster)
-    before = previous(args.out)
+    before = recorded(args.out)
 
     if args.recheck:
         # Only entities we already believe we know. An agency that was never
         # identified cannot have migrated *away* from anything, and re-reading
-        # 632 unknowns to learn that they are still unknown is 1,264 requests
+        # 635 unknowns to learn that they are still unknown is 1,270 requests
         # for no answer.
-        known = {e for e, row in before.items() if row.get("platform") != "unknown"}
+        known = identified(before)
         done, mapped = set(), set()
         roster = [r for r in roster if r["entity_id"] in known]
     else:
