@@ -28,6 +28,7 @@ from .palm_beach_schools import PalmBeachSchoolsAdapter
 from .sam_gov import SamGovAdapter
 from .vendor_registry import VendorRegistryAdapter
 from .vendorlink import VendorLinkAdapter
+from .workday_sourcing import WorkdaySourcingAdapter
 from .catalog import CatalogAdapter
 
 ADAPTERS: Dict[str, Type[SourceAdapter]] = {
@@ -48,6 +49,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "civicplus": CivicPlusAdapter,
     "vendorlink": VendorLinkAdapter,
     "vendor_registry": VendorRegistryAdapter,
+    "workday_sourcing": WorkdaySourcingAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,
     "catalog": CatalogAdapter,
