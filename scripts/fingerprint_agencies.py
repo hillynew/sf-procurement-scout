@@ -124,7 +124,11 @@ def report(path: Path) -> int:
     if not path.exists():
         print(f"no results yet at {path}")
         return 1
-    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # Latest line per entity, not every line. The file is append-only, so a
+    # recheck or a retry adds a row rather than replacing one — counting lines
+    # reported 1,633 "entities fingerprinted" against a roster of 2,817 when
+    # only 815 had ever been asked.
+    rows = list(recorded(path).values())
     platforms = Counter(r["platform"] for r in rows)
     print(f"{len(rows)} entities fingerprinted\n")
     print(f"{'platform':<22}{'count':>7}")
@@ -155,6 +159,9 @@ def main() -> int:
     ap.add_argument("--report", action="store_true", help="summarise and exit")
     ap.add_argument("--recheck", action="store_true",
                     help="re-read entities already placed on a platform and report moves")
+    ap.add_argument("--retry-unknown", action="store_true",
+                    help="re-ask the entities that came back unknown (use after the "
+                         "fingerprinter learns a new way to look)")
     args = ap.parse_args()
 
     if args.report:
@@ -175,6 +182,14 @@ def main() -> int:
         known = identified(before)
         done, mapped = set(), set()
         roster = [r for r in roster if r["entity_id"] in known]
+    elif args.retry_unknown:
+        # The other half of the same idea. `--recheck` asks whether an answer
+        # has changed; this asks whether a *non-answer* still stands, which is
+        # the question after the fingerprinter learns to look somewhere new —
+        # a procurement subdomain, one more hop, a page that is itself a board.
+        unknown = set(before) - identified(before)
+        done, mapped = set(), set()
+        roster = [r for r in roster if r["entity_id"] in unknown]
     else:
         done = set() if args.redo else already_done(args.out)
         mapped = already_mapped(SOURCES)
@@ -199,6 +214,8 @@ def main() -> int:
 
     if args.recheck:
         print(f"rechecking {len(todo)} entities already placed on a platform")
+    elif args.retry_unknown:
+        print(f"re-asking {len(todo)} entities that came back unknown")
     else:
         print(
             f"roster {len(roster)} · already verified {len(mapped)} · "
@@ -238,6 +255,12 @@ def main() -> int:
     if args.recheck:
         report_changes(before, results)
         return 0
+
+    if args.retry_unknown:
+        gained = [fp for fp in results if fp.platform != "unknown"]
+        print(f"\n{len(results)} re-asked · {len(gained)} now identified")
+        for fp in sorted(gained, key=lambda f: (f.platform, f.name)):
+            print(f"  {fp.platform:<18} {fp.name[:40]:42} {(fp.portal_url or '')[:60]}")
 
     print("\nthis run:")
     for platform, n in counts.most_common():

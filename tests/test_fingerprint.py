@@ -167,7 +167,8 @@ def test_a_client_rendered_homepage_says_so(monkeypatch):
     assert "client-side" in result.note
 
 
-def test_a_self_hosted_bid_board_is_unknown_not_invented(monkeypatch):
+def test_a_page_that_merely_mentions_a_bid_is_not_a_board(monkeypatch):
+    """One unnumbered ITB is a purchasing page, not a list of live work."""
     _pages(
         monkeypatch,
         {

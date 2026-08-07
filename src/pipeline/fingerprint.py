@@ -218,6 +218,63 @@ def procurement_link(html: str, base: str) -> Optional[str]:
 #: read links out of.
 _JS_SHELL = 6000
 
+#: A solicitation as agencies write it: a type and a *structured* number.
+#: `ITB 26-014`, `RFP#2026-01`, `Bid No. 25-1147`. The number is what keeps this
+#: off a purchasing policy page, which says "bid" constantly and numbers
+#: nothing; requiring a year-and-sequence shape rather than any digits is what
+#: keeps "Bid 60" in a sentence from counting as one.
+_SOLICITATION_RE = re.compile(
+    r"\b(?:ITB|IFB|RFP|RFQ|RFI|ITN|BID|SOLICITATION)\b[\s.#:No-]{0,6}"
+    r"(?:\d{2,4}[-/]\d{1,4}|\d{4,})",
+    re.I,
+)
+
+_DATE_RE = re.compile(
+    r"\b\d{1,2}/\d{1,2}/\d{2,4}\b"
+    r"|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+20\d{2}\b",
+    re.I,
+)
+
+#: Distinct solicitations and dates a page must show before it is called a bid
+#: board. Two of each: a page carrying two numbered solicitations and two dates
+#: is publishing bids, and Cape Canaveral — which had exactly two open — is the
+#: case that set this. One is a news item announcing a single RFP.
+_BOARD_MIN = 2
+
+
+def _refs(text: str) -> set:
+    """Distinct solicitation numbers, normalised so one is not counted twice.
+
+    `RFP-2026-02` and `RFP2026-02` on the same page are one solicitation
+    written two ways, and counting them as two was enough to call Arcadia's
+    single news post a bid board.
+    """
+    return {
+        re.sub(r"[^A-Z0-9]", "", m.group(0).upper())
+        for m in _SOLICITATION_RE.finditer(text)
+    }
+
+
+def looks_like_a_bid_board(html: str) -> bool:
+    """True when this page is itself a list of live solicitations.
+
+    Some agencies run no platform at all — they keep the table on their own
+    website. Filing those as `unknown` puts a real, readable bid board in the
+    same bucket as a site that timed out, and they are opposite kinds of miss:
+    one needs a page-level reader, the other needs nothing because there is
+    nothing there.
+
+    The test is deliberately hard to pass. A page must name at least two
+    distinct *numbered* solicitations and carry at least two dates. Measured
+    against the 146 readable no-signature pages from the sweep, that calls 17
+    of them boards — small towns mostly do not have a board at all, they have a
+    purchasing contact and a page that says to call them.
+    """
+    text = re.sub(r"<[^>]+>", " ", html)
+    if len(_refs(text)) < _BOARD_MIN:
+        return False
+    return len(set(_DATE_RE.findall(text))) >= _BOARD_MIN
+
 
 def _fetch_tolerant(url: str, *, timeout: int):
     """Fetch a roster URL, retrying the obvious variants before giving up.
@@ -250,22 +307,72 @@ def _fetch_tolerant(url: str, *, timeout: int):
 #: Paths worth trying when a homepage links nothing. `/Bids.aspx` is first
 #: because CivicPlus serves it on every site it hosts, and CivicPlus is the
 #: most common platform among Florida municipalities.
-_KNOWN_PATHS = ("/Bids.aspx", "/bids", "/purchasing", "/procurement")
+_KNOWN_PATHS = (
+    "/Bids.aspx", "/bids", "/purchasing", "/procurement",
+    "/rfp", "/rfps", "/solicitations", "/bid-opportunities",
+)
+
+#: Hosts worth trying when a homepage links nothing. Large institutions put
+#: procurement on its own subdomain and never link it from the front page —
+#: `procurement.fsu.edu` and `bids.fiu.edu` are both Jaggaer, and both read as
+#: "no procurement link found" for as long as this only followed links.
+_KNOWN_SUBDOMAINS = ("procurement", "purchasing", "bids", "vendors")
+
+#: How many probes one agency is worth, and the order they are spent in: the
+#: four paths that answer most often, then the subdomains, then the rest. Order
+#: only matters when something answers — a site with no board is going to cost
+#: the whole budget whatever the order — so it is set to reach a small town's
+#: `/Bids.aspx` in one request and a university's `bids.` host in five.
+_PROBE_BUDGET = 12
+_PATHS_FIRST = 4
 
 
-def _probe_known_paths(base: str, *, timeout: int) -> Optional[str]:
-    """The first of the usual paths that answers with a real page, or None."""
-    root = base.rstrip("/")
-    for path in _KNOWN_PATHS:
+def _probe_candidates(base: str) -> List[str]:
+    """URLs to try, best first: the common paths, the subdomains, then the rest."""
+    split = urlsplit(base)
+    root = f"{split.scheme}://{split.netloc}".rstrip("/")
+    paths = [root + path for path in _KNOWN_PATHS]
+
+    host = split.netloc.lower()
+    bare = host[4:] if host.startswith("www.") else host
+    # Only off the agency's own domain. `bids.fiu.edu` is a fair guess;
+    # `bids.town.windermere.fl.us`, hung off a host that is already a
+    # subdomain of something else, is a guess too far.
+    subs = (
+        [f"{split.scheme}://{sub}.{bare}" for sub in _KNOWN_SUBDOMAINS]
+        if bare and bare == _domain_of("//" + bare) else []
+    )
+    return paths[:_PATHS_FIRST] + subs + paths[_PATHS_FIRST:]
+
+
+def _probe_for_board(base: str, *, timeout: int):
+    """Look for a bid board where the homepage linked none.
+
+    Returns the response, not a URL, because the caller needs the body and
+    fetching it twice for every probed agency is a request nobody has to spend.
+
+    Stops at the first page that *demonstrates* something — a platform
+    signature or a list of live solicitations. A page that merely answers is
+    kept as a fallback, so "we read their purchasing page and it named no
+    platform" stays distinguishable from "there was nothing to read".
+    """
+    fallback = None
+    for url in _probe_candidates(base)[:_PROBE_BUDGET]:
         try:
-            resp = get(root + path, timeout=timeout, retries=0)
+            resp = get(url, timeout=timeout, retries=0)
         except (RobotsDisallowed, SourceBlocked):
-            return None
+            continue
         except Exception:  # noqa: BLE001 — a 404 here is the expected case
             continue
-        if len(resp.text or "") > _MIN_HTML:
-            return str(resp.url)
-    return None
+        html = resp.text or ""
+        if len(html) <= _MIN_HTML:
+            continue
+        strong, _weak = identify(html)
+        if strong or looks_like_a_bid_board(html):
+            return resp
+        if fallback is None:
+            fallback = resp
+    return fallback
 
 
 def _normalise(website: str) -> str:
@@ -309,15 +416,18 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
         fp.note = "matched on homepage"
         return fp
 
+    page = None
     link = procurement_link(home_html, str(home.url))
     if not link:
-        # Plenty of city homepages never link bids from the front page — the
-        # board lives under Business or Departments, two hops down. Rather than
-        # crawl the site, try the handful of paths these platforms all use.
-        # `/Bids.aspx` alone recovers every CivicPlus city, which is the single
-        # largest platform among Florida municipalities.
-        probed = _probe_known_paths(str(home.url), timeout=timeout)
-        if probed is None:
+        # Plenty of homepages never link bids from the front page — the board
+        # lives under Business or Departments, two hops down, or on its own
+        # subdomain. Rather than crawl the site, try the handful of addresses
+        # these platforms and institutions all use. `/Bids.aspx` alone recovers
+        # every CivicPlus city; `procurement.<domain>` recovers the
+        # universities, which never link procurement from a homepage aimed at
+        # students.
+        page = _probe_for_board(str(home.url), timeout=timeout)
+        if page is None:
             fp.checked_url = str(home.url)
             # Distinguish the two misses, because only one of them is worth a
             # human's time: a few kilobytes of homepage is a client-rendered
@@ -328,22 +438,23 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
                 else "no procurement link found"
             )
             return fp
-        link = probed
+        link = str(page.url)
 
-    try:
-        page = get(link, timeout=timeout, retries=1)
-    except RobotsDisallowed as e:
-        fp.note = f"robots refused: {str(e)[:80]}"
-        fp.checked_url = link
-        return fp
-    except SourceBlocked:
-        fp.note = "procurement page blocked (WAF)"
-        fp.checked_url = link
-        return fp
-    except Exception as e:  # noqa: BLE001
-        fp.note = f"procurement page unreachable ({type(e).__name__})"
-        fp.checked_url = link
-        return fp
+    if page is None:
+        try:
+            page = get(link, timeout=timeout, retries=1)
+        except RobotsDisallowed as e:
+            fp.note = f"robots refused: {str(e)[:80]}"
+            fp.checked_url = link
+            return fp
+        except SourceBlocked:
+            fp.note = "procurement page blocked (WAF)"
+            fp.checked_url = link
+            return fp
+        except Exception as e:  # noqa: BLE001
+            fp.note = f"procurement page unreachable ({type(e).__name__})"
+            fp.checked_url = link
+            return fp
 
     fp.checked_url = str(page.url)
     html = page.text or ""
@@ -353,6 +464,26 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
 
     strong, weak = identify(html)
     if not strong and not weak:
+        # A procurement landing page is often only a signpost: contacts, terms,
+        # and a link to where the bids actually are. One more hop off it is
+        # what separates UF and USF — both Jaggaer, both behind a
+        # `procurement.` page that names no platform — from a dead end.
+        hop = _second_hop(html, str(page.url), timeout=timeout)
+        if hop is not None:
+            page, html = hop, (hop.text or "")
+            fp.checked_url = str(page.url)
+            strong, weak = identify(html)
+
+    if not strong and not weak:
+        if looks_like_a_bid_board(html):
+            # No platform because there is no platform: the agency keeps the
+            # table on its own website. A real answer, and a different queue
+            # from the sites that never answered.
+            fp.platform = "selfhosted"
+            fp.confidence = "page"
+            fp.portal_url = str(page.url)
+            fp.note = "solicitations listed on the agency's own page"
+            return fp
         fp.note = "no platform signature"
         return fp
 
@@ -379,6 +510,31 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
     return fp
 
 
+def _second_hop(html: str, base: str, *, timeout: int):
+    """One more hop from a procurement page that named no platform.
+
+    Bounded to one fetch and guarded on where it goes. A procurement page links
+    plenty — vendor forms, the state's own site, sometimes another agency
+    entirely — and New College's page links `unf.edu`, which is a different
+    university. So a hop is only taken within the agency's own domain (`bids.`
+    off `www.` counts; a different institution does not) or to a host that is
+    itself a known platform. Anything else would file one agency's platform
+    under another's name.
+    """
+    link = procurement_link(html, base)
+    if not link or link.rstrip("/") == base.rstrip("/"):
+        return None
+    if _domain_of(link) != _domain_of(base) and not any(
+        needle.lower() in link.lower() for needle in _ALL_STRONG
+    ):
+        return None
+    try:
+        resp = get(link, timeout=timeout, retries=0)
+    except Exception:  # noqa: BLE001 — the first page's verdict stands
+        return None
+    return resp if len(resp.text or "") > _MIN_HTML else None
+
+
 def _points_offsite(html: str, platform: str) -> bool:
     """True when the page's bid list is empty but it links the other platform."""
     has_rows = 'class="bidTitle"' in html or "listItemsRow" in html
@@ -391,3 +547,15 @@ def _points_offsite(html: str, platform: str) -> bool:
 
 def host_of(url: str) -> str:
     return urlsplit(url or "").netloc.lower()
+
+
+def _domain_of(url: str) -> str:
+    """The agency's domain, so `www.fiu.edu` and `bids.fiu.edu` read as one.
+
+    Two labels, except under `.us`, where Florida governments live three deep —
+    `town.windermere.fl.us`. Treating `fl.us` as the domain would make every
+    Florida municipality a sibling of every other one.
+    """
+    parts = host_of(url).split(".")
+    keep = 3 if parts[-1] == "us" and len(parts) > 2 else 2
+    return ".".join(parts[-keep:])
