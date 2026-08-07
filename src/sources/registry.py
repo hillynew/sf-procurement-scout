@@ -26,7 +26,6 @@ from .opengov import OpenGovAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
 from .sam_gov import SamGovAdapter
-from .demandstar import DemandStarAdapter
 from .vendor_registry import VendorRegistryAdapter
 from .vendorlink import VendorLinkAdapter
 from .workday_sourcing import WorkdaySourcingAdapter
@@ -50,7 +49,6 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "civicplus": CivicPlusAdapter,
     "vendorlink": VendorLinkAdapter,
     "vendor_registry": VendorRegistryAdapter,
-    "demandstar": DemandStarAdapter,
     "workday_sourcing": WorkdaySourcingAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,

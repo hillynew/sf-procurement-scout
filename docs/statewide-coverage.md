@@ -217,6 +217,26 @@ Their public agency pages do expose a JSON endpoint that works without
 authentication, and it would be easy to use. I have deliberately not built
 against it.
 
+> **This decision was re-made, wrongly, on 7 Aug 2026, and reverted the same
+> day.** An adapter was built against exactly that endpoint
+> (`api.demandstar.com/contents/agency/search?id=<guid>`), shipped 14 agencies,
+> and was merged as PR #43 before anyone noticed this section existed. The
+> mistake was procedural, not technical: the reasoning started from
+> `research/FL_PROCUREMENT_RESEARCH.md`, which frames DemandStar as a *coverage*
+> question — "useful as fingerprinting oracles, not as data sources" — and that
+> reads like a judgement about value, which new evidence can overturn. This
+> file, where it is recorded as a **terms** decision already taken, was never
+> opened.
+>
+> The clause is still live; verified verbatim against
+> `network.demandstar.com/terms-of-use/` on 7 Aug 2026, at (I) in the
+> prohibited-conduct list. Robots.txt is not the test here and never was:
+> DemandStar serves `User-agent: *` with no rules at all, so a robots check
+> returns "allowed" and means nothing. **An open endpoint is not permission.**
+>
+> If a future change wants to revisit this, the bar is a change in *their*
+> terms or a paid plan — not a fresh reading of how easy the endpoint is.
+
 The practical reason matters more than the legal one: this is the fact pattern
 platforms actually enforce against, and the remedy is cheap for them (kill the
 account, block the IP) and expensive for us — including losing the legitimate
@@ -231,6 +251,45 @@ The alternatives, in order:
    agency matters most and route it to the bid mailbox.
 3. **$60/yr per county** for the two or three counties where we actually bid.
    That is real money for real coverage, and it is a fraction of statewide.
+
+### 3a. BidNet Direct: same answer, arrived at differently
+
+11 Florida agencies fingerprint strong on BidNet, 10 of them covered nowhere
+else — Palm Beach and Hernando school districts, Highlands County, five
+colleges, Bal Harbour, Medley. Its `/florida` page lists 85 open solicitations
+without a login. Not building against it is a real cost, and it is still the
+right call.
+
+Three things decide it, in order of weight:
+
+1. **Their terms are unreadable to us.** `robots.txt` disallows
+   `/public/info/`, which is where the terms of use live. So the one document
+   that settles the question cannot be fetched without breaking the rule the
+   fetch would be relying on. After §3, the test is the terms, not the
+   endpoint — and here the test cannot be run.
+2. **They block AI crawlers by name**, including `anthropic-ai`, `ClaudeBot`
+   and `Claude-Web`, alongside GPTBot, CCBot, PerplexityBot and
+   Google-Extended, each with `Disallow: /`. This crawler is none of those: its
+   product token is `sf-procurement-scout`, so under RFC 9309 the `*` group
+   governs it, and that group permits `/florida/...` at `Crawl-delay: 5` while
+   forbidding paging. The letter allows it. The intent is not ambiguous.
+3. **BidNet sells subscriptions.** The free surface is deliberately bounded,
+   which is the fact pattern platforms enforce against — the same reasoning
+   that governs DemandStar in §3.
+
+Point 1 alone would be enough. A judgement call made on evidence one cannot
+read, in favour of the party that gains from reading it that way, is not a
+judgement call.
+
+What is recorded instead: the 10 uncovered agencies are **catalog entries**, so
+the gap shows in the app as "this agency posts here, go look" rather than as
+silence. That is what the catalog is for.
+
+Note the contrast with Bonfire, Ionwave and Jaggaer in `ROBOTS_OVERRIDES`. Those
+serve a blanket `Disallow: /` and are crawled anyway, under a documented
+exception. The difference is not how permissive robots.txt is — it is that for
+those three the *terms* were read and bind on registration rather than on
+reading. Here they could not be read at all.
 
 ## 4. What is worth buying
 

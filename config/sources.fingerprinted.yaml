@@ -149,15 +149,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.cityofcrestview.org/Bids.aspx
-- id: fp_mun_city_of_fernandina_beach
-  name: City of Fernandina Beach (Demandstar)
-  county: nassau
-  agency: City of Fernandina Beach
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/city-of-fernandina-beach-fl/procurement-opportunities/1a3c13ef-30b7-4e4d-bb57-7f973cd4dc9a/
-  demandstar_agency: 1a3c13ef-30b7-4e4d-bb57-7f973cd4dc9a
 - id: fp_mun_city_of_florida_city
   name: City of Florida City (Civicplus)
   county: unknown
@@ -230,15 +221,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.townofjupiterisland.com/Bids.aspx
-- id: fp_mun_city_of_labelle
-  name: City of LaBelle (Demandstar)
-  county: hendry
-  agency: City of LaBelle
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/city-of-labelle/procurement-opportunities/5d7d6f4e-8d3f-4be2-abc7-14512880e2b9/
-  demandstar_agency: 5d7d6f4e-8d3f-4be2-abc7-14512880e2b9
 - id: fp_mun_town_of_lake_hamilton
   name: Town of Lake Hamilton (Civicplus)
   county: hamilton
@@ -263,15 +245,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.lakemaryfl.com/Bids.aspx
-- id: fp_mun_town_of_lantana
-  name: Town of Lantana (Demandstar)
-  county: palm-beach
-  agency: Town of Lantana
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/town-of-lantana/procurement-opportunities/5ad3daaf-82a4-4571-9efb-573546ecd9e3/
-  demandstar_agency: 5ad3daaf-82a4-4571-9efb-573546ecd9e3
 - id: fp_mun_city_of_lake_wales
   name: City of Lake Wales (Civicplus)
   county: polk
@@ -312,15 +285,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.cityoflynnhaven.gov/Bids.aspx
-- id: fp_mun_city_of_madeira_beach
-  name: City of Madeira Beach (Demandstar)
-  county: pinellas
-  agency: City of Madeira Beach
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/city-of-madeira-beach/procurement-opportunities/cf653e72-e53c-43e2-9bfd-734f9b28d461/
-  demandstar_agency: cf653e72-e53c-43e2-9bfd-734f9b28d461
 - id: fp_mun_city_of_maitland
   name: City of Maitland (Civicplus)
   county: orange
@@ -361,15 +325,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.margatefl.com/Bids.aspx
-- id: fp_mun_city_of_midway
-  name: City of Midway (Demandstar)
-  county: gadsden
-  agency: City of Midway
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/city-of-midway/procurement-opportunities/b927c925-ab49-4256-9486-3173b84453d5/
-  demandstar_agency: b927c925-ab49-4256-9486-3173b84453d5
 - id: fp_mun_city_of_milton
   name: City of Milton (Civicplus)
   county: santa-rosa
@@ -402,15 +357,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://cityofniceville.org/Bids.aspx
-- id: fp_mun_city_of_north_port
-  name: City of North Port (Demandstar)
-  county: sarasota
-  agency: City of North Port
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/city-of-north-port/procurement-opportunities/1bad82a4-b873-4d69-ab29-85b68ad1cf2e/
-  demandstar_agency: 1bad82a4-b873-4d69-ab29-85b68ad1cf2e
 - id: fp_mun_town_of_oakland
   name: Town of Oakland (Civicplus)
   county: unknown
@@ -436,15 +382,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://palatka-fl.gov/Bids.aspx
-- id: fp_mun_village_of_palm_springs
-  name: Village of Palm Springs (Demandstar)
-  county: palm-beach
-  agency: Village of Palm Springs
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/village-of-palm-springs/procurement-opportunities/d4737aa4-b8cb-4378-8a91-a2f5555b85ef/
-  demandstar_agency: d4737aa4-b8cb-4378-8a91-a2f5555b85ef
 - id: fp_mun_city_of_panama_city_beach
   name: City of Panama City Beach (Civicplus)
   county: bay
@@ -469,24 +406,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.cityofoviedo.net/Bids.aspx
-- id: fp_mun_city_of_riviera_beach
-  name: City of Riviera Beach (Demandstar)
-  county: palm-beach
-  agency: City of Riviera Beach
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://network.demandstar.com/agencies/florida/city-of-riviera-beach/procurement-opportunities/ac495a12-6345-4238-86a0-6d5091f55c45/
-  demandstar_agency: ac495a12-6345-4238-86a0-6d5091f55c45
-- id: fp_mun_town_of_pierson
-  name: Town of Pierson (Demandstar)
-  county: unknown
-  agency: Town of Pierson
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/town-of-pierson/procurement-opportunities/4e781fce-cc56-4601-907b-c0edbd883de7/
-  demandstar_agency: 4e781fce-cc56-4601-907b-c0edbd883de7
 - id: fp_mun_city_of_pinellas_park
   name: City of Pinellas Park (Civicplus)
   county: pinellas
@@ -591,15 +510,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://stpetebeach.org/Bids.aspx
-- id: fp_mun_city_of_treasure_island
-  name: City of Treasure Island (Demandstar)
-  county: pinellas
-  agency: City of Treasure Island
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/city-of-treasure-island/procurement-opportunities/2878b61a-ebdf-408b-b857-a34bd33bf71e/
-  demandstar_agency: 2878b61a-ebdf-408b-b857-a34bd33bf71e
 - id: fp_mun_city_of_tavares
   name: City of Tavares (Civicplus)
   county: lake
@@ -616,15 +526,6 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.tequesta.org/Bids.aspx
-- id: fp_mun_village_of_wellington
-  name: Village of Wellington (Demandstar)
-  county: palm-beach
-  agency: Village of Wellington
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/village-of-wellington/procurement-opportunities/4cfc11bd-9874-4bb1-9fd6-a0fec5e16311/
-  demandstar_agency: 4cfc11bd-9874-4bb1-9fd6-a0fec5e16311
 - id: fp_mun_city_of_vero_beach
   name: City of Vero Beach (Civicplus)
   county: indian-river
@@ -650,33 +551,6 @@ sources:
   platform: bonfire
   portal_url: https://flvs.bonfirehub.com/
   bonfire_host: flvs.bonfirehub.com
-- id: fp_sch_hamilton_county_school_district
-  name: Hamilton County School District (Demandstar)
-  county: hamilton
-  agency: Hamilton County School District
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/school-district-of-hamilton-county/procurement-opportunities/15747f40-0ea0-4443-b326-4a78e49f2030/
-  demandstar_agency: 15747f40-0ea0-4443-b326-4a78e49f2030
-- id: fp_sch_nassau_county_school_district
-  name: Nassau County School District (Demandstar)
-  county: nassau
-  agency: Nassau County School District
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/Florida/Nassau-County-School-District/procurement-opportunities/50B98650-DD09-4D01-B1FD-D65F5AF9C5F5\\\
-  demandstar_agency: 50B98650-DD09-4D01-B1FD-D65F5AF9C5F5
-- id: fp_he_broward_college
-  name: Broward College (Demandstar)
-  county: broward
-  agency: Broward College
-  live_fetch: true
-  adapter: demandstar
-  platform: demandstar
-  portal_url: https://www.demandstar.com/app/agencies/florida/broward-college/procurement-opportunities/541477cd-9050-4370-8cff-a59c88c5c17a/
-  demandstar_agency: 541477cd-9050-4370-8cff-a59c88c5c17a
 - id: fp_sd_babcock_ranch_community_independent_special_district
   name: Babcock Ranch Community Independent Special District (Civicplus)
   county: unknown

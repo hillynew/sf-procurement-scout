@@ -781,3 +781,75 @@ sources:
     workday_tenant: hillsborough-community-college
     portal_url: https://hillsborough-community-college.public-portal.us.workdayspend.com/opportunities
     register_url: https://hillsborough-community-college.us.workdayspend.com/supplier_self_registration
+
+  # ---------------------------------------------------------------------
+  # BidNet Direct — catalog only, deliberately.
+  #
+  # These agencies publish on BidNet and nowhere else we can read. The
+  # listings are visible without a login and robots.txt's `*` group permits
+  # the pages, but BidNet's terms of use sit behind `Disallow: /public/info/`
+  # — so the one document that decides the question cannot be fetched without
+  # breaking the rule the fetch would rely on. They also block `anthropic-ai`,
+  # `ClaudeBot` and `Claude-Web` by name. See docs/statewide-coverage.md §3a.
+  #
+  # Recorded as pointers so the gap is visible in the app rather than silent.
+  # ---------------------------------------------------------------------
+  - id: bidnet_highlands_county
+    name: Highlands County (BidNet Direct)
+    county: highlands
+    agency: Highlands County
+    live_fetch: false
+    adapter: catalog
+    platform: bidnet
+    portal_url: https://www.bidnetdirect.com/florida/highlandscountyfl
+    register_url: https://www.bidnetdirect.com/florida
+
+  - id: bidnet_nwfsc
+    name: Northwest Florida State College (BidNet Direct)
+    county: okaloosa
+    agency: Northwest Florida State College
+    live_fetch: false
+    adapter: catalog
+    platform: bidnet
+    portal_url: https://www.bidnetdirect.com/florida/northwestfloridastatecollege
+    register_url: https://www.bidnetdirect.com/florida
+
+  - id: bidnet_palm_beach_schools
+    name: Palm Beach County School District (BidNet Direct)
+    county: palm-beach
+    agency: School District of Palm Beach County
+    live_fetch: false
+    adapter: catalog
+    platform: bidnet
+    portal_url: https://www.bidnetdirect.com/palmbeachschools
+    register_url: https://www.bidnetdirect.com/florida
+
+  - id: bidnet_polk_state_college
+    name: Polk State College (BidNet Direct)
+    county: polk
+    agency: Polk State College
+    live_fetch: false
+    adapter: catalog
+    platform: bidnet
+    portal_url: https://www.bidnetdirect.com/florida/polkstatecollege
+    register_url: https://www.bidnetdirect.com/florida
+
+  - id: bidnet_town_of_medley
+    name: Town of Medley (BidNet Direct)
+    county: miami-dade
+    agency: Town of Medley
+    live_fetch: false
+    adapter: catalog
+    platform: bidnet
+    portal_url: https://www.bidnetdirect.com/townofmedley
+    register_url: https://www.bidnetdirect.com/florida
+
+  - id: bidnet_bal_harbour
+    name: Village of Bal Harbour (BidNet Direct)
+    county: miami-dade
+    agency: Village of Bal Harbour
+    live_fetch: false
+    adapter: catalog
+    platform: bidnet
+    portal_url: https://www.bidnetdirect.com/florida/balharbourvillage
+    register_url: https://www.bidnetdirect.com/florida

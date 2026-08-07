@@ -66,14 +66,6 @@ PLATFORM_ADAPTERS: Dict[str, tuple] = {
     "bonfire": ("bonfire", "bonfire_host", r"https?://([a-z0-9-]+\.bonfirehub\.com)"),
     "opengov": ("opengov", "opengov_code", r"/portal/([a-z0-9_-]+)"),
     "ionwave": ("ionwave", "ionwave_host", r"https?://([a-z0-9-]+\.ionwave\.net)"),
-    # The GUID out of an agency's own landing URL. There is no public agency
-    # directory — `/common/getAgencies` is a 401 — so this is the only way a
-    # DemandStar tenant is ever identified: by fingerprinting the agency's own
-    # website and reading the link it publishes.
-    "demandstar": (
-        "demandstar", "demandstar_agency",
-        r"/procurement-opportunities/([0-9a-fA-F-]{36})",
-    ),
     "jaggaer": ("jaggaer", "jaggaer_org", r"[?&]CustomerOrg=([A-Za-z0-9_-]+)"),
     # Either host carries the tenant as its first label. The auth host is the
     # one fingerprints usually land on, and the one this must never configure —
