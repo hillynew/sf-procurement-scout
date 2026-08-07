@@ -227,22 +227,41 @@ def _contracts_section() -> Optional[Tuple[int, str]]:
     if not soon:
         return None
 
+    # Ranked by size, then by date. There are three thousand of these once the
+    # state register is loaded, and only ten fit — picked by date alone, a
+    # $4,000 canine agreement displaces a $40M highway contract expiring the
+    # same week. Contracts whose portal publishes no amount sort after the ones
+    # that do rather than being dropped, since an unpriced lead is still a lead.
+    shown = sorted(soon, key=lambda c: (-(c.amount or 0.0), c.end_date))[:10]
+
     rows = "".join(
         f'<li style="margin:0 0 8px">{c.name}'
         f'<br><span style="color:#5A6478;font-size:13px">{c.agency}'
         f" · incumbent: {c.vendor or 'not named'}"
+        f"{_money(c.amount)}"
         f" · ends {c.end_date:%-d %b %Y} ({c.days_until_expiry()}d)</span></li>"
-        for c in soon[:10]
+        for c in shown
     )
     html = (
         f'<h3 style="margin:20px 0 8px">Incumbent contracts ending within '
         f"{CONTRACT_HORIZON_DAYS} days</h3>"
         '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
         "A rebid is scoped long before it is advertised. These are the agencies "
-        "whose current supplier is about to run out.</p>"
+        "whose current supplier is about to run out, largest first.</p>"
         f'<ul style="padding-left:18px;margin:0">{rows}</ul>'
     )
     return len(soon), html
+
+
+def _money(amount: Optional[float]) -> str:
+    """A contract's value, rounded to something a person reads at a glance."""
+    if not amount:
+        return ""
+    if amount >= 1_000_000:
+        return f" · ${amount / 1_000_000:,.1f}M"
+    if amount >= 1_000:
+        return f" · ${amount / 1_000:,.0f}k"
+    return f" · ${amount:,.0f}"
 
 
 def build_daily_digest(

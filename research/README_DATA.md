@@ -579,3 +579,32 @@ The catch is that PDA is an AngularJS application which embeds its data in a
 selection, and the blob carries a signed `akey` token. So it is a real adapter
 rather than a URL, and it is not built here. Recorded so the next attempt starts
 at the right host.
+
+**14. FACTS carries the ranking signal too, and it was worth the schema work.**
+Correction 11 above said `Total Amount` and `Method of Procurement` were left
+unstored because the `contracts` table had no column and the schema was
+additive-only. Both are stored now.
+
+The numbers say why it mattered. Of the 12,377 contracts with a live end date,
+**82% carry an amount and 100% carry a method**, and the spread is enormous —
+the largest expiry inside 120 days is a **$7.1 billion** Statewide Medicaid
+Managed Care contract ending 30 September 2026, against a $4,000 canine-tracking
+agreement expiring the same week. A digest that shows ten rows picked by date
+alone shows the canine one.
+
+The method is the second half of it, and it is more specific than expected:
+`Agency Request For Proposals [s. 287.057…]`, `Consultant's Competitive
+Negotiation Act`, `Department of Transportation Invitation to Bid [s.337, F.S.]`,
+`Non-competitively awarded grants to governmental entities…`. That last one is
+905 of the contracts expiring within a year — a rebid that is not really a
+rebid. Note the strings are long: 9% exceed 128 characters and the longest is
+300, with the statutory citation on the tail.
+
+The blocker was real but narrower than it looked. `Base.metadata.create_all`
+creates missing *tables* and silently ignores missing *columns*, so
+"additive-only schema — no migrations" was only half true: adding a table was
+free, adding a column meant `no such column` on any database that already
+existed. `src/db/engine.py` now runs a guarded `ALTER TABLE ... ADD COLUMN` for
+nullable columns the models declare and the live tables lack — nothing else,
+idempotent, and it raises rather than half-applying a NOT NULL column with no
+default.

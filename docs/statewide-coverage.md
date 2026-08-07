@@ -320,10 +320,20 @@ under a truncated FLAIR id, 148 of them differing, usually with one copy missing
 the vendor and sometimes carrying an older end date. The more complete record
 wins — a named vendor first, then the later end date.
 
-Not carried over: `Total Amount` and `Method of Procurement`, which are the best
-way to rank a rebid. The `contracts` table has no column for either and this
-schema is additive-only with no migration step, so that is a schema decision
-rather than an adapter one.
+`Total Amount` and `Method of Procurement` are both carried, and they are what
+make ten thousand expiries usable: the digest leads with the $7.1B Medicaid
+managed-care contract ending 30 September rather than a $4,000 canine agreement
+ending the same week. 82% of rows carry an amount; 100% carry a method, and the
+method is the second half of the signal — "Agency Request For Proposals" is an
+opening, "Non-competitively awarded grants" mostly is not.
+
+Storing them needed the schema to become additive in fact rather than in
+comment. `create_all` makes missing *tables* and ignores missing *columns*, so
+adding one to `contracts` would have raised `no such column` on every database
+that already existed. `src/db/engine.py` now runs a guarded
+`ALTER TABLE ... ADD COLUMN` for nullable columns the models declare and the
+live tables lack — additive only, idempotent, and it refuses a NOT NULL column
+with no default rather than half-applying one.
 
 ### Florida Sheriffs Association — already covered, by VendorLink
 

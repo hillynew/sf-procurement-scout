@@ -266,3 +266,72 @@ def test_the_scheduler_does_not_walk_registers_on_the_event_loop():
 
     assert "refresh_contracts" not in source
     assert "src.contracts" not in source
+
+
+# -- ranking the digest ----------------------------------------------------
+
+
+def test_the_digest_leads_with_the_biggest_contracts(monkeypatch):
+    """Three thousand of these fit in ten lines once the state register loads.
+
+    Picked by date alone, a $4,000 canine agreement displaces a $40M highway
+    contract expiring the same week.
+    """
+    from web.services import digest
+
+    def _c(name, amount, ends="2026-09-05"):
+        c = _contract(name, ends)
+        c.amount = amount
+        return c
+
+    monkeypatch.setattr(digest, "load_stored", lambda: [
+        _c("Canine Tracking Assistance", 4_000.0, "2026-09-01"),
+        _c("SR 516 Resurfacing", 41_000_000.0, "2026-09-05"),
+        _c("Janitorial Services", 250_000.0, "2026-09-03"),
+    ])
+    count, html = digest._contracts_section()
+
+    assert count == 3
+    assert html.index("SR 516") < html.index("Janitorial") < html.index("Canine")
+
+
+def test_an_unpriced_contract_still_appears(monkeypatch):
+    """Bonfire's register publishes no amounts. An unpriced lead is still a
+    lead — it sorts after the priced ones rather than being dropped."""
+    from web.services import digest
+
+    priced = _contract("Priced", "2026-09-05")
+    priced.amount = 10_000.0
+    monkeypatch.setattr(digest, "load_stored", lambda: [
+        _contract("Unpriced", "2026-09-01"), priced,
+    ])
+    count, html = digest._contracts_section()
+
+    assert count == 2
+    assert html.index("Priced") < html.index("Unpriced")
+
+
+def test_the_amount_is_shown_in_units_a_person_reads():
+    from web.services.digest import _money
+
+    assert _money(41_000_000.0) == " · $41.0M"
+    assert _money(250_000.0) == " · $250k"
+    assert _money(4_000.0) == " · $4k"
+    assert _money(750.0) == " · $750"
+    assert _money(None) == ""
+    assert _money(0.0) == ""
+
+
+def test_amount_and_method_round_trip_through_the_store():
+    from src.db import store as dbstore
+    from src.db.engine import init_db
+
+    init_db()
+    c = _contract("Resurfacing", "2026-12-01", cid="9")
+    c.amount = 41_000_000.0
+    c.method = "Competitive Solicitation"
+    dbstore.save_contracts([c])
+    (loaded,) = dbstore.load_contracts()
+
+    assert loaded.amount == 41_000_000.0
+    assert loaded.method == "Competitive Solicitation"

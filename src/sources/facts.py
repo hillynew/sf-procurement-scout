@@ -63,14 +63,24 @@ it back and pay for it.
   that shifts its fields, so `Status` arrives holding part of a contract title.
   A malformed row is skipped rather than allowed to abort a 63,000-row parse.
 
-## What is not carried over
+## Amount and method
 
-The export has `Total Amount` and `Method of Procurement`, which are the two
-best ways to rank a rebid — a $40M sole-source expiry is not a $4,000 one. The
-`contracts` table has no column for either, and this project's schema is
-additive-only with no migration step (`src/db/engine.py`), so adding one is a
-decision about the schema rather than about this adapter. Recorded here so the
-next person knows the data is already in hand and only the column is missing.
+Both are carried, because a date alone cannot rank ten thousand contracts: a
+$40M highway job and a $4,000 canine agreement expire on the same day and are
+not the same lead. `Total Amount` falls back to `Original Contract Amount`,
+since an amendment writes the former and leaves the latter — the same shape as
+the two end-date columns.
+
+`Method of Procurement` is the second half of the signal. A rebid that was
+competitively bid last time is an opening; one recorded as "Non-competitively
+awarded grants to governmental entities" — 905 of the contracts expiring within
+a year — mostly is not. Its values are long, carrying the statutory citation on
+the tail: 9% exceed 128 characters and the longest is 300.
+
+Live on 7 Aug 2026: 82% of rows carry an amount, 100% carry a method, and the
+largest expiry inside 120 days is a $7.1B Statewide Medicaid Managed Care
+contract ending 30 September — against a $4,000 canine agreement ending the
+same week.
 """
 
 from __future__ import annotations
@@ -270,6 +280,8 @@ class FactsAdapter(SourceAdapter):
             source_id=self.source_id,
             vendor=_vendor(row),
             status_id=(row.get("Status") or "").strip()[:16] or None,
+            amount=_money(row.get("Total Amount")) or _money(row.get("Original Contract Amount")),
+            method=(row.get("Method of Procurement") or "").strip()[:320] or None,
             start_date=_date(row.get("Begin Date")),
             end_date=end_date_of(row),
             url=_detail_url(agency_id, contract_id),
@@ -398,6 +410,24 @@ def _vendor(row: Dict[str, str]) -> Optional[str]:
     if a in b or b in a:
         return first if len(first) >= len(second) else second
     return f"{first} {second}"
+
+
+def _money(value: Optional[str]) -> Optional[float]:
+    """A dollar figure, or None. Never a guess.
+
+    The export writes plain decimals, but not always: blanks, `$` and thousands
+    separators all appear, and one row's shifted quoting puts a contract title
+    where the amount should be. An unreadable figure is left absent rather than
+    coerced to zero, which would sort a $40M contract to the bottom of the list.
+    """
+    text = (value or "").strip().replace("$", "").replace(",", "")
+    if not text:
+        return None
+    try:
+        amount = float(text)
+    except ValueError:
+        return None
+    return amount if amount > 0 else None
 
 
 def _slug(agency: str) -> str:
