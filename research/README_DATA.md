@@ -608,3 +608,49 @@ existed. `src/db/engine.py` now runs a guarded `ALTER TABLE ... ADD COLUMN` for
 nullable columns the models declare and the live tables lack — nothing else,
 idempotent, and it raises rather than half-applying a NOT NULL column with no
 default.
+
+**15. FDOT's advertisements, and the four hops to reach them.** Correction 13
+above located them on `pdaexternal.fdot.gov` and stopped there because the app
+is an AngularJS front end with a signed token. The route turned out to be
+short once each piece is in hand, and it is written down here so nobody has to
+find it twice:
+
+1. `GET /Home/Config` publishes `RestApiUrl: https://pdaextapi.fdot.gov/api/`.
+2. In the Angular bundle, `AllAdDetailsPublishingController` builds
+   `AdvertisementPublic/GetAllNoticeDetails?DistrictCode=&ProcrPathCodeValue=&PageView=`.
+3. An `$httpProvider` interceptor copies a page-scoped `akey` into an
+   **`Authentication`** header. Without it the API answers **401 with an empty
+   body** — which reads as a broken endpoint, not a missing header.
+4. `GET /Pub/AdvertisementPublic/AllAdDetail/{PS|D-B}/A` mints that `akey` into
+   `window.AllAdInitParams` (the district-selection page spells the same
+   variable `window.InitParams`).
+
+So a refresh is two requests per procurement path. Empty `DistrictCode` means
+statewide and `PageView=A` returns every status, so one call replaces the
+thirty-two the UI would make.
+
+Verified 7 Aug 2026:
+
+| | current | planned | in selection | all |
+|---|---:|---:|---:|---:|
+| Professional Services (`PS`) | 14 | 124 | 111 | 276 |
+| Design-Build (`D-B`) | 1 | 0 | 10 | 13 |
+
+Every row carries a response deadline and 275 of 276 carry a contract amount.
+
+**The planned ads are the find.** FDOT publishes a Notice of Planned
+Advertisement months ahead of the advertisement — 124 for professional services,
+with projected deadlines into 2027. Nothing else in this project sees work that
+early. They map to the `upcoming` status so they never reach the open board.
+
+Two shapes worth knowing: the API returns **display HTML inside JSON**, doubly
+escaped (`' 7.1-Signing &amp; Channelization &lt;br/&gt; '`), so a naive read
+glues two work types together; and `AdContractAmount` arrives as `'2950000.0'`,
+a string, which is not what belongs on a board.
+
+**The district does not fit the schema.** Every ad carries an FDOT district and
+a district is several counties — District 4 is Broward, Palm Beach, Martin,
+St. Lucie, Indian River and Okeechobee; District 6 is Miami-Dade and Monroe.
+Okeechobee is in two districts. `county` holds one value, so it stays
+`statewide` and the district goes in `department`, with the district's counties
+added to the keywords so a county search still finds them.

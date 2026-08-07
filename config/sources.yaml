@@ -634,3 +634,34 @@ sources:
     adapter: facts
     platform: facts
     portal_url: https://facts.fldfs.com/Search/ContractSearch.aspx
+
+  # FDOT advertisements. Not on bidletting.fdot.gov — that host is bid openings
+  # that have already happened. These come from the Procurement Development
+  # Application, which needs a page-scoped token before its API will answer.
+  #
+  # Two procurement paths, kept separate because they are separate streams with
+  # separate ad numbers: PS is professional services under the Consultants'
+  # Competitive Negotiation Act, D-B is design-build.
+  #
+  # Both carry Notices of Planned Advertisement — work FDOT has scheduled but
+  # not yet advertised — which arrive as `upcoming` and are months earlier than
+  # anything else this project sees.
+  - id: fdot_ps
+    name: FDOT Professional Services Advertisements
+    county: statewide
+    agency: Florida Department of Transportation
+    live_fetch: true
+    adapter: fdot_ads
+    platform: fdot_pda
+    fdot_procurement_path: PS
+    portal_url: https://pdaexternal.fdot.gov/Pub/AdvertisementPublic/AllAdDetail/PS/A
+
+  - id: fdot_db
+    name: FDOT Design-Build Advertisements
+    county: statewide
+    agency: Florida Department of Transportation
+    live_fetch: true
+    adapter: fdot_ads
+    platform: fdot_pda
+    fdot_procurement_path: D-B
+    portal_url: https://pdaexternal.fdot.gov/Pub/AdvertisementPublic/AllAdDetail/D-B/A
