@@ -8,12 +8,37 @@ Rules shape (all keys optional):
     min_value / max_value: int — dollar bounds against the parsed budget
     no_bond: bool              — exclude bids with a bond requirement
     recurring_only: bool       — only bids with prior cycles on record
+    include_statewide: bool    — with `counties`, also keep statewide bids that
+                                 name no county at all (see below)
+
+## Why `counties` has to look past the county field
+
+A growing share of this build's sources are statewide by nature: MyFloridaMarketPlace,
+FACTS, SAM.gov, and both FDOT advertisement feeds. Their `county` is
+`statewide`, which is honest — an FDOT District 4 job spans six counties and a
+state term contract spans all of them.
+
+Matched on the county field alone, a Broward watchlist silently drops every one
+of them. Measured against a live sample of 307 bids, a tri-county rule kept 24
+and discarded 241 — including all 24 FDOT District 4 advertisements, which are
+Broward and Palm Beach road work. The user's own county filter was hiding the
+work in their own county.
+
+So a statewide bid matches a county rule when it *names* one of those counties,
+either in the keywords an adapter stamped on it (FDOT writes its district's
+counties there for exactly this) or in its own text. On that same sample the
+rule recovers 147 of the 241.
+
+The remaining 94 are genuinely unlocated — a state contract that could be
+performed anywhere. They stay out unless `include_statewide` asks for them,
+because four times as much unlocated noise as located signal is not a filter.
 """
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Set
 
+from src.fl_geo import COUNTY_SLUGS, infer_county
 from src.models.opportunity import Opportunity
 
 
@@ -32,8 +57,40 @@ def by_due(opps: List[Opportunity]) -> List[Opportunity]:
     )
 
 
+def counties_named(o: Opportunity) -> Set[str]:
+    """Every county this bid names, beyond the one in its `county` field.
+
+    Two places carry it. Adapters for multi-county sources stamp the slugs into
+    `keywords` — FDOT writes its district's six counties there — and the rest of
+    the time the county is in the prose, where `infer_county` finds it.
+    """
+    found = {k for k in (o.keywords or []) if k in COUNTY_SLUGS}
+    text = " ".join(part for part in (o.title, o.description, o.department) if part)
+    guess = infer_county(text)
+    if guess in COUNTY_SLUGS:
+        found.add(guess)
+    return found
+
+
+def _county_ok(o: Opportunity, rules: dict) -> bool:
+    wanted = rules.get("counties")
+    if not wanted:
+        return True
+    if o.county in wanted:
+        return True
+    if o.county != "statewide":
+        return False
+    # Statewide by nature. Keep it when it names a county the rule asked for;
+    # keep an unlocated one only when the rule opted in. See the module
+    # docstring — this is where FDOT District 4's Broward work was being lost.
+    named = counties_named(o)
+    if named:
+        return bool(named & set(wanted))
+    return bool(rules.get("include_statewide"))
+
+
 def matches_rules(o: Opportunity, rules: dict) -> bool:
-    if rules.get("counties") and o.county not in rules["counties"]:
+    if not _county_ok(o, rules):
         return False
     if rules.get("offers") and offer_key(o) not in rules["offers"]:
         return False

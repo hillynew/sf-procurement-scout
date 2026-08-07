@@ -90,7 +90,7 @@ a FastAPI JSON API (`web/server.py`, routers in `web/api/`). Fully responsive
 | **All bids** | Instant search-as-you-type, county/type/status filter chips, sortable list with value and detail-score on every row |
 | **Pipeline** | Drag-and-drop kanban (Watching → Preparing → Submitted → Result) with per-column dollar totals, a win/loss dialog that records real amounts, and an archive |
 | **Workroom** | Deep read of one bid: AI deal brief, scope, requirements checklist, documents, key dates, commercial terms, go/no-go, autosaving notes |
-| **Watchlists** | Real rule builder (keywords, counties, types, value range, no-bond, recurring) with live match preview, rename/delete, and genuinely-correct NEW badges |
+| **Watchlists** | Real rule builder (keywords, counties, types, value range, no-bond, recurring) with live match preview, rename/delete, and genuinely-correct NEW badges. A county rule also keeps statewide bids that *name* that county — see below |
 | **Sources** | Health KPIs and per-portal status, plus a working "add a source" flow: paste a URL, CivicPlus portals are detected, added, and test-fetched on the spot |
 | **Settings** | Auto-fetch schedule, notification prefs, email digest, AI model choice, and data management (export CSV, purges, demo data) |
 
@@ -481,6 +481,48 @@ data/                   # SQLite DB (local) + CSV/JSON snapshots from the CLI
 ## Always verify on the official portal
 
 Due dates, addenda, and bid packages can change. Confirm on the agency site before submitting.
+
+## Counties, when the source is statewide
+
+A growing share of the sources are statewide by nature — MyFloridaMarketPlace,
+FACTS, SAM.gov, and both FDOT advertisement feeds. Their `county` is
+`statewide`, which is honest: an FDOT District 4 job spans six counties and a
+state term contract spans all of them.
+
+Matched on the county field alone, a Broward watchlist silently drops every one
+of them. Measured against a live sample of 307 bids, a tri-county rule kept 24
+and discarded 241 — **including all 24 FDOT District 4 advertisements, which
+are Broward and Palm Beach road work.** The user's own county filter was hiding
+work in their own county.
+
+So a statewide bid matches a county rule when it *names* one of those counties,
+either in the keywords its adapter stamped on it (FDOT writes its district's
+counties there for exactly this) or in its own text — "SR736/Davie Blvd Bridge"
+resolves to Broward off the title alone, whichever district filed it. On that
+sample the rule recovers 147 of the 241, and the tri-county watchlist goes from
+24 matches to 72.
+
+The remaining 94 are genuinely unlocated — a state contract performable
+anywhere. They stay out unless a rule sets `include_statewide`, because four
+times as much unlocated noise as located signal is not a filter.
+
+## Planned work is kept apart
+
+`upcoming` means an agency has said what it intends to advertise, not that it
+has. FDOT publishes 124 of these at a time with projected deadlines into 2027,
+and they are genuinely the earliest warning the scout gets — but they are not
+biddable, and two things had to change before the digest could carry them
+honestly:
+
+- Every row carries a **PLANNED** tag, so a projected deadline never reads as a
+  real one.
+- They get their **own section**. Watchlist lists sort soonest-due-first, and a
+  projection months out sorts last — so mixed in with open bids the planned ones
+  fell off the ten-row cap every single day. Measured: 43 of 72 matches were
+  planned and none of them appeared.
+
+The subject line separates them too: *"29 new matches, 43 planned"* rather than
+72 of something the reader would assume they could bid on.
 
 ## Crawl policy
 

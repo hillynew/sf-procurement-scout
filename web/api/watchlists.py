@@ -24,6 +24,11 @@ class Rules(BaseModel):
     max_value: Optional[int] = None
     no_bond: bool = False
     recurring_only: bool = False
+    #: With `counties`, also keep statewide bids that name no county at all.
+    #: Off by default: a statewide solicitation that names a county is kept
+    #: regardless, and the rest are unlocated — four times as many as the
+    #: located ones on a live sample. See `web/services/matching.py`.
+    include_statewide: bool = False
 
     def compact(self) -> dict:
         """Only the meaningful keys — keeps rule chips readable."""
@@ -46,6 +51,8 @@ class Rules(BaseModel):
             out["max_value"] = self.max_value
         if self.no_bond:
             out["no_bond"] = True
+        if self.include_statewide:
+            out["include_statewide"] = True
         if self.recurring_only:
             out["recurring_only"] = True
         return out

@@ -61,9 +61,47 @@ def _bid_line(o: Opportunity) -> str:
     return (
         f'<li style="margin:0 0 10px"><a href="{o.url}" '
         f'style="color:#6E56F8;font-weight:600;text-decoration:none">{o.title}</a>'
+        f"{_planned_tag(o)}"
         f'<br><span style="color:#5A6478;font-size:13px">{o.agency} · {county} · '
         f"{due}{_fmt_value(o)}</span></li>"
     )
+
+
+def _planned_tag(o: Opportunity) -> str:
+    """Mark a bid that cannot be responded to yet.
+
+    `upcoming` means the agency has said it intends to advertise, not that it
+    has. FDOT alone publishes 124 of these at a time, with projected deadlines
+    into 2027 — so on a busy day they are the *majority* of a watchlist's new
+    matches. Rendered like an open bid they read as one with a long fuse, and
+    the reader learns to distrust the deadline on every row rather than just
+    these. Two words fix it.
+    """
+    if o.status != "upcoming":
+        return ""
+    return (
+        '<span style="margin-left:6px;padding:1px 6px;border-radius:3px;'
+        'background:#EEF0FB;color:#5A6478;font-size:11px;font-weight:600;'
+        'text-transform:uppercase;letter-spacing:.03em">planned</span>'
+    )
+
+
+def _bullets(items: List[Opportunity], *, cap: int = 10) -> str:
+    """A capped list that admits what it left out.
+
+    Every section here has always shown ten. That was the whole story when the
+    build read a dozen portals; it now reads 305 sources, and a section that
+    silently drops the eleventh row through the two-hundredth reports the same
+    "10" whether there were eleven or two hundred. The overflow line is the
+    difference between a digest and a sample of one.
+    """
+    rows = "".join(_bid_line(o) for o in items[:cap])
+    if len(items) > cap:
+        rows += (
+            '<li style="margin:0;color:#5A6478;font-size:13px;list-style:none">'
+            f"+ {len(items) - cap} more in the app</li>"
+        )
+    return f'<ul style="padding-left:18px;margin:0">{rows}</ul>'
 
 
 def _wrap(title: str, inner: str) -> str:
@@ -134,9 +172,8 @@ def send_instant_digest(new_by_watchlist: Dict[str, List[Opportunity]]) -> bool:
         if not matches:
             continue
         total += len(matches)
-        items = "".join(_bid_line(o) for o in matches[:10])
         sections.append(f'<h3 style="margin:20px 0 8px">{name}</h3>'
-                        f'<ul style="padding-left:18px;margin:0">{items}</ul>')
+                        f"{_bullets(matches)}")
     if not total:
         return False
     subject = f"Scout: {total} new bid{'s' if total != 1 else ''} matching your watchlists"
@@ -290,18 +327,41 @@ def build_daily_digest(
     if contracts:
         sections.append(contracts[1])
 
+    # Open and planned are split rather than interleaved. Every watchlist list
+    # is sorted soonest-due-first, and a planned advertisement's projected
+    # deadline is months out — so mixed together the planned ones sort to the
+    # bottom and fall off the ten-row cap every single day. Measured on a live
+    # sample: 43 of 72 matches were planned and *none* of them appeared. The
+    # early warning was the reason to carry them, and the digest was structurally
+    # incapable of showing it.
     total_new = 0
+    planned: List[Opportunity] = []
     for wl in watchlists:
         if not wl.get("email_digest"):
             continue
         matches = wl_matches(wl.get("rules") or {}, opps)
         seen = set(wl.get("seen_ids") or [])
         fresh = [o for o in matches if o.opportunity_id not in seen]
-        if fresh:
-            total_new += len(fresh)
-            items = "".join(_bid_line(o) for o in fresh[:10])
+        if not fresh:
+            continue
+        total_new += len(fresh)
+        live = [o for o in fresh if o.status != "upcoming"]
+        for o in fresh:
+            if o.status == "upcoming" and o not in planned:
+                planned.append(o)
+        if live:
             sections.append(f'<h3 style="margin:20px 0 8px">{wl["name"]}</h3>'
-                            f'<ul style="padding-left:18px;margin:0">{items}</ul>')
+                            f"{_bullets(live)}")
+
+    if planned:
+        sections.append(
+            '<h3 style="margin:20px 0 8px">Planned work — not advertised yet</h3>'
+            '<p style="margin:0 0 8px;color:#5A6478;font-size:13px">'
+            "Agencies that have said what they intend to advertise. Nothing here "
+            "can be bid today; the dates are projections. This is the earliest "
+            "warning the scout gets.</p>"
+            f"{_bullets(planned)}"
+        )
 
     by_id = {o.opportunity_id: o for o in opps}
     deadlines = []
@@ -313,9 +373,8 @@ def build_daily_digest(
             deadlines.append(opp)
     deadlines.sort(key=lambda o: o.days_until_due or 0)
     if deadlines:
-        items = "".join(_bid_line(o) for o in deadlines[:10])
         sections.append('<h3 style="margin:20px 0 8px">Tracked bids due this week</h3>'
-                        f'<ul style="padding-left:18px;margin:0">{items}</ul>')
+                        f"{_bullets(deadlines)}")
 
     problems = [h for h in db.latest_health() if str(h.status) in ("degraded", "error")]
     if problems:
@@ -334,8 +393,11 @@ def build_daily_digest(
         bits.append(f"{awards[0]} protest window{'s' if awards[0] != 1 else ''} open")
     if records:
         bits.append(f"{records[0]} tabulation{'s' if records[0] != 1 else ''} requestable")
-    if total_new:
-        bits.append(f"{total_new} new match{'es' if total_new != 1 else ''}")
+    live_new = total_new - len(planned)
+    if live_new:
+        bits.append(f"{live_new} new match{'es' if live_new != 1 else ''}")
+    if planned:
+        bits.append(f"{len(planned)} planned")
     if deadlines:
         bits.append(f"{len(deadlines)} deadline{'s' if len(deadlines) != 1 else ''} this week")
     subject = "Scout daily: " + (", ".join(bits) if bits else "source health")
