@@ -25,6 +25,10 @@ Usage::
 
     # What did we learn?
     python scripts/fingerprint_agencies.py --report
+
+    # Has anything moved? Re-reads only the entities already placed on a
+    # platform and prints the ones whose answer changed.
+    python scripts/fingerprint_agencies.py --recheck
 """
 
 from __future__ import annotations
@@ -84,6 +88,66 @@ def already_mapped(path: Path) -> set:
     }
 
 
+def previous(path: Path) -> Dict[str, Dict]:
+    """entity_id -> its last fingerprint, latest line winning.
+
+    Latest wins because the file is append-only: a recheck writes a new line
+    rather than editing the old one, so the history of a migration stays
+    readable in the file itself.
+    """
+    out: Dict[str, Dict] = {}
+    if not path.exists():
+        return out
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            row = json.loads(line)
+        except Exception:  # noqa: BLE001
+            continue
+        if row.get("entity_id"):
+            out[row["entity_id"]] = row
+    return out
+
+
+def report_changes(before: Dict[str, Dict], after: List) -> int:
+    """Print what moved, and return how many did.
+
+    A platform that goes *from* known *to* unknown is reported too, and
+    separately: it is usually a site being slow or a WAF, not a migration, and
+    conflating the two would cry wolf every sweep.
+    """
+    moved, lost, same = [], [], 0
+    for fp in after:
+        was = (before.get(fp.entity_id) or {}).get("platform", "unknown")
+        now = fp.platform
+        if was == now:
+            same += 1
+        elif now == "unknown":
+            lost.append((fp, was))
+        else:
+            moved.append((fp, was))
+
+    print(f"\n{len(after)} rechecked · {same} unchanged · "
+          f"{len(moved)} moved · {len(lost)} no longer readable")
+
+    if moved:
+        print("\nMIGRATED — these need their source config revisited:")
+        for fp, was in sorted(moved, key=lambda m: m[0].name):
+            print(f"  {fp.name[:38]:40} {was:18} -> {fp.platform} ({fp.confidence})")
+            if fp.portal_url:
+                print(f"  {'':40} {fp.portal_url[:88]}")
+
+    if lost:
+        print("\nno longer identifiable (usually a slow site or a WAF, not a move):")
+        for fp, was in sorted(lost, key=lambda m: m[0].name)[:20]:
+            print(f"  {fp.name[:38]:40} was {was:18} {fp.note[:40]}")
+        if len(lost) > 20:
+            print(f"  ... and {len(lost) - 20} more")
+
+    return len(moved)
+
+
 def report(path: Path) -> int:
     if not path.exists():
         print(f"no results yet at {path}")
@@ -117,6 +181,8 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=WORKERS)
     ap.add_argument("--redo", action="store_true", help="ignore previous results")
     ap.add_argument("--report", action="store_true", help="summarise and exit")
+    ap.add_argument("--recheck", action="store_true",
+                    help="re-read entities already placed on a platform and report moves")
     args = ap.parse_args()
 
     if args.report:
@@ -127,8 +193,19 @@ def main() -> int:
         return 2
 
     roster = load_roster(args.roster)
-    done = set() if args.redo else already_done(args.out)
-    mapped = already_mapped(SOURCES)
+    before = previous(args.out)
+
+    if args.recheck:
+        # Only entities we already believe we know. An agency that was never
+        # identified cannot have migrated *away* from anything, and re-reading
+        # 632 unknowns to learn that they are still unknown is 1,264 requests
+        # for no answer.
+        known = {e for e, row in before.items() if row.get("platform") != "unknown"}
+        done, mapped = set(), set()
+        roster = [r for r in roster if r["entity_id"] in known]
+    else:
+        done = set() if args.redo else already_done(args.out)
+        mapped = already_mapped(SOURCES)
 
     tiers = {t.strip() for t in args.tier.split(",") if t.strip()}
     counties = {c.strip() for c in args.county.split(",") if c.strip()}
@@ -148,10 +225,13 @@ def main() -> int:
     if args.limit:
         todo = todo[: args.limit]
 
-    print(
-        f"roster {len(roster)} · already verified {len(mapped)} · "
-        f"already swept {len(done)} · to do now {len(todo)}"
-    )
+    if args.recheck:
+        print(f"rechecking {len(todo)} entities already placed on a platform")
+    else:
+        print(
+            f"roster {len(roster)} · already verified {len(mapped)} · "
+            f"already swept {len(done)} · to do now {len(todo)}"
+        )
     if not todo:
         return report(args.out)
 
@@ -161,6 +241,7 @@ def main() -> int:
     def run(row: Dict):
         return fingerprint_agency(row["entity_id"], row["name"], row["website"])
 
+    results = []
     with args.out.open("a", encoding="utf-8") as fh:
         with ThreadPoolExecutor(max_workers=max(1, args.workers)) as pool:
             futures = {pool.submit(run, row): row for row in todo}
@@ -172,14 +253,19 @@ def main() -> int:
                     print(f"  !! {row['entity_id']}: {type(e).__name__}: {e}")
                     continue
                 counts[fp.platform] += 1
+                results.append(fp)
                 with _write_lock:
                     fh.write(json.dumps(fp.as_dict()) + "\n")
                     fh.flush()
-                if fp.platform != "unknown":
+                if fp.platform != "unknown" and not args.recheck:
                     print(f"  {fp.platform:<18} {fp.name[:46]}")
                 if i % 50 == 0:
                     ident = sum(n for p, n in counts.items() if p != "unknown")
                     print(f"  ... {i}/{len(todo)} swept, {ident} identified")
+
+    if args.recheck:
+        report_changes(before, results)
+        return 0
 
     print("\nthis run:")
     for platform, n in counts.most_common():
