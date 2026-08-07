@@ -37,7 +37,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Optional
 from urllib.parse import urlsplit
-from urllib.robotparser import RobotFileParser
+
+from . import robots as robots_txt
 
 #: Where an administrator can reach a human about this crawler. Override with
 #: SF_SCOUT_CONTACT so a deployment can point at a real inbox.
@@ -85,7 +86,7 @@ class RobotsDisallowed(RuntimeError):
 
 @dataclass
 class _Robots:
-    parser: Optional[RobotFileParser]
+    parser: Optional[robots_txt.Robots]
     fetched_at: float
     #: What the file said, in a form worth writing to the log.
     summary: str
@@ -127,14 +128,15 @@ def _fetch_robots(host: str) -> _Robots:
     if "<html" in body[:400].lower():
         return _Robots(None, time.monotonic(), "none (HTML, not robots)")
 
-    parser = RobotFileParser()
-    parser.parse(body.splitlines())
-    delay = parser.crawl_delay(CRAWLER_UA)
-    try:
-        delay = float(delay) if delay is not None else None
-    except (TypeError, ValueError):
-        delay = None
-    return _Robots(parser, time.monotonic(), f"present ({len(body)}b)", delay)
+    # Parsed by `src.robots`, not `urllib.robotparser` — the stdlib implements
+    # the 1996 draft, in which a blank line ends a record, so a file that puts
+    # a comment banner between `User-agent: *` and its rules reads as a group
+    # with no rules and every Disallow in it disappears. See that module.
+    parser = robots_txt.parse(body)
+    return _Robots(
+        parser, time.monotonic(), f"present ({len(body)}b)",
+        parser.crawl_delay(CRAWLER_UA),
+    )
 
 
 def robots_for(host: str) -> _Robots:
@@ -161,7 +163,7 @@ def robots_allows(url: str) -> tuple[bool, str]:
     robots = robots_for(host)
     if robots.parser is None:
         return True, robots.summary
-    allowed = robots.parser.can_fetch(CRAWLER_UA, url)
+    allowed = robots.parser.allows(CRAWLER_UA, url)
     return allowed, ("allowed by robots" if allowed else "disallowed by robots")
 
 

@@ -549,6 +549,7 @@ frontend/src/api/       # typed client + TanStack Query hooks
 src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-platform adapters (+ DB-stored custom sources)
 src/netpolicy.py        # crawl policy: identity, robots.txt, per-host rate limit, fetch log
+src/robots.py           # RFC 9309 robots.txt (the stdlib parser drops rules after a blank line)
 src/protest.py          # the 72-hour protest clock and the day-31 records sunset
 src/records.py          # which tabulations are requestable, and the Chapter 119 letter
 src/contracts.py        # incumbent contracts and when they expire
@@ -633,6 +634,13 @@ adapters, because a guardrail an adapter can forget is not a guardrail.
   A missing or unreadable file means unrestricted, which is what the standard
   says and what most of Florida serves. `dms.myflorida.com` is refused
   outright — the data is on VIP, which serves no robots.txt at all.
+  Parsed by `src/robots.py` against **RFC 9309**, not by
+  `urllib.robotparser`, which implements the 1996 draft and ends a group at a
+  blank line. A file that puts a comment banner between `User-agent: *` and its
+  rules — an ordinary way to write one — reads under the stdlib as a group with
+  *no rules*, so every `Disallow` in it disappears and the crawler concludes it
+  may fetch anything. The log still says `present`, so nothing looks wrong.
+  BidNet Direct serves exactly that shape.
 - **We rate-limit per host**, one request per second unless robots asks for
   longer, held across threads. Per *host* matters: 91 OpenGov tenants and 32
   Bonfire tenants each share one server.
