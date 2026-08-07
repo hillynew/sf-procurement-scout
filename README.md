@@ -1,9 +1,9 @@
 # SF Procurement Scout
 
 Live aggregator for government procurement across **Florida** — every state
-agency through MyFloridaMarketPlace, plus **305 live local sources** on eleven
-platforms (OpenGov, CivicPlus, VendorLink, Bonfire, Ionwave, Vendor Registry,
-FACTS, FDOT, Jaggaer, Workday, and a handful of bespoke portals), **federal bids
+agency through MyFloridaMarketPlace, plus **300 live local sources** on ten
+platforms (OpenGov, CivicPlus, VendorLink, Bonfire, Ionwave, FACTS, FDOT,
+Jaggaer, Workday, and a handful of bespoke portals), **federal bids
 in Florida** via SAM.gov, and a catalog of the portals that cannot be read
 without an account.
 
@@ -390,7 +390,6 @@ tractable. Counts are what is configured and answering today.
 | **VendorLink** | 66 | Florida-native ASP.NET grid, paged via ViewState postbacks. List-only: detail is behind a login |
 | **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
 | **Ionwave** | 4 | Four public lists the tenant's own login page links to, no cookie needed. Cloudflare challenges the fourth request on a session, so `fetch` costs exactly one |
-| **Vendor Registry** | 5 | **Archive only.** The platform's current list reports no open solicitations for any buyer in any state; these agencies post on OpenGov, Bonfire and BidNet now. 1,098 past solicitations that back-fill recurrence for the feeds that replaced them |
 | **Workday Strategic Sourcing** | 3 | UNF, St. Johns County and Hillsborough Community College, all arrived here in 2026. Apollo GraphQL behind an `X-XSRF-TOKEN` handshake; only the public-portal host is read, never the authenticated one |
 | **Jaggaer** | 5 | Florida State, Florida Atlantic, FIU, and — found by the fingerprint sweep — Florida and South Florida, the two largest buyers in the state system. Four GET-addressable tabs; the row is one `<td>` of nested markup, read by the portal's own field labels |
 | **FDOT advertisements** | 2 | Professional services and design-build, from the PDA REST host behind a page-minted token. Carries Notices of Planned Advertisement — 124 jobs FDOT has scheduled but not yet advertised, as `upcoming` |
@@ -550,6 +549,7 @@ src/models/             # Opportunity + SourceHealth models
 src/sources/            # per-platform adapters (+ DB-stored custom sources)
 src/netpolicy.py        # crawl policy: identity, robots.txt, per-host rate limit, fetch log
 src/robots.py           # RFC 9309 robots.txt (the stdlib parser drops rules after a blank line)
+src/terms.py            # per-platform terms verdict — what may be read at all, and the clause behind it
 src/protest.py          # the 72-hour protest clock and the day-31 records sunset
 src/records.py          # which tabulations are requestable, and the Chapter 119 letter
 src/contracts.py        # incumbent contracts and when they expire
@@ -646,6 +646,22 @@ adapters, because a guardrail an adapter can forget is not a guardrail.
   Bonfire tenants each share one server.
 - **We log every fetch** — URL, time, status, and what robots said at the time
   — when `SF_SCOUT_FETCH_LOG` is set.
+- **A platform's terms decide, not its endpoints.** `src/terms.py` records, per
+  platform, what its terms of use say about automated reading, the clause,
+  where it was read and when. A test fails the build if an adapter exists for a
+  platform recorded `prohibited` or `unreadable`, and a *new* adapter has to be
+  `permitted` or `agency_site` — most are the latter, because most adapters
+  read a government body's own website and there is no vendor in between.
+
+  This exists because it was needed. An adapter was built against DemandStar's
+  open JSON endpoint and merged, against a decision recorded in
+  `docs/statewide-coverage.md` quoting their prohibition on "any robot, spider,
+  data scraping, crawler or other extraction tool". Nothing in the code said
+  no. Robots.txt was no help and never could be: DemandStar serves
+  `User-agent: *` with no rules, so the check returns "allowed" and means
+  nothing. **An open endpoint is not permission.** Writing the table down then
+  found a second one — Vendor Registry forbids copying or downloading content
+  under a browse-wrap that binds on reading — and that adapter is gone too.
 - **We never create an account to harvest.** Where a portal's detail pages need
   a login, the adapter reports list-only rather than pretending.
 - **A bot challenge is a refusal, not backpressure.** Cloudflare's "Just a

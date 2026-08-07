@@ -291,6 +291,30 @@ exception. The difference is not how permissive robots.txt is — it is that for
 those three the *terms* were read and bind on registration rather than on
 reading. Here they could not be read at all.
 
+### 3b. Vendor Registry: found by the guardrail, on its first use
+
+Building the terms table in `src/terms.py` meant reading the terms of every
+platform this build fetches, which nobody had done in one pass. Vendor
+Registry's §1.1 says:
+
+> You may not copy or download any content from the Site or Services except
+> with the prior written approval of Vendor Registry.
+
+under a browse-wrap that opens *"YOUR USE OF THIS SITE SHALL BE DEEMED TO BE
+YOUR AGREEMENT TO ABIDE BY EACH OF THE TERMS."* It binds on reading. Note the
+contrast with Ionwave, whose terms are in `ROBOTS_OVERRIDES` precisely because
+they bind on *registration* and say nothing about automated access — the same
+question, opposite answers, and the difference is only visible if you read both.
+
+The archive-only adapter downloaded 1,098 past solicitations across five
+Florida buyers. That is squarely inside the clause. The adapter, its tests and
+its five configured sources are removed.
+
+It cost something. Those years back-filled recurrence for the OpenGov and
+Bonfire feeds that replaced Vendor Registry at those agencies — 10 of 22
+currently open bids there carried a prior cycle because of it. The agencies
+themselves are not lost: all five post on platforms this build already reads.
+
 ## 4. What is worth buying
 
 | What | Cost | Why |
