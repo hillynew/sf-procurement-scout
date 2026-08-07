@@ -527,3 +527,55 @@ Four things the data does that the documentation does not mention:
 The export's quoting is also not reliable — at least one row carries a stray
 `""` that shifts its remaining fields — so a parser has to skip a bad row rather
 than let it abort a 63,000-row read.
+
+**12. The FSA "RSS feed" is not a bid feed, and FSA needs no adapter.** The
+report scores the Florida Sheriffs Association co-op as "**RSS feed** · direct
+PDF · 2 hours", and README_DATA lists `flsheriffs.org/purchasingprogram/feed/`
+as verified HTTP 200 `application/rss+xml`. It is 200, and it is RSS. What it
+contains is a WordPress **product** catalog — ten items, the WordPress default
+page size, every one dated 1 Oct 2024, with `lastBuildDate` of Dec 2025:
+
+    All Terrain & Utility Vehicles: All Terrain Vehicles (Quad)
+    Bulldozer: 180hp
+    Chipper: Brush Chipper
+    ...
+
+Those are equipment categories on an awarded co-op contract, not solicitations.
+A content-type check confirms a feed exists; it does not confirm the feed is
+about bids.
+
+**The solicitations are already covered.** FSA does run real ITBs — six live
+co-op contracts, FSA23 through FSA26 — and the announcement letter says where
+they are bid:
+
+> "All bidders must submit a complete bid package online **via the VendorLink
+> bid system** by September 1, 2026."
+
+`vl_296` (Florida Sheriffs Association) has been configured since the VendorLink
+sweep and returns exactly that, better structured than anything on
+flsheriffs.org: `FSA26-EQU24.0 Equipment`, due 2026-09-02, questions closing
+2026-07-24, plus 13 archived. The redundant `pp_flsheriffs` catalog pointer is
+already suppressed by supersession. Nothing to build.
+
+What is unique to flsheriffs.org is the award-packet PDFs, which carry each
+co-op contract's term (FSA26-EQU24.0 runs 1 Oct 2026 – 30 Sep 2028). That is
+contract-register material, but the rebid it would predict already arrives
+through VendorLink months ahead with a real deadline, so it earns nothing.
+
+**13. FDOT: `bidletting.fdot.gov` is results-only; the ads are elsewhere and
+behind an SPA.** The report gives `bidletting.fdot.gov/LettingResults?districtID=99`
+plus districts 01-07. That host is exactly what its name says — *results*, bid
+openings that have already happened, back to Aug 2024, newest 29 Jul 2026. There
+are no advertisements on it.
+
+Open FDOT work is advertised on **`pdaexternal.fdot.gov/Pub/AdvertisementPublic/`**,
+split by procurement path (`PS` professional services, `D-B` design-build) and
+view (`C` current, `P` planned, `S` shortlist/results, `A` all). Both hosts are
+crawlable — `bidletting.fdot.gov` serves `Allow: /` and `pdaexternal` serves no
+robots.txt at all.
+
+The catch is that PDA is an AngularJS application which embeds its data in a
+`window.InitParams` blob rather than fetching it, reached only after a district
+selection, and the blob carries a signed `akey` token. So it is a real adapter
+rather than a URL, and it is not built here. Recorded so the next attempt starts
+at the right host.
