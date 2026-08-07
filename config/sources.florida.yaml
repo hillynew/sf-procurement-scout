@@ -2847,9 +2847,9 @@ sources:
   register_url: https://marionfl.bonfirehub.com/
   discovered_open: 9
 - id: bonfire_indianriver
-  name: Indianriver (Bonfire)
+  name: Indian River County (Bonfire)
   county: unknown
-  agency: Indianriver
+  agency: Indian River County
   live_fetch: true
   adapter: bonfire
   platform: bonfire

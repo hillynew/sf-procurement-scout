@@ -332,6 +332,11 @@ def _bonfire_agency_name(host: str) -> str:
         "hart": "Hillsborough Area Regional Transit",
         "lynx": "Central Florida Regional Transportation Authority (LYNX)",
         "jea": "JEA", "swfwmd": "Southwest Florida Water Management District",
+        # Tenants whose subdomain drops the "county" the title-caser keys on,
+        # so the fallback yields "Indianriver" rather than an agency name —
+        # and `src/pipeline/history.py` joins on agency name, so a wrong one
+        # silently costs that agency every prior cycle it has.
+        "indianriver": "Indian River County",
         "sjrwmd": "St. Johns River Water Management District",
         "sfwmd": "South Florida Water Management District",
     }

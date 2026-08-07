@@ -446,3 +446,53 @@ sites write `https&#58;//host/...`, which no pattern in
 `src/pipeline/fingerprint.py` matched. It cost Lee County's portal URL — the
 platform matched, the row went out with `portal_url: null`, and the host had to
 be read off the page by hand. The HTML is unescaped before matching now.
+
+**8. Vendor Registry has no live feed left, in any state.** The report describes
+it as "Listings public, documents behind a free login", and `README_DATA.md`
+above lists three Florida buyer GUIDs verified by HTTP 200 and a matching page
+title. The GUIDs are right and the pages do load. What they load is nothing.
+
+`/Bids/View/BidsList?BuyerId=<guid>` renders server-side and tells an anonymous
+caller *"Currently, <agency> has no open solicitations."* Checked 7 Aug 2026
+against **fifteen buyers across five states**, including Williamson County TN,
+one of the platform's flagship customers: every one returned zero current rows.
+A title check confirms a buyer exists; it does not confirm the page has data.
+
+The archives corroborate it. Every buyer's expired list stops between October
+2023 and January 2026, clustered at the recent end — platform-wide, not
+per-tenant. mdf commerce owns both Vendor Registry and BidNet Direct, and the
+Florida tenants have moved. Each was checked against its own website:
+
+| Agency | Last on Vendor Registry | Posts now on |
+|---|---|---|
+| Santa Rosa County | Oct 2023 | OpenGov (`og_santarosafl`, 11 open) |
+| Central Florida Expressway | Jan 2026 | OpenGov (`og_cfxway`, 4 open) |
+| Indian River County | Jun 2025 | Bonfire (`bonfire_indianriver`, 7 open) |
+| City of Sebring | Jan 2026 | BidNet Direct — its vendor page links there |
+| Okeechobee County | Jul 2025 | unknown; county site 403s us |
+
+So `src/sources/vendor_registry.py` reads the **archive only** — 1,098 past
+solicitations across the five Florida buyers, which `src/pipeline/history.py`
+joins to open bids by agency name. `fetch` returns nothing and declares why.
+
+**9. Four more Florida-plausible buyer GUIDs, identity unconfirmed.** Found by
+search, all readable, all with zero current rows. Vendor Registry pages carry
+no state anywhere, and every one of these names exists in several — including
+in states where the platform is far more common than it is in Florida. Left out
+of config rather than guessed at, the same rule `discover_vendorlink.py` uses.
+Whoever can confirm one should add it:
+
+* City of Holly Hill — `b9df4bcb-13e4-49c7-92c4-7f66b8221459` (FL and SC; a
+  `City of Holly Hill` is already fetched live via VendorLink as `vl_171`,
+  which is suggestive but not proof they are the same body)
+* Madison County — `2031c069-2fb3-4786-8284-c1031824b1fc` (385 archived rows)
+* County of Union/IPT — `00c1a5b6-1ae3-4fdd-955c-28b0bbb3392f`
+* Calhoun County — `ed24d102-09ce-4209-adaf-0c563c3611f8`
+
+**10. The Bonfire tenant `indianriver` was named "Indianriver".** The name
+fallback in `scripts/discover_fl_agencies.py` title-cases the subdomain and
+appends " County" only when the subdomain ends in `county`; this one does not.
+It matters more than cosmetics: bid history joins on agency name, so that one
+word cost Indian River County every prior cycle it had. With the name fixed and
+the Vendor Registry archive loaded, 4 of its 7 open bids carry prior cycles, one
+reaching back to 2020.
