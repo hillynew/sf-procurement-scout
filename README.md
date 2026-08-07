@@ -1,9 +1,9 @@
 # SF Procurement Scout
 
 Live aggregator for government procurement across **Florida** — every state
-agency through MyFloridaMarketPlace, plus **298 live local sources** on eight
+agency through MyFloridaMarketPlace, plus **300 live local sources** on nine
 platforms (OpenGov, CivicPlus, VendorLink, Bonfire, Ionwave, Vendor Registry,
-FACTS, and a handful of bespoke portals), **federal bids in Florida** via
+FACTS, FDOT, and a handful of bespoke portals), **federal bids in Florida** via
 SAM.gov, and a catalog of the portals that cannot be read without an account.
 
 It started as a tri-county tool. The county field now takes any of Florida's 67,
@@ -347,6 +347,7 @@ tractable. Counts are what is configured and answering today.
 | **Bonfire** | 32 | Public JSON API — open, past, and the contract register |
 | **Ionwave** | 4 | Four public lists the tenant's own login page links to, no cookie needed. Cloudflare challenges the fourth request on a session, so `fetch` costs exactly one |
 | **Vendor Registry** | 5 | **Archive only.** The platform's current list reports no open solicitations for any buyer in any state; these agencies post on OpenGov, Bonfire and BidNet now. 1,098 past solicitations that back-fill recurrence for the feeds that replaced them |
+| **FDOT advertisements** | 2 | Professional services and design-build, from the PDA REST host behind a page-minted token. Carries Notices of Planned Advertisement — 124 jobs FDOT has scheduled but not yet advertised, as `upcoming` |
 | **FACTS** | 1 | **Contract register, not a bid feed.** Every executed state contract under s. 215.985(14) — 12,377 with a live end date, 10,192 expiring within a year, with dollar values and procurement method. Two POSTs: run the search, download the CSV |
 | **MyFloridaMarketPlace (VIP)** | 1 | Every state agency, university, college and water management district in one adapter, with anonymous PDF downloads |
 | **SAM.gov** | 1 | Federal solicitations with a Florida place of performance (free API key) |

@@ -268,9 +268,8 @@ geography, agency discovery, 358 sources.
 parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
-**Phase 3 — the remaining platforms.** Jaggaer for the universities, and FDOT's
-advertisements — which are *not* on the letting host the research names; see
-below. FACTS is done, and has its own section below. The Florida Sheriffs
+**Phase 3 — the remaining platforms.** Jaggaer for the universities. FACTS and
+FDOT are both done and have their own sections below; the Florida Sheriffs
 Association co-op came off this list without an adapter, also below.
 OpenGov, VendorLink and Ionwave were all on this list and are now done, and all three came off it the same way: the route
 that had been checked was not the route that is public. OpenGov's list endpoint
@@ -351,19 +350,45 @@ package online via the VendorLink bid system by September 1, 2026."* And
 13 archived. The duplicate `pp_flsheriffs` catalog pointer is already
 suppressed. There is nothing to build.
 
-### FDOT — the letting host is the wrong host
+### FDOT — the letting host was the wrong host
 
-`bidletting.fdot.gov/LettingResults` is what its name says: bid openings that
-have already happened, back to August 2024. No advertisements.
+`bidletting.fdot.gov/LettingResults`, which the research names, is what its name
+says: bid openings that have already happened, back to August 2024. No
+advertisements.
 
 Open work is at **`pdaexternal.fdot.gov/Pub/AdvertisementPublic/`**, split by
-procurement path (`PS` professional services, `D-B` design-build) and view
-(`C` current, `P` planned, `S` results, `A` all). Both hosts are crawlable —
-`bidletting` serves `Allow: /`, `pdaexternal` serves no robots.txt.
+procurement path (`PS` professional services under the Consultants' Competitive
+Negotiation Act, `D-B` design-build). Both hosts are crawlable — `bidletting`
+serves `Allow: /`, `pdaexternal` serves no robots.txt.
 
-Not built yet: PDA is an AngularJS app that embeds its data in a
-`window.InitParams` blob reached after a district selection, with a signed
-`akey` token attached. That is an adapter, not a URL.
+`src/sources/fdot_ads.py` reads it. Live on 7 Aug 2026:
+
+| | current | planned | in selection | all |
+|---|---:|---:|---:|---:|
+| Professional Services | 14 | 124 | 111 | 276 |
+| Design-Build | 1 | 0 | 10 | 13 |
+
+**The planned ads are the reason to bother.** FDOT publishes a Notice of
+Planned Advertisement months before the advertisement itself — 124 of them for
+professional services, with projected deadlines running into 2027. Nothing else
+in this build sees work that early, and they arrive as `upcoming` so they never
+sit on the open board as though they could be bid today.
+
+Getting there takes four hops to find and two to use. `/Home/Config` publishes
+`RestApiUrl: https://pdaextapi.fdot.gov/api/`; the Angular bundle builds
+`AdvertisementPublic/GetAllNoticeDetails`; an HTTP interceptor copies a
+page-scoped `akey` into an `Authentication` header — without it the API answers
+**401 with an empty body**, which reads as a broken endpoint rather than a
+missing header; and the page mints that `akey` into `window.AllAdInitParams`.
+So a fetch is one page load for a fresh token and one API call. Empty
+`DistrictCode` is statewide and `PageView=A` is every status, so one call does
+the work of thirty-two.
+
+One thing does not fit the schema. Every ad carries an FDOT district, and a
+district is several counties — District 4 is Broward, Palm Beach, Martin,
+St. Lucie, Indian River and Okeechobee. `county` holds one value, so it stays
+`statewide`, the district goes in `department`, and the district's counties are
+added to the keywords so a search for "broward" still finds its 24 ads.
 
 ### Vendor Registry — checked, and deliberately not adapted
 
