@@ -110,14 +110,30 @@ def test_the_seeder_does_not_eat_its_own_output(registry_dir):
 
 def test_a_platform_with_no_adapter_is_reported_not_dropped(registry_dir):
     rows = [
-        _row(platform="vendor_registry", adapter="vendor_registry", name="Okeechobee County"),
+        _row(platform="planetbids", adapter="planetbids", name="Bradford County"),
         _row(platform="jaggaer", adapter="jaggaer", name="University of North Florida"),
     ]
     fresh, skipped = _run(registry_dir, rows)
 
     assert fresh == []
-    assert skipped["vendor_registry (no vendor_registry adapter)"] == 1
+    assert skipped["planetbids (no planetbids adapter)"] == 1
     assert skipped["jaggaer (no jaggaer adapter)"] == 1
+
+
+def test_a_platform_that_gains_an_adapter_stops_being_reported_as_missing(registry_dir):
+    """This test used to name vendor_registry as its example of "no adapter".
+
+    Building one moved those rows into the hand-configured bucket, which is the
+    right answer — the registry's three Vendor Registry rows are archive
+    sources with buyer GUIDs the CSV does not carry, so re-emitting them would
+    write config the adapter cannot use.
+    """
+    rows = [_row(platform="vendor_registry", adapter="vendor_registry",
+                 name="Okeechobee County")]
+    fresh, skipped = _run(registry_dir, rows)
+
+    assert fresh == []
+    assert skipped["vendor_registry (already configured by hand)"] == 1
 
 
 def test_opengov_rows_defer_to_the_native_discovery_file(registry_dir):

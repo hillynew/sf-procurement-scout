@@ -48,6 +48,12 @@ class SourceAdapter(ABC):
     #: Declared here so that quirk lives with the rest of the portal knowledge.
     document_headers: Dict[str, str] = {}
 
+    #: False when this source produces no open bids by design — an archive-only
+    #: adapter, say. Such a source cannot supersede an agency's catalog pointer:
+    #: past solicitations are not coverage of what the agency is buying today,
+    #: and dropping the pointer would remove the only note saying where it posts.
+    provides_open_bids: bool = True
+
     #: True when the adapter implements `fetch_detail`. List pages carry little
     #: more than a title and a date, so the detail pass is where scope,
     #: documents, requirements and contacts come from.

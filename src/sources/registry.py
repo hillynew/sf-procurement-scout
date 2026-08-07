@@ -23,6 +23,7 @@ from .opengov import OpenGovAdapter
 from .west_palm_beach import WestPalmBeachAdapter
 from .palm_beach_schools import PalmBeachSchoolsAdapter
 from .sam_gov import SamGovAdapter
+from .vendor_registry import VendorRegistryAdapter
 from .vendorlink import VendorLinkAdapter
 from .catalog import CatalogAdapter
 
@@ -40,6 +41,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "mfmp_vbs": MfmpVbsAdapter,
     "civicplus": CivicPlusAdapter,
     "vendorlink": VendorLinkAdapter,
+    "vendor_registry": VendorRegistryAdapter,
     "notice_links": NoticeLinksAdapter,
     "email_alerts": EmailAlertsAdapter,
     "catalog": CatalogAdapter,
@@ -203,7 +205,15 @@ def _superseded_catalog_ids(configs: List[Dict[str, Any]]) -> set:
         # An adapter this build does not have fetches nothing, so it cannot
         # stand in for the pointer — otherwise one typo in a config silently
         # removes the only coverage an agency had.
-        if cfg.get("adapter") not in ADAPTERS:
+        cls = ADAPTERS.get(cfg.get("adapter"))
+        if cls is None:
+            continue
+        # Nor can one that fetches only an archive. Vendor Registry's buyers
+        # produce past solicitations and no open ones, so treating them as
+        # coverage would delete the pointer telling a user where the agency
+        # actually posts today — the exact false negative this guards against,
+        # arrived at from the other direction.
+        if not getattr(cls, "provides_open_bids", True):
             continue
         live.add(_agency_key(cfg["agency"]))
 

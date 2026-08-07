@@ -268,15 +268,57 @@ geography, agency discovery, 358 sources.
 parsers, liveness monitoring. This unlocks Public Purchase's 228 agencies and
 BidNet in one move, and it is the highest-value next step by a distance.
 
-**Phase 3 — the remaining platforms.** Vendor Registry, Jaggaer for the
-universities, FDOT's letting pages for construction. OpenGov, VendorLink and
-Ionwave were all on this list and are now done, and all three came off it the
-same way: the route that had been checked was not the route that is public.
-OpenGov's list endpoint is a POST on the API host, not a GET on the portal.
-Ionwave was filed here as "needs a session-cookie handshake" — it needs no
-cookie at all; `/` redirects to a login and `SourcingEvents.aspx?SourceType=1`,
-which the login page itself links to, does not. Probe the whole surface before
-concluding a platform needs a browser or an account.
+**Phase 3 — the remaining platforms.** Jaggaer for the universities, FDOT's
+letting pages for construction. OpenGov, VendorLink and Ionwave were all on
+this list and are now done, and all three came off it the same way: the route
+that had been checked was not the route that is public. OpenGov's list endpoint
+is a POST on the API host, not a GET on the portal. Ionwave was filed here as
+"needs a session-cookie handshake" — it needs no cookie at all; `/` redirects
+to a login and `SourcingEvents.aspx?SourceType=1`, which the login page itself
+links to, does not. Probe the whole surface before concluding a platform needs
+a browser or an account.
+
+Vendor Registry also came off this list, but the other way — it is **not worth
+an adapter**, and that is a finding rather than a deferral. See below.
+
+### Vendor Registry — checked, and deliberately not adapted
+
+Its current list is not a live feed. `/Bids/View/BidsList?BuyerId=<guid>`
+renders server-side and tells an anonymous caller *"Currently, <agency> has no
+open solicitations."* Fifteen buyers were checked across five states on
+7 Aug 2026, including Williamson County TN — one of the platform's own flagship
+customers. Every one returned zero. Fifteen agencies do not simultaneously have
+nothing out for bid.
+
+The archives agree from the other side: every buyer's expired list stops
+between October 2023 and January 2026, clustered at the recent end. That is a
+platform-wide freeze, not fifteen coincidences. mdf commerce owns Vendor
+Registry *and* BidNet Direct, and the Florida tenants have moved between them:
+
+| Agency | Last posting on Vendor Registry | Posts now on |
+|---|---|---|
+| Santa Rosa County | Oct 2023 | OpenGov — 11 open today, fetched live here |
+| Central Florida Expressway | Jan 2026 | OpenGov — 4 open today, fetched live here |
+| Indian River County | Jun 2025 | Bonfire — fetched live here |
+| City of Sebring | Jan 2026 | BidNet Direct — its own vendor page links there |
+| Okeechobee County | Jul 2025 | unknown; the county's site refuses us (403) |
+
+An adapter reading the current list would report every one of them healthy and
+empty, forever, while their bids arrived elsewhere. That failure has already
+cost this project three times — Solid Waste Authority moving to Bonfire, six
+CivicPlus cities that had gone to OpenGov, Deerfield Beach moving to Ionwave —
+and each time the tell was the same: a page that still resolves and still
+returns nothing.
+
+**What was built instead is archive-only.** The expired lists are public,
+complete and unauthenticated — 1,098 past solicitations across the five Florida
+buyers, each with a type, reference number, deadline and its own detail page.
+`src/pipeline/history.py` joins past to open on agency name, so those years
+back-fill recurrence for the OpenGov and Bonfire feeds that replaced them.
+Measured: 10 of 22 currently open bids across Santa Rosa, CFX and Indian River
+now carry prior cycles, one of them reaching back to 2020. `fetch` returns
+nothing and declares why through `empty_note`, so the source reports `empty`
+rather than pretending to be a feed.
 
 **Phase 4 — the long tail.** The ~410 cities on CivicPlus and similar CMS bid
 boards, driven off the Florida League of Cities directory, and the special
