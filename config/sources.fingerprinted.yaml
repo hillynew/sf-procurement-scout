@@ -29,6 +29,14 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.atlantisfl.gov/Bids.aspx
+- id: fp_mun_town_of_bay_harbor_islands
+  name: Town of Bay Harbor Islands (Civicplus)
+  county: miami-dade
+  agency: Town of Bay Harbor Islands
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.bayharborislands-fl.gov/Bids.aspx
 - id: fp_mun_city_of_belleview
   name: City of Belleview (Civicplus)
   county: marion
@@ -173,6 +181,14 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://hallandalebeachfl.gov/Bids.aspx
+- id: fp_mun_town_of_highland_beach
+  name: Town of Highland Beach (Civicplus)
+  county: palm-beach
+  agency: Town of Highland Beach
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.highlandbeach.us/Bids.aspx
 - id: fp_mun_town_of_howey_in_the_hills
   name: Town of Howey-in-the-Hills (Civicplus)
   county: unknown
@@ -356,7 +372,7 @@ sources:
   live_fetch: true
   adapter: bonfire
   platform: bonfire
-  portal_url: https://palmcoastgov.bonfirehub.com/opportunities/247363
+  portal_url: https://palmcoastgov.bonfirehub.com/portal/?tab=openOpportunities
   bonfire_host: palmcoastgov.bonfirehub.com
 - id: fp_mun_city_of_palatka
   name: City of Palatka (Civicplus)
@@ -470,6 +486,14 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://www.templeterrace.gov/Bids.aspx
+- id: fp_mun_city_of_titusville
+  name: City of Titusville (Civicplus)
+  county: brevard
+  agency: City of Titusville
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.titusville.com/Bids.aspx
 - id: fp_mun_city_of_tarpon_springs
   name: City of Tarpon Springs (Civicplus)
   county: pinellas
@@ -527,3 +551,59 @@ sources:
   platform: bonfire
   portal_url: https://flvs.bonfirehub.com/
   bonfire_host: flvs.bonfirehub.com
+- id: fp_sd_babcock_ranch_community_independent_special_district
+  name: Babcock Ranch Community Independent Special District (Civicplus)
+  county: unknown
+  agency: Babcock Ranch Community Independent Special District
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://babcockranchliving.com/Bids.aspx
+- id: fp_sd_bay_county_law_library
+  name: Bay County Law Library (Civicplus)
+  county: bay
+  agency: Bay County Law Library
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.baycountyfl.gov/Bids.aspx
+- id: fp_sd_bartow_municipal_airport_development_authority
+  name: Bartow Municipal Airport Development Authority (Civicplus)
+  county: polk
+  agency: Bartow Municipal Airport Development Authority
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.bartow-airport.com/Bids.aspx
+- id: fp_sd_blackwater_soil_and_water_conservation_district
+  name: Blackwater Soil and Water Conservation District (Civicplus)
+  county: unknown
+  agency: Blackwater Soil and Water Conservation District
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.santarosa.fl.gov/Bids.aspx
+- id: fp_sd_children_s_services_council_of_st_lucie_county
+  name: Children's Services Council of St. Lucie County (Civicplus)
+  county: st-lucie
+  agency: Children's Services Council of St. Lucie County
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.cscslc.org/Bids.aspx
+- id: fp_sd_city_of_lake_alfred_community_redevelopment_agency
+  name: City of Lake Alfred Community Redevelopment Agency (Civicplus)
+  county: lake
+  agency: City of Lake Alfred Community Redevelopment Agency
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://mylakealfred.com/Bids.aspx
+- id: fp_sd_city_of_mascotte_community_redevelopment_agency
+  name: City of Mascotte Community Redevelopment Agency (Civicplus)
+  county: unknown
+  agency: City of Mascotte Community Redevelopment Agency
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://cityofmascotte.com/Bids.aspx

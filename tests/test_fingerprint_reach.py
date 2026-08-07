@@ -223,6 +223,31 @@ def test_a_page_that_already_matched_is_not_hopped_from(monkeypatch):
     assert "https://city.gov/bids/archive" not in seen
 
 
+# -- signatures a second vendor also serves --------------------------------
+
+
+def test_a_records_request_portal_is_not_a_bid_portal():
+    """`/PublicPortal/` is where Bonfire's API lives, and it was a strong
+    signature until 15 Florida agencies turned up as Bonfire tenants with no
+    Bonfire host. They link `<agency>.justfoia.com/publicportal/` — a public
+    *records request* portal. A path a second vendor also serves proves
+    nothing, and the false positives were unfalsifiable: strong confidence, no
+    portal URL, so nothing downstream could ever check them.
+    """
+    strong, weak = fp.identify(
+        '<a href="https://largofl.justfoia.com/publicportal/home/newrequest">'
+        "Create Public Records Request</a>"
+    )
+
+    assert strong == [] and weak == []
+
+
+def test_a_real_bonfire_tenant_still_matches():
+    strong, _ = fp.identify('<a href="https://swa.bonfirehub.com/portal/">Bids</a>')
+
+    assert strong == ["bonfire"]
+
+
 # -- boards with no platform behind them -----------------------------------
 
 
