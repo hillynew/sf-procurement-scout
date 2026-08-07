@@ -47,8 +47,21 @@ DEFAULT_SETTINGS: Dict[str, dict] = {
     "notifications": {"deadline_days": 5, "watchlist": True, "fetch_events": True},
     "digest": {"enabled": False, "cadence": "daily", "hour": 7, "email": ""},
     "ai": {"model": "claude-haiku-4-5", "auto_summarize_tracked": True},
+    # The two slow walks that run on their own cadence rather than with the bid
+    # fetch: the contract register weekly, the platform check monthly. Both are
+    # measured in days since the last run, not on a clock — see
+    # web/services/maintenance.py.
+    # Off by default, like auto-fetch and the digest: both jobs make hundreds of
+    # requests to agency websites, and nothing in this build starts doing that
+    # on its own until someone asks it to.
+    "maintenance": {"enabled": False, "contracts_days": 7, "platform_check_days": 30},
     # Internal bookkeeping (not exposed for editing): last digest/deadline scan.
-    "internal": {"last_digest_on": None, "last_deadline_scan_on": None},
+    "internal": {
+        "last_digest_on": None,
+        "last_deadline_scan_on": None,
+        "last_contracts_refresh_on": None,
+        "last_platform_check_on": None,
+    },
 }
 
 # Seeded on first run so Watchlists is useful before the user builds their own.

@@ -254,6 +254,14 @@ export interface Settings {
   notifications: { deadline_days: number; watchlist: boolean; fetch_events: boolean };
   digest: { enabled: boolean; cadence: string; hour: number; email: string };
   ai: { model: string; auto_summarize_tracked: boolean };
+  maintenance: { enabled: boolean; contracts_days: number; platform_check_days: number };
+}
+
+/** Read-only: when the slow walks last ran, and whether one is running now. */
+export interface MaintenanceStatus {
+  last_contracts_refresh_on: string | null;
+  last_platform_check_on: string | null;
+  running: string | null;
 }
 
 export interface Capabilities {
@@ -266,6 +274,7 @@ export interface Capabilities {
 export interface SettingsResponse {
   settings: Settings;
   capabilities: Capabilities;
+  maintenance_status: MaintenanceStatus;
 }
 
 export interface TestEmailResult {

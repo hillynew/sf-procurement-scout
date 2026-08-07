@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta
 
 from src.db import store as db
 
+from . import maintenance
 from .fetch_job import job
 
 TICK_SECONDS = 60
@@ -47,13 +48,6 @@ async def tick(now: datetime | None = None) -> None:
         _deadline_scan(settings)
         db.update_settings({"internal": {"last_deadline_scan_on": today_iso}})
 
-    # The contract register is deliberately *not* refreshed here. It is a full
-    # walk of several thousand rows per tenant, and this tick runs on the event
-    # loop — doing it inline stalls the interval fetch, the deadline scan and
-    # the digest behind minutes of blocking HTTP. Bid history has the same
-    # shape and is refreshed the same way: `python -m src.cli contracts
-    # --refresh`, on its own cadence.
-
     # Daily digest at the configured hour (UTC).
     digest_cfg = settings["digest"]
     if (
@@ -66,6 +60,17 @@ async def tick(now: datetime | None = None) -> None:
 
         digest.send_daily_digest(db.load_opportunities(present_only=True))
         db.update_settings({"internal": {"last_digest_on": today_iso}})
+
+    # Last, and off the loop. The slow walks — the contract register weekly, the
+    # platform check monthly — are minutes of blocking HTTP each, which is
+    # exactly why the register was kept out of this tick when it was written.
+    # `maintenance` hands them to a worker thread and runs at most one per tick,
+    # so the await here delays only the *next* tick, never the digest or the
+    # deadline scan above it, and never the loop itself. Both still run by hand:
+    # `python -m src.cli contracts --refresh`,
+    # `scripts/fingerprint_agencies.py --recheck`.
+    if not job.running:
+        await maintenance.maybe_run(settings, now)
 
 
 def _deadline_scan(settings: dict) -> None:

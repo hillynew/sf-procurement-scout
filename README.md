@@ -236,6 +236,49 @@ surfaces it in the left menu and the **Source health** panel.
 > The City of West Palm Beach portal sits behind a WAF that blocks scrapers, so
 > that source reports `degraded` and falls back to its DemandStar listing.
 
+## Background upkeep
+
+Health catches an adapter that breaks. It cannot catch the two ways this build
+goes wrong quietly, so each has its own job on its own cadence, under
+**Settings → Background upkeep**. Both are off until you switch them on, like
+auto-fetch and the digest, because between them they make several hundred
+requests to agency websites.
+
+| Job | Default | What it answers |
+|-----|---------|-----------------|
+| Contract register | Weekly | When does the incumbent's term end? |
+| Platform check | Monthly | Is this agency still on the portal we read? |
+
+The **contract register** is the only leading indicator in the build. A rebid is
+advertised weeks before it opens and scoped months before that; an incumbent's
+end date is the earliest warning available. It decays invisibly — a stale
+register looks exactly like a current one — so it is re-read weekly and reports
+what is expiring inside 90 days.
+
+The **platform check** exists because of a failure mode that has cost this
+project five agencies: *a live page returning zero rows reads as a quiet agency,
+not a migrated one.* The adapter works, the fetch succeeds, health stays green,
+and the agency has simply stopped posting there. Deerfield Beach (DemandStar →
+Ionwave), UNF (Jaggaer → Workday), St. Johns County and its Anastasia Sanitary
+District (DemandStar → Workday) were all found this way rather than by anything
+noticing they had gone silent. So once a month every identified agency's own
+website is asked whether it still runs the platform the registry records, and
+each disagreement becomes a notification naming where it went.
+
+An agency that goes from a known platform to *unreadable* is reported
+separately, and only when it happens in bulk — individually that is a slow site
+or a bot wall, not a migration, and treating the two alike would cry wolf every
+sweep.
+
+Both run in a worker thread, one at a time, never during a fetch, and never two
+in one tick — they are minutes of blocking HTTP each, and the scheduler's tick
+runs on the event loop. Either can also be run by hand:
+
+```bash
+python -m src.cli contracts --refresh
+python scripts/fingerprint_agencies.py --recheck
+```
+
 ## Deploy on Render
 
 > Handing this to an AI agent (Claude Code, Cursor, Copilot, etc.) to deploy
