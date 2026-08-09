@@ -57,7 +57,12 @@ def build_pricing(opps: Optional[List[Opportunity]] = None) -> dict:
             if county:
                 by_county.setdefault(slug, {}).setdefault(county, []).append(dollars)
 
-    for o in opps if opps is not None else db.load_opportunities():
+    pool = list(opps) if opps is not None else db.load_opportunities()
+    # The history archive is where backfills land (FDOT's two-year letting
+    # walk, platform archives); its award rows price the same categories.
+    seen = {o.opportunity_id for o in pool}
+    pool += [h for h in db.load_history_records() if h.opportunity_id not in seen]
+    for o in pool:
         if o.status == "award" and o.award_amount:
             county = o.county if o.county not in ("statewide", "federal", "unknown") else None
             add([c for c in o.categories if c != "general"], county, o.award_amount)
