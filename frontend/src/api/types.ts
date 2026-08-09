@@ -57,6 +57,7 @@ export interface Opportunity {
   contract_term?: string | null;
   protest_deadline?: string | null;
   first_seen_at?: string | null;
+  detail_fetched?: boolean;
   last_cycle_closed: string | null;
   days_until_due: number | null;
   detail_score: number;

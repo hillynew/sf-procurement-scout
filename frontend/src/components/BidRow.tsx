@@ -64,13 +64,21 @@ export default function BidRow({ bid, showStatus = false }: {
           {bid.prior_cycles > 0 && (
             <span className="text-[11px] font-semibold text-upcoming">↻ rebid</span>
           )}
+          {bid.status === "award" && (
+            <span className="truncate text-[11px] font-semibold text-warn">
+              {bid.awarded_vendor ? `won by ${bid.awarded_vendor}` : "winner not published"}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="hidden shrink-0 sm:block"><CountyPill county={bid.county} small /></div>
       <div className="hidden shrink-0 md:block"><DetailMeter score={bid.detail_score} /></div>
       <div className="w-16 shrink-0 text-right">
-        <ValueTag amount={bid.budget_amount} />
+        {/* An awarded row's number is the real award, not the estimate. */}
+        {bid.status === "award" && bid.award_amount != null
+          ? <ValueTag amount={bid.award_amount} est={false} />
+          : <ValueTag amount={bid.budget_amount} />}
       </div>
       <div className="shrink-0">
         {showStatus ? <StatusPill status={bid.status} />

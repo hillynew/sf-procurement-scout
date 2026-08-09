@@ -582,6 +582,16 @@ export default function Workroom() {
             </Section>
           )}
 
+          {bid.documents.length === 0 && (
+            <Section title="Documents">
+              <p className="text-sm text-ink-faint">
+                {bid.detail_fetched
+                  ? "The portal publishes no documents for this bid."
+                  : "Packet not fetched yet — this source may be list-only, or the detail pass hasn't reached it. The portal link is the source of truth."}
+              </p>
+            </Section>
+          )}
+
           {bid.documents.length > 0 && (
             <Section title={`Documents (${bid.documents.length})`}>
               <div className="space-y-1">
