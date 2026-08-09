@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Handshake,
@@ -11,7 +11,7 @@ import {
   Star,
   Trophy,
 } from "lucide-react";
-import { useOpportunities, useWatchlists } from "../api/hooks";
+import { useOpportunities, useWatchlists, useSettings, useStartFetch } from "../api/hooks";
 import { fmtRelative } from "../lib/format";
 import FetchButton from "../features/FetchButton";
 import NotificationBell from "../features/NotificationBell";
@@ -35,6 +35,24 @@ const MOBILE_NAV = NAV.filter((n) =>
 export default function AppShell() {
   const { data: snapshot } = useOpportunities();
   const { data: watchlists } = useWatchlists();
+  const { data: settingsData } = useSettings();
+  const startFetch = useStartFetch();
+  const openFetchTried = useRef(false);
+
+  // "On open" refresh: when the stored snapshot is older than the configured
+  // staleness, kick a background fetch once per app load. A 409 (already
+  // running) is fine — the point is freshness, not ownership.
+  useEffect(() => {
+    if (openFetchTried.current) return;
+    const auto = settingsData?.settings?.auto_fetch;
+    if (!auto || auto.mode !== "on_open" || !snapshot) return;
+    openFetchTried.current = true;
+    const staleMs = (auto.stale_minutes ?? 360) * 60_000;
+    const fetchedAt = snapshot.fetched_at ? Date.parse(snapshot.fetched_at) : 0;
+    if (Date.now() - fetchedAt > staleMs) {
+      startFetch.mutate(undefined, { onError: () => undefined });
+    }
+  }, [settingsData, snapshot, startFetch]);
   const navigate = useNavigate();
 
   const openCount =

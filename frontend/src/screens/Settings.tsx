@@ -346,6 +346,7 @@ export default function SettingsScreen() {
           ["summaries", "Clear AI briefs", "Regenerate summaries from scratch"],
           ["contractors", "Clear contractor network", "Removes every matched firm and its bid matches"],
           ["notifications", "Clear notifications", ""],
+          ["pdf_cache", "Clear PDF text cache", "Re-extract bid packages on the next fetch"],
         ].map(([target, label, hint]) => (
           <Row key={target} label={label} hint={hint || undefined}>
             {confirmTarget === target ? (
