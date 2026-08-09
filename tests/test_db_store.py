@@ -321,3 +321,90 @@ def test_first_run_has_no_history_and_no_flag(db):
     fresh = _health(0, status="empty")
     db.save_snapshot([], fresh)
     assert str(fresh[0].status) == "empty"
+
+
+# ---------------------------------------------------------------------------
+# Run lifecycle: a fetch opens its run row first, so a death leaves evidence
+# ---------------------------------------------------------------------------
+
+
+def test_run_started_is_finalized_by_save_snapshot(db):
+    started = datetime.utcnow()
+    run_id = db.record_run_started(started)
+
+    result = db.save_snapshot([make_opp("Ditch Mowing")], HEALTH, started_at=started,
+                              run_id=run_id)
+    assert result.run_id == run_id, "the running row is finalized, not duplicated"
+    runs = db.recent_runs()
+    assert len(runs) == 1
+    assert runs[0]["status"] == "done"
+    assert runs[0]["opp_count"] == 1
+
+
+def test_run_started_is_finalized_by_failed_run(db):
+    started = datetime.utcnow()
+    run_id = db.record_run_started(started)
+    db.record_failed_run(started, "boom", run_id=run_id)
+    runs = db.recent_runs()
+    assert len(runs) == 1
+    assert runs[0]["status"] == "error"
+
+
+def test_stale_running_row_is_flagged_as_died(db):
+    """An OOM-killed fetch writes nothing; the next run must expose the corpse."""
+    db.record_run_started(datetime.utcnow())          # dies silently
+    db.record_run_started(datetime.utcnow())          # next fetch starts
+
+    statuses = [r["status"] for r in db.recent_runs()]
+    assert statuses.count("died") == 1
+    assert statuses.count("running") == 1
+    _, notes = db.list_notifications()
+    assert "fetch_died" in [n["kind"] for n in notes]
+
+
+# ---------------------------------------------------------------------------
+# Demo data stays out of a live database
+# ---------------------------------------------------------------------------
+
+
+def _sample_opp(title: str) -> Opportunity:
+    return make_opp(title, source_id="sample", source_name="Sample data")
+
+
+def test_count_real_opportunities_ignores_the_demo_seed(db):
+    db.save_snapshot([_sample_opp("Fake Roof"), make_opp("Real Roof")], HEALTH)
+    assert db.count_real_opportunities() == 1
+
+
+def test_purge_demo_removes_only_sample_records(db):
+    from src.contracts import Contract
+
+    fake, real = _sample_opp("Fake Roof"), make_opp("Real Roof")
+    db.save_snapshot([fake, real], HEALTH)
+    db.save_contracts([
+        Contract(contract_id="SAMPLE-1", agency="A", name="Fake", source_id="sample"),
+        Contract(contract_id="REAL-1", agency="A", name="Real", source_id="facts"),
+    ])
+    # The demo seeds a pipeline on top of its bids; purge must take that too.
+    db.set_tracked(fake.opportunity_id, True)
+    db.set_result(fake.opportunity_id, "won", amount_cents=100)
+    db.set_tracked(real.opportunity_id, True)
+
+    db.purge("demo")
+    assert [o.title for o in db.load_opportunities()] == ["Real Roof"]
+    assert [c.contract_id for c in db.load_contracts()] == ["REAL-1"]
+    assert list(db.workflow_state()) == [real.opportunity_id]
+
+
+def test_purge_demo_removes_the_demo_run_but_keeps_real_runs(db):
+    from src.models.opportunity import HealthStatus
+
+    db.save_snapshot([make_opp("Real Roof")], HEALTH)
+    demo_health = [SourceHealth(source_id="sample", name="Sample data", ok=True,
+                                count=15, status=HealthStatus.OK)]
+    db.save_snapshot([make_opp("Real Roof")], demo_health)
+
+    db.purge("demo")
+    remaining = db.recent_runs()
+    assert len(remaining) == 1
+    assert remaining[0]["opp_count"] == 1

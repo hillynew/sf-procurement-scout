@@ -709,3 +709,43 @@ def test_records_queue_mints_letters_for_ripe_leads(client):
 
     r = client.put(f"/api/records/{stale.opportunity_id}", json={"status": "bogus"})
     assert r.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Demo data cannot replace a live database
+# ---------------------------------------------------------------------------
+
+
+def test_demo_reload_over_demo_data_is_allowed(seeded):
+    resp = seeded.post("/api/demo")
+    assert resp.status_code == 200
+
+
+def test_demo_load_is_refused_while_real_data_exists(client):
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    real = Opportunity(
+        source_id="mfmp_vbs", source_name="MFMP", title="Mowing, district 4",
+        url="https://vendor.myfloridamarketplace.com/x", county="broward",
+        agency="DOT", status="open",
+    )
+    db.save_snapshot([real], [SourceHealth(source_id="mfmp_vbs", name="MFMP",
+                                           ok=True, count=1)])
+
+    resp = client.post("/api/demo")
+    assert resp.status_code == 409
+    assert "real records" in resp.json()["detail"]
+    # ...and the live row is untouched.
+    data = client.get("/api/opportunities").json()
+    assert data["count"] == 1
+
+
+def test_purge_demo_endpoint_clears_the_seed(seeded):
+    from src.db import store as db
+
+    assert db.count_real_opportunities() == 0
+    resp = seeded.post("/api/settings/data/purge", json={"target": "demo"})
+    assert resp.status_code == 200
+    data = seeded.get("/api/opportunities").json()
+    assert data["count"] == 0

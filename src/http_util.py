@@ -15,7 +15,7 @@ from .netpolicy import check, log_fetch, user_agent_for
 __all__ = [
     "BROWSER_UA", "CHALLENGE_MARKERS", "CRAWLER_UA", "DEFAULT_UA",
     "RobotsDisallowed", "SourceBlocked",
-    "get", "get_h2", "get_json", "is_challenge", "session",
+    "get", "get_h2", "get_json", "is_challenge", "read_bounded", "session",
 ]
 
 #: The crawler identifies itself honestly. `src.netpolicy` keeps the browser
@@ -127,6 +127,36 @@ def get(
 
     # Only reachable when the final attempt raised a RequestException.
     raise last_exc  # pragma: no cover
+
+
+def read_bounded(resp, max_bytes: int) -> Optional[bytes]:
+    """Body of a streamed response, or None once it exceeds ``max_bytes``.
+
+    ``resp.content`` buffers however much the server sends before any size
+    check can run, so one oversized file is a memory spike no cap after the
+    fact can prevent. The caller passes ``stream=True`` on the request; this
+    bails on the Content-Length header when the server declares one, and
+    mid-stream when it doesn't. The response is always closed.
+    """
+    try:
+        declared = int(resp.headers.get("Content-Length") or 0)
+    except (TypeError, ValueError):
+        declared = 0
+    if declared > max_bytes:
+        resp.close()
+        return None
+
+    chunks = []
+    total = 0
+    try:
+        for chunk in resp.iter_content(64 * 1024):
+            total += len(chunk)
+            if total > max_bytes:
+                return None
+            chunks.append(chunk)
+    finally:
+        resp.close()
+    return b"".join(chunks)
 
 
 def is_challenge(resp) -> bool:

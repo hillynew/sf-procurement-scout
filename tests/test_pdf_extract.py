@@ -121,22 +121,45 @@ def test_value_without_a_dollar_figure_is_skipped():
 # ---------------------------------------------------------------------------
 
 
-def test_non_pdf_response_is_rejected(monkeypatch, tmp_path):
-    class _Resp:
-        content = b"<html>not a pdf</html>"
+class _Resp:
+    """The streamed-response surface fetch_text actually touches."""
 
+    def __init__(self, body: bytes, content_length: str | None = None):
+        self._body = body
+        self.headers = {"Content-Length": content_length} if content_length else {}
+        self.streamed = False
+        self.closed = False
+
+    def iter_content(self, chunk_size):
+        self.streamed = True
+        for i in range(0, len(self._body), chunk_size):
+            yield self._body[i : i + chunk_size]
+
+    def close(self):
+        self.closed = True
+
+
+def test_non_pdf_response_is_rejected(monkeypatch, tmp_path):
     monkeypatch.setattr(pdf_extract, "cache_dir", lambda: tmp_path)
-    monkeypatch.setattr(pdf_extract, "get", lambda *a, **k: _Resp())
+    monkeypatch.setattr(pdf_extract, "get", lambda *a, **k: _Resp(b"<html>not a pdf</html>"))
     assert fetch_text("https://x.gov/a.pdf") == ""
 
 
-def test_oversized_download_is_rejected(monkeypatch, tmp_path):
-    class _Resp:
-        content = b"%PDF" + b"x" * (pdf_extract.MAX_BYTES + 1)
-
+def test_oversized_download_is_cut_off_mid_stream(monkeypatch, tmp_path):
+    resp = _Resp(b"%PDF" + b"x" * (pdf_extract.MAX_BYTES + 1))
     monkeypatch.setattr(pdf_extract, "cache_dir", lambda: tmp_path)
-    monkeypatch.setattr(pdf_extract, "get", lambda *a, **k: _Resp())
+    monkeypatch.setattr(pdf_extract, "get", lambda *a, **k: resp)
     assert fetch_text("https://x.gov/big.pdf") == ""
+    assert resp.closed, "the connection must be released after the bail"
+
+
+def test_declared_oversize_is_rejected_without_reading_the_body(monkeypatch, tmp_path):
+    resp = _Resp(b"%PDF whatever", content_length=str(pdf_extract.MAX_BYTES + 1))
+    monkeypatch.setattr(pdf_extract, "cache_dir", lambda: tmp_path)
+    monkeypatch.setattr(pdf_extract, "get", lambda *a, **k: resp)
+    assert fetch_text("https://x.gov/big.pdf") == ""
+    assert not resp.streamed, "an honest Content-Length spares the download entirely"
+    assert resp.closed
 
 
 def test_download_failure_is_swallowed(monkeypatch, tmp_path):
@@ -151,12 +174,12 @@ def test_download_failure_is_swallowed(monkeypatch, tmp_path):
 def test_cache_avoids_a_second_download(monkeypatch, tmp_path):
     calls = []
 
-    class _Resp:
-        content = b"%PDF-1.4 fake"
-
     monkeypatch.setattr(pdf_extract, "cache_dir", lambda: tmp_path)
     monkeypatch.setattr(pdf_extract, "_extract", lambda raw: "Estimated Value: $10,000")
-    monkeypatch.setattr(pdf_extract, "get", lambda *a, **k: (calls.append(1), _Resp())[1])
+    monkeypatch.setattr(
+        pdf_extract, "get",
+        lambda *a, **k: (calls.append(1), _Resp(b"%PDF-1.4 fake"))[1],
+    )
 
     first = fetch_text("https://x.gov/a.pdf")
     second = fetch_text("https://x.gov/a.pdf")
