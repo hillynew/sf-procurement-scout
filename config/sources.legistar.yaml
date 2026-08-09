@@ -3,62 +3,102 @@
 # survey (docs/SOURCES.md). Clients below were live-verified that day.
 # Miami-Dade's instance is dead (frozen July 2018) and deliberately absent.
 sources:
-  - id: legistar_broward
-    name: Broward County commission awards
-    county: broward
-    agency: Broward County
-    live_fetch: true
-    adapter: legistar
-    platform: legistar
-    legistar_client: broward
-    portal_url: https://broward.legistar.com/Legislation.aspx
-
-  - id: legistar_fortlauderdale
-    name: Fort Lauderdale commission awards
-    county: broward
-    agency: City of Fort Lauderdale
-    live_fetch: true
-    adapter: legistar
-    platform: legistar
-    legistar_client: fortlauderdale
-    portal_url: https://fortlauderdale.legistar.com/Legislation.aspx
-
-  - id: legistar_miami
-    name: City of Miami commission awards
-    county: miami-dade
-    agency: City of Miami
-    live_fetch: true
-    adapter: legistar
-    platform: legistar
-    legistar_client: miamifl
-    portal_url: https://miamifl.legistar.com/Legislation.aspx
-
-  - id: legistar_coralgables
-    name: Coral Gables commission awards
-    county: miami-dade
-    agency: City of Coral Gables
-    live_fetch: true
-    adapter: legistar
-    platform: legistar
-    legistar_client: coralgables
-    portal_url: https://coralgables.legistar.com/Legislation.aspx
-
-  - id: legistar_polk
-    name: Polk County commission awards
-    county: polk
-    agency: Polk County
-    live_fetch: true
-    adapter: legistar
-    platform: legistar
-    legistar_client: polkcountyfl
-    portal_url: https://polkcountyfl.legistar.com/Legislation.aspx
-
-  - id: legistar_jacksonville
-    name: Jacksonville council awards
-    county: duval
-    agency: City of Jacksonville
-    live_fetch: true
-    adapter: legistar
-    platform: legistar
-    legistar_client: jaxcityc
-    portal_url: https://jaxcityc.legistar.com/Legislation.aspx
+- id: legistar_broward
+  name: Broward County commission awards
+  county: broward
+  agency: Broward County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: broward
+  portal_url: https://broward.legistar.com/Legislation.aspx
+- id: legistar_fortlauderdale
+  name: Fort Lauderdale commission awards
+  county: broward
+  agency: City of Fort Lauderdale
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: fortlauderdale
+  portal_url: https://fortlauderdale.legistar.com/Legislation.aspx
+- id: legistar_miami
+  name: City of Miami commission awards
+  county: miami-dade
+  agency: City of Miami
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: miamifl
+  portal_url: https://miamifl.legistar.com/Legislation.aspx
+- id: legistar_coralgables
+  name: Coral Gables commission awards
+  county: miami-dade
+  agency: City of Coral Gables
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: coralgables
+  portal_url: https://coralgables.legistar.com/Legislation.aspx
+- id: legistar_polk
+  name: Polk County commission awards
+  county: polk
+  agency: Polk County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: polkcountyfl
+  portal_url: https://polkcountyfl.legistar.com/Legislation.aspx
+- id: legistar_jacksonville
+  name: Jacksonville council awards
+  county: duval
+  agency: City of Jacksonville
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: jaxcityc
+  portal_url: https://jaxcityc.legistar.com/Legislation.aspx
+- id: legistar_charlottecountyfl
+  name: Charlotte County commission awards
+  county: charlotte
+  agency: Charlotte County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: charlottecountyfl
+  portal_url: https://charlottecountyfl.legistar.com/Legislation.aspx
+- id: legistar_hillsboroughcounty
+  name: Hillsborough County commission awards
+  county: hillsborough
+  agency: Hillsborough County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: hillsboroughcounty
+  portal_url: https://hillsboroughcounty.legistar.com/Legislation.aspx
+- id: legistar_hernandocountyfl
+  name: Hernando County commission awards
+  county: hernando
+  agency: Hernando County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: hernandocountyfl
+  portal_url: https://hernandocountyfl.legistar.com/Legislation.aspx
+- id: legistar_seminolecountyfl
+  name: Seminole County commission awards
+  county: seminole
+  agency: Seminole County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: seminolecountyfl
+  portal_url: https://seminolecountyfl.legistar.com/Legislation.aspx
+- id: legistar_lakecounty
+  name: Lake County commission awards
+  county: lake
+  agency: Lake County
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: lakecounty
+  portal_url: https://lakecounty.legistar.com/Legislation.aspx
