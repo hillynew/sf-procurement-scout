@@ -65,12 +65,22 @@ class Opportunity(BaseModel):
     county: str
     agency: str
     department: Optional[str] = None
+    # state | county | municipal | school_district | higher_ed |
+    # special_district | federal | unknown. Stamped by the pipeline from the
+    # agency name when an adapter doesn't set it.
+    tier: Optional[str] = None
 
     # Classification
     solicitation_type: SolicitationType = SolicitationType.UNKNOWN
     offer_type: OfferType = OfferType.UNKNOWN
     categories: List[str] = Field(default_factory=list)
     keywords: List[str] = Field(default_factory=list)
+    # The source's own classification text, verbatim — kept so a bad call by
+    # our classifier can always be traced back to what the portal said.
+    raw_category: Optional[str] = None
+    # Commodity codes as the source publishes them, scheme-prefixed:
+    # "UNSPSC 78101804 Relocation services", "NIGP 91450 HVAC".
+    commodity_codes: List[str] = Field(default_factory=list)
 
     # Dates & status
     posted_date: Optional[date] = None
@@ -84,6 +94,21 @@ class Opportunity(BaseModel):
     # s. 120.57(3)(b), 72 hours excluding weekends and state holidays. This is
     # the tightest deadline in the system by an order of magnitude.
     protest_deadline: Optional[datetime] = None
+
+    # Award facts, populated when the source publishes them. Awards and open
+    # solicitations are two linked record types: an award record names the
+    # solicitation it decides via `linked_ref` where the source provides one
+    # (MFMP's linkedAdNumber, a bid number quoted in an agenda item), and
+    # `award_linkage` records how the join was made so a bad match can be
+    # traced: "ref" (explicit reference) | "fuzzy" (agency+title+date).
+    awarded_vendor: Optional[str] = None
+    award_amount: Optional[int] = None  # whole dollars
+    award_date: Optional[date] = None
+    linked_ref: Optional[str] = None
+    award_linkage: Optional[str] = None
+
+    # Contract term as published, free text: "1 year, two 1-year renewals".
+    contract_term: Optional[str] = None
 
     # Narrative
     description: Optional[str] = None
@@ -220,6 +245,15 @@ class Opportunity(BaseModel):
             "duration_days": self.duration_days if self.duration_days is not None else "",
             "liquidated_damages": self.liquidated_damages or "",
             "licenses": self.licenses or "",
+            "tier": self.tier or "",
+            "raw_category": self.raw_category or "",
+            "commodity_codes": "; ".join(self.commodity_codes),
+            "awarded_vendor": self.awarded_vendor or "",
+            "award_amount": self.award_amount if self.award_amount is not None else "",
+            "award_date": self.award_date.isoformat() if self.award_date else "",
+            "linked_ref": self.linked_ref or "",
+            "award_linkage": self.award_linkage or "",
+            "contract_term": self.contract_term or "",
             "prior_cycles": self.prior_cycles,
             "last_cycle_closed": self.last_cycle_closed.isoformat() if self.last_cycle_closed else "",
             "personalized": self.personalized,

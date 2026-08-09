@@ -114,3 +114,40 @@ def test_coverage_counts_only_real_counties():
         ["broward", "leon", "statewide", "federal", "unknown", "broward"]
     )
     assert (covered, total) == (2, 67)
+
+
+class TestInferTier:
+    """Tier detection: most-specific pattern first, unknown over a guess."""
+
+    def test_school_district_beats_county(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("Miami-Dade County Public Schools") == "school_district"
+
+    def test_higher_ed_beats_bare_county_name(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("Broward College") == "higher_ed"
+
+    def test_special_district_beats_county_suffix(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("Solid Waste Authority of Palm Beach County") == "special_district"
+
+    def test_state_body(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("Florida Department of Transportation") == "state"
+
+    def test_municipal_forms(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("City of Davie") == "municipal"
+        assert infer_tier("Hialeah") == "municipal"
+
+    def test_county(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("St. Johns County") == "county"
+
+    def test_federal_hint_wins(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("SAM.gov", county="federal") == "federal"
+
+    def test_unknown_stays_unknown(self):
+        from src.fl_geo import infer_tier
+        assert infer_tier("Acme Widgets") == "unknown"

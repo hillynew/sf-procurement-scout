@@ -11,6 +11,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 from rich.console import Console
 from rich.table import Table
 
+from ..fl_geo import infer_tier
 from ..http_util import SourceBlocked
 from ..models.opportunity import HealthStatus, Opportunity, SourceHealth
 from ..pdf_extract import fetch_text, parse_facts
@@ -155,6 +156,8 @@ def derive_fields(opps: List[Opportunity]) -> None:
         o.contact_phone = o.contact_phone or extract_contact_phone(*texts)
         # Prose and package extractors overlap; show one chip per obligation.
         o.requirements = dedupe_requirements(o.requirements)
+        if not o.tier:
+            o.tier = infer_tier(o.agency, county=o.county)
 
 
 def _primary_package(opp: Opportunity) -> Optional[str]:
