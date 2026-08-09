@@ -140,17 +140,24 @@ def save_snapshot(
             row.last_seen_at = now
             row.present = True
 
-        # Untracked rows that vanished from the portals are dropped; tracked
-        # rows are kept (archive) and merely flagged absent.
+        # Rows that vanished from the portals are kept and flagged absent —
+        # never deleted. A captured record is the archive: award linkage joins
+        # against closed solicitations, and "what was open last month" has to
+        # come from somewhere. A vanished open row is also aged to closed,
+        # since a bid a portal no longer lists is over even if we never saw a
+        # close date.
         gone = existing_ids - incoming_ids
-        drop = [oid for oid in gone if oid not in tracked_ids]
-        keep_flag = [oid for oid in gone if oid in tracked_ids]
-        if drop:
-            s.execute(delete(OpportunityRow).where(OpportunityRow.opportunity_id.in_(drop)))
-        for oid in keep_flag:
+        for oid in gone:
             row = s.get(OpportunityRow, oid)
-            if row is not None:
-                row.present = False
+            if row is None:
+                continue
+            row.present = False
+            if row.status in ("open", "upcoming") and oid not in tracked_ids:
+                row.status = "closed"
+                payload = dict(row.payload or {})
+                if payload.get("status") in ("open", "upcoming"):
+                    payload["status"] = "closed"
+                    row.payload = payload
 
         run = FetchRun(
             started_at=started_at or now,

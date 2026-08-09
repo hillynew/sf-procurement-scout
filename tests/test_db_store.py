@@ -65,7 +65,8 @@ def test_second_snapshot_counts_only_new(db):
     assert result.new_ids == [b.opportunity_id]
 
 
-def test_tracked_rows_survive_snapshot_replace(db):
+def test_vanished_rows_are_kept_not_deleted(db):
+    """A captured record is the archive — nothing is deleted on replace."""
     a, b = make_opp("Guardrail Install"), make_opp("Fleet Fuel Contract")
     db.save_snapshot([a, b], HEALTH)
     db.set_tracked(a.opportunity_id, True)
@@ -73,9 +74,14 @@ def test_tracked_rows_survive_snapshot_replace(db):
     # Next fetch: both bids fell off the portals.
     db.save_snapshot([], HEALTH)
     loaded = db.load_opportunities()
-    assert [o.opportunity_id for o in loaded] == [a.opportunity_id]
-    # ...and the retained row is flagged as no longer present.
+    assert {o.opportunity_id for o in loaded} == {a.opportunity_id, b.opportunity_id}
+    # ...and every retained row is flagged as no longer present.
     assert db.load_opportunities(present_only=True) == []
+    # The untracked one is aged to closed — a bid the portal no longer lists
+    # is over; the tracked one keeps its status for the user's pipeline.
+    by_id = {o.opportunity_id: o for o in loaded}
+    assert by_id[b.opportunity_id].status == "closed"
+    assert by_id[a.opportunity_id].status == "open"
 
 
 def test_untrack_removes_result_too(db):
