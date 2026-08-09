@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 from ..classify import enrich
 from ..http_util import get
-from ..models.opportunity import Opportunity
+from ..models.opportunity import Document, Opportunity
 from .base import SourceAdapter
 
 # "IFB 2026-021", "RFP No. 2026-023", "ITB-25-26-120"
@@ -84,6 +84,10 @@ class NoticeLinksAdapter(SourceAdapter):
                     "Public notice posted by the agency; open the document for the "
                     "submittal deadline and bid package."
                 ),
+                # The notice file itself — it was already in hand as the URL,
+                # but never recorded as a document, so these rows scored as if
+                # they had no package at all.
+                documents=[Document(name=title[:160] or "Public notice", url=url)],
                 raw={"link_text": text[:300]},
             )
 

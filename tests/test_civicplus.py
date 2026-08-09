@@ -105,8 +105,8 @@ def test_duplicate_rows_collapse(monkeypatch):
         ("Closed", "closed"),
         ("Cancelled", "cancelled"),
         ("Canceled", "cancelled"),
-        ("Awarded", "closed"),
-        ("Intent to Award", "closed"),
+        ("Awarded", "award"),
+        ("Intent to Award", "award"),
         ("Archived", "closed"),
     ],
 )
@@ -192,3 +192,42 @@ def test_alternate_skin_without_listitemsrow(monkeypatch):
 def test_titles_too_short_are_skipped(monkeypatch):
     (rows) = _page(_row(title="Bid"))
     assert _adapter(monkeypatch, rows).fetch() == []
+
+
+def test_award_detail_captures_category_and_winner(monkeypatch):
+    """The raw Category lives in the BidDetail/BidDetailSpec span family, and
+    the winner in 'Awarded To:' prose."""
+    from src.sources.civicplus import CivicPlusAdapter
+
+    html = """
+    <html><body>
+      <table>
+        <tr><td><span class="BidDetail">Bid Number:</span>
+            <span class="BidDetailSpec">ITB-GR-24-11</span></td></tr>
+        <tr><td><span class="BidDetail">Category:</span>
+            <span class="BidDetailSpec">Formal Solicitations</span></td></tr>
+      </table>
+      <table>
+        <tr><td><span class="BidListHeader">Description:</span></td></tr>
+        <tr><td><span class="BidDetail">Gate valves, city-wide.
+            Awarded To: Fortiline, Inc. dba Fortiline Waterworks</span></td></tr>
+      </table>
+    </body></html>
+    """
+
+    monkeypatch.setattr("src.sources.civicplus.get", lambda url, **kw: type("R", (), {"text": html})())
+    from src.models.opportunity import Opportunity
+
+    adapter = CivicPlusAdapter({
+        "id": "davie", "name": "Town of Davie", "county": "broward",
+        "agency": "Town of Davie", "portal_url": "https://www.davie-fl.gov/bids.aspx",
+    })
+    opp = Opportunity(
+        source_id="davie", source_name="Town of Davie", title="Gate Valves",
+        url="https://www.davie-fl.gov/bids.aspx?bidID=1073",
+        county="broward", agency="Town of Davie", status="award",
+    )
+    adapter.fetch_detail(opp)
+
+    assert opp.raw_category == "Formal Solicitations"
+    assert opp.awarded_vendor == "Fortiline, Inc. dba Fortiline Waterworks"

@@ -63,6 +63,7 @@ from bs4 import BeautifulSoup
 
 from ..classify import enrich
 from ..dates import parse_dt
+from ..protest import protest_deadline
 from ..http_util import get, session
 from ..models.opportunity import Opportunity
 from .base import SourceAdapter
@@ -178,6 +179,15 @@ class JaggaerAdapter(SourceAdapter):
         ref = (row.get("number") or "").strip() or None
         fields = enrich(title, external_id=ref)
 
+        status = TABS[tab]
+        # An award row starts the 72-hour protest clock like every other
+        # adapter's award rows do — mfmp and ionwave already did; this one
+        # silently didn't, and the inconsistency read as a missing deadline.
+        protest = None
+        if status == "award":
+            anchor = parse_dt(row.get("close")) or parse_dt(row.get("open"))
+            protest = protest_deadline(anchor)
+
         return Opportunity(
             **self._base_kwargs(),
             external_id=fields["external_id"] or ref,
@@ -193,7 +203,8 @@ class JaggaerAdapter(SourceAdapter):
             contact=(row.get("contact") or "").strip() or None,
             posted_date=_date(row.get("open")),
             due_date=parse_dt(row.get("close")),
-            status=TABS[tab],
+            status=status,
+            protest_deadline=protest,
             raw={"jaggaer": row},
         )
 

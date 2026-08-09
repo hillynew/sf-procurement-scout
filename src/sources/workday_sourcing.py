@@ -99,6 +99,7 @@ QUERY = """query BidOpportunitiesQuery($first: Int, $after: String, $input: Even
       translatedState
       restricted
       commodityCodes
+      description
       bidUrl
     }
     pageInfo { endCursor hasNextPage }
@@ -260,6 +261,9 @@ class WorkdaySourcingAdapter(SourceAdapter):
         fields = enrich(title, external_id=ref)
         posted = parse_dt(row.get("publishedAt"))
 
+        description = str(row.get("description") or "").strip() or None
+        codes = [str(c).strip() for c in row.get("commodityCodes") or [] if str(c).strip()]
+
         return Opportunity(
             **self._base_kwargs(),
             external_id=fields["external_id"] or ref,
@@ -271,6 +275,9 @@ class WorkdaySourcingAdapter(SourceAdapter):
             offer_type=fields["offer_type"],
             categories=fields["categories"],
             keywords=_keywords(fields["keywords"], row.get("commodityCodes")),
+            commodity_codes=codes,
+            raw_category="; ".join(codes) or None,
+            description=description,
             posted_date=posted.date() if posted else None,
             due_date=parse_dt(row.get("bidSubmissionDeadline")),
             status=STATUS.get((row.get("state") or "").strip().lower(), "closed"),
