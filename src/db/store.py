@@ -270,6 +270,15 @@ def load_opportunities(*, present_only: bool = False) -> List[Opportunity]:
     return out
 
 
+def first_seen_map() -> Dict[str, str]:
+    """opportunity_id -> ISO first-seen timestamp, for 'new since last visit'."""
+    with session_scope() as s:
+        rows = s.execute(
+            select(OpportunityRow.opportunity_id, OpportunityRow.first_seen_at)
+        ).all()
+    return {oid: ts.isoformat() for oid, ts in rows if ts is not None}
+
+
 def get_opportunity(opportunity_id: str) -> Optional[Opportunity]:
     with session_scope() as s:
         row = s.get(OpportunityRow, opportunity_id)

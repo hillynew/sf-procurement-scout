@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   Bar,
@@ -13,7 +14,7 @@ import {
   YAxis,
 } from "recharts";
 import { format, parseISO } from "date-fns";
-import { useLoadDemo, useStats } from "../api/hooks";
+import { useLoadDemo, useOpportunities, useStats } from "../api/hooks";
 import { Button, EmptyState, Spinner, StatCard } from "../components/ui";
 import {
   COUNTY_COLOR,
@@ -46,10 +47,41 @@ const tooltipStyle = {
   fontFamily: "inherit",
 };
 
+const LAST_VISIT_KEY = "scout.lastVisit";
+
+/** The previous visit's timestamp, captured once per mount before updating. */
+function usePrevVisit(): string | null {
+  const [prev] = useState(() => {
+    const stored = localStorage.getItem(LAST_VISIT_KEY);
+    localStorage.setItem(LAST_VISIT_KEY, new Date().toISOString());
+    return stored;
+  });
+  return prev;
+}
+
 export default function Dashboard() {
   const { data: stats, isLoading } = useStats();
+  const { data: snapshot } = useOpportunities();
+  const prevVisit = usePrevVisit();
   const demo = useLoadDemo();
   const navigate = useNavigate();
+
+  const newSince = useMemo(() => {
+    if (!prevVisit || !snapshot) return [];
+    return snapshot.opportunities
+      .filter((o) => ["open", "upcoming"].includes(o.status)
+        && o.first_seen_at && o.first_seen_at > prevVisit)
+      .sort((a, b) => (b.first_seen_at ?? "").localeCompare(a.first_seen_at ?? ""));
+  }, [snapshot, prevVisit]);
+
+  const recentAwards = useMemo(() => {
+    if (!snapshot) return [];
+    return snapshot.opportunities
+      .filter((o) => o.status === "award")
+      .sort((a, b) => ((b.award_date ?? b.posted_date ?? "") as string)
+        .localeCompare((a.award_date ?? a.posted_date ?? "") as string))
+      .slice(0, 5);
+  }, [snapshot]);
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
 
@@ -132,6 +164,62 @@ export default function Dashboard() {
                   {w.hours_left < 24
                     ? `${Math.round(w.hours_left)}h left`
                     : `~${Math.round(w.hours_left / 24)} business days`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {newSince.length > 0 && (
+        <div className="card p-4">
+          <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+            New since your last visit ({newSince.length})
+          </div>
+          <div className="space-y-1.5">
+            {newSince.slice(0, 8).map((o) => (
+              <button key={o.opportunity_id}
+                      onClick={() => navigate(`/bids/${o.opportunity_id}`)}
+                      className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-bg">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold">{o.title}</span>
+                <span className="hidden shrink-0 truncate text-xs text-ink-soft sm:block sm:max-w-[180px]">
+                  {o.agency}
+                </span>
+                <span className="money hidden shrink-0 text-xs sm:block">
+                  {fmtMoney(o.budget_amount)}
+                </span>
+              </button>
+            ))}
+          </div>
+          {newSince.length > 8 && (
+            <Link to="/bids" className="mt-2 block text-xs font-semibold text-accent">
+              See all in All bids →
+            </Link>
+          )}
+        </div>
+      )}
+
+      {recentAwards.length > 0 && (
+        <div className="card p-4">
+          <div className="mb-2.5 flex items-baseline justify-between">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+              Recently awarded
+            </div>
+            <Link to="/awards" className="text-xs font-semibold text-accent">All awards →</Link>
+          </div>
+          <div className="space-y-1.5">
+            {recentAwards.map((o) => (
+              <button key={o.opportunity_id}
+                      onClick={() => navigate(`/bids/${o.opportunity_id}`)}
+                      className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-bg">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{o.title}</span>
+                  <span className="block truncate text-xs text-ink-soft">
+                    {o.agency}{o.awarded_vendor ? ` · won by ${o.awarded_vendor}` : ""}
+                  </span>
+                </span>
+                <span className="money shrink-0 text-sm font-bold">
+                  {o.award_amount != null ? fmtMoney(o.award_amount) : "—"}
                 </span>
               </button>
             ))}
