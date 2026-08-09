@@ -116,6 +116,7 @@ class JaggaerAdapter(SourceAdapter):
     def fetch_history(self) -> List[Opportunity]:
         """Closed and awarded, as far as one page of each goes."""
         opps = self._collect(ARCHIVE_TABS)
+        self._read_award_docs([o for o in opps if o.status == "award"])
         if any(self._counts.get(tab, 0) >= PAGE_SIZE for tab in ARCHIVE_TABS):
             self._note(
                 f"the archive tabs stop at {PAGE_SIZE} rows with no pager; "
@@ -170,6 +171,34 @@ class JaggaerAdapter(SourceAdapter):
         if read == 0:
             self._note("no tab of the portal could be read")
         return list(by_key.values())
+
+    def _read_award_docs(self, awards: List[Opportunity]) -> None:
+        """Winner and amount out of the award attachments, best-effort.
+
+        The row itself never says who won (verified live: zero vendor or
+        dollar strings in award-row markup); the facts are inside tabulation
+        XLSX sheets and intent-to-award PDFs. Bounded to MAX_AWARD_DOCS
+        downloads per fetch, and a cancellation notice flips the status —
+        an "Awarded"-badged row can actually be a cancellation.
+        """
+        budget = MAX_AWARD_DOCS
+        for opp in awards:
+            if budget <= 0:
+                break
+            for name, url in (opp.raw or {}).get("jaggaer", {}).get("award_docs", []):
+                if budget <= 0 or (opp.awarded_vendor and opp.award_amount):
+                    break
+                if re.search(r"cancell?ation", name, re.I):
+                    opp.status = "cancelled"
+                    break
+                budget -= 1
+                try:
+                    vendor, amount = _award_facts_from_doc(name, url, self._session())
+                except Exception:  # noqa: BLE001 — one bad file is not the tab
+                    continue
+                opp.awarded_vendor = opp.awarded_vendor or vendor
+                if opp.award_amount is None:
+                    opp.award_amount = amount
 
     def _to_opportunity(self, row: Dict[str, str], tab: str) -> Optional[Opportunity]:
         title = (row.get("title") or "").strip()
@@ -256,6 +285,17 @@ def event_rows(html: str) -> List[Dict[str, str]]:
         if badge is not None:
             row["status"] = badge.get_text(" ", strip=True)
 
+        # Award attachments: tabulation sheets and intent-to-award PDFs on
+        # pre-signed S3 URLs minted for this render — usable now or never.
+        docs = []
+        for a in tr.find_all("a", href=re.compile(r"s3\.amazonaws\.com")):
+            name = a.get_text(" ", strip=True)
+            href = a.get("href") or ""
+            if name and href:
+                docs.append([name, href])
+        if docs:
+            row["award_docs"] = docs
+
         for layout in tr.select("div.table-row-layout"):
             pair = layout.select("div.table-cell-layout")
             if len(pair) < 2:
@@ -274,3 +314,83 @@ def _date(value: Optional[str]):
     """The portal writes '8/3/2026, 12:00 AM EDT'; only the day is wanted here."""
     parsed = parse_dt(value)
     return parsed.date() if parsed else None
+
+
+#: Award attachments downloaded per fetch — they are per-render URLs, so
+#: nothing is cacheable and every read is a real download.
+MAX_AWARD_DOCS = 8
+
+_AWARD_VENDOR_PDF = re.compile(
+    r"(?:intent\s+to\s+award|award(?:ed)?)\s+(?:\w+\s+){0,3}?to[:\s]+"
+    r"([A-Z][\w&.,'()\- ]{2,80}?)(?=[,;\n]|\s{2,}|$)",
+    re.I,
+)
+_MONEY_ANY = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)")
+
+
+def _award_facts_from_doc(name: str, url: str, session) -> tuple:
+    """(vendor, amount) from one award attachment; (None, None) when unreadable."""
+    resp = session.get(url, timeout=60)
+    resp.raise_for_status()
+    body = resp.content
+
+    if body[:4] == b"PK\x03\x04" and re.search(r"\.xlsx?", name, re.I):
+        return _facts_from_xlsx(body)
+    if body[:4] == b"%PDF":
+        return _facts_from_pdf(body)
+    return None, None
+
+
+def _facts_from_xlsx(body: bytes) -> tuple:
+    """FSU-style tabulation: a header row naming BIDDER and PRICE/TOTAL, data
+    below, lowest first. The first data row is the apparent winner."""
+    import io
+
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(body), read_only=True, data_only=True)
+    try:
+        ws = wb.worksheets[0]
+        vendor_col = amount_col = None
+        for row in ws.iter_rows(max_row=30, values_only=True):
+            cells = [str(c or "").strip() for c in row]
+            uppers = [c.upper() for c in cells]
+            if vendor_col is None:
+                for i, text in enumerate(uppers):
+                    if "BIDDER" in text or "VENDOR" in text:
+                        vendor_col = i
+                    if "PRICE" in text or "TOTAL" in text or "AMOUNT" in text:
+                        amount_col = i
+                continue
+            if amount_col is None:
+                break
+            vendor = cells[vendor_col] if vendor_col < len(cells) else ""
+            raw_amount = cells[amount_col] if amount_col < len(cells) else ""
+            if not vendor or not raw_amount:
+                continue
+            try:
+                amount = int(round(float(re.sub(r"[^\d.]", "", raw_amount))))
+            except ValueError:
+                continue
+            return vendor, amount
+    finally:
+        wb.close()
+    return None, None
+
+
+def _facts_from_pdf(body: bytes) -> tuple:
+    import io
+
+    from pypdf import PdfReader
+
+    text = ""
+    reader = PdfReader(io.BytesIO(body))
+    for page in reader.pages[:5]:
+        text += page.extract_text() or ""
+    vendor = None
+    m = _AWARD_VENDOR_PDF.search(text)
+    if m:
+        vendor = re.sub(r"\s+", " ", m.group(1)).strip(" ,.")
+    amounts = [float(a.replace(",", "")) for a in _MONEY_ANY.findall(text)]
+    amount = int(round(max(amounts))) if amounts else None
+    return vendor, amount
