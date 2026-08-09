@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAwards } from "../api/hooks";
-import { CountyPill, EmptyState, Spinner, StatCard } from "../components/ui";
+import { CountyPill, EmptyState, Spinner, StatCard, LoadFailed } from "../components/ui";
 import { fmtDate, fmtMoney } from "../lib/format";
 
 /** Awards — who won, for how much — and the contracts about to expire.
@@ -11,7 +11,7 @@ import { fmtDate, fmtMoney } from "../lib/format";
  * what is coming up for rebid before anyone advertises it.
  */
 export default function Awards() {
-  const { data, isLoading } = useAwards();
+  const { data, isLoading, isError, refetch } = useAwards();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
 
@@ -36,6 +36,7 @@ export default function Awards() {
   }, [data, q]);
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
+  if (isError) return <LoadFailed what="awards" onRetry={() => refetch()} />;
 
   const withAmount = (data?.awards ?? []).filter((a) => a.award_amount != null);
   const totalAwarded = withAmount.reduce((sum, a) => sum + (a.award_amount ?? 0), 0);

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useQuality, useSourceMutation, useSources, useTaxonomy } from "../api/hooks";
 import type { DetectResponse, SourceInfo } from "../api/types";
 import SortControl from "../components/SortControl";
-import { Button, FilterChip, Spinner, StatCard } from "../components/ui";
+import { Button, FilterChip, Spinner, StatCard, LoadFailed } from "../components/ui";
 import { countyLabel, fmtRelative } from "../lib/format";
 import { useSortPref, type SortKeyDef } from "../lib/sort";
 
@@ -125,7 +125,7 @@ function QualityPanel() {
 }
 
 export default function Sources() {
-  const { data, isLoading } = useSources();
+  const { data, isLoading, isError, refetch } = useSources();
   const { detect, add, remove } = useSourceMutation();
   const [filter, setFilter] = useState("");
   const [url, setUrl] = useState("");
@@ -181,6 +181,7 @@ export default function Sources() {
   };
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
+  if (isError) return <LoadFailed what="sources" onRetry={() => refetch()} />;
 
   return (
     <div className="fade-up">

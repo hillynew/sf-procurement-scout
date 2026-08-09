@@ -7,7 +7,7 @@ import BidRow from "../components/BidRow";
 import { BidCard, BidCompactRow } from "../components/BidCard";
 import FilterPanel, { ActiveFilterChips } from "../components/FilterPanel";
 import SortControl from "../components/SortControl";
-import { Button, EmptyState, Spinner } from "../components/ui";
+import { Button, EmptyState, Spinner, LoadFailed } from "../components/ui";
 import { applyFilters, parseFilters, writeFilters, type BidFilters } from "../lib/filters";
 import { BID_SORT_KEYS, sortOpportunities, useSortPref } from "../lib/sort";
 
@@ -72,7 +72,7 @@ function matchesQuery(o: Opportunity, q: string): boolean {
 }
 
 export default function AllBids() {
-  const { data, isLoading } = useOpportunities();
+  const { data, isLoading, isError, refetch } = useOpportunities();
   const demo = useLoadDemo();
   const [params, setParams] = useSearchParams();
   const [query, setQuery] = useState(params.get("q") ?? "");
@@ -114,6 +114,7 @@ export default function AllBids() {
   const showStatus = filters.statuses.length !== 1 || filters.statuses[0] !== "open";
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
+  if (isError) return <LoadFailed what="the bid list" onRetry={() => refetch()} />;
 
   if (all.length === 0) {
     return (

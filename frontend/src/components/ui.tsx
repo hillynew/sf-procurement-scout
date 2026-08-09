@@ -177,6 +177,24 @@ export function Spinner({ size = 16 }: { size?: number }) {
   return <Loader2 size={size} className="animate-spin text-ink-faint" />;
 }
 
+export function LoadFailed({ what, onRetry }: { what: string; onRetry?: () => void }) {
+  return (
+    <div className="card mx-auto my-16 max-w-md p-6 text-center">
+      <div className="text-sm font-bold">Couldn't load {what}</div>
+      <p className="mt-1 text-sm text-ink-soft">
+        The server didn't answer. If the app just woke up, give it a few
+        seconds — free-tier hosting sleeps when idle.
+      </p>
+      {onRetry && (
+        <button onClick={onRetry}
+                className="mt-3 rounded-[10px] border border-line px-3 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent">
+          Try again
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function EmptyState({ title, body, action }: {
   title: string; body?: string; action?: ReactNode;
 }) {

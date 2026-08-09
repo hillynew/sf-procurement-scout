@@ -29,7 +29,7 @@ const NAV = [
 ];
 
 const MOBILE_NAV = NAV.filter((n) =>
-  ["/", "/bids", "/pipeline", "/watchlists"].includes(n.to),
+  ["/", "/bids", "/awards", "/pipeline"].includes(n.to),
 );
 
 export default function AppShell() {

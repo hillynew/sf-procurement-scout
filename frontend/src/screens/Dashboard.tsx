@@ -15,7 +15,7 @@ import {
 } from "recharts";
 import { format, parseISO } from "date-fns";
 import { useLoadDemo, useOpportunities, useStats } from "../api/hooks";
-import { Button, EmptyState, Spinner, StatCard } from "../components/ui";
+import { Button, EmptyState, Spinner, StatCard, LoadFailed } from "../components/ui";
 import {
   COUNTY_COLOR,
   countyLabel,
@@ -60,7 +60,7 @@ function usePrevVisit(): string | null {
 }
 
 export default function Dashboard() {
-  const { data: stats, isLoading } = useStats();
+  const { data: stats, isLoading, isError, refetch } = useStats();
   const { data: snapshot } = useOpportunities();
   const prevVisit = usePrevVisit();
   const demo = useLoadDemo();
@@ -84,6 +84,7 @@ export default function Dashboard() {
   }, [snapshot]);
 
   if (isLoading) return <div className="flex justify-center py-24"><Spinner size={26} /></div>;
+  if (isError) return <LoadFailed what="the dashboard" onRetry={() => refetch()} />;
 
   if (!stats || (stats.totals.open_count === 0 && stats.totals.tracked === 0)) {
     return (
