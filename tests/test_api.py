@@ -436,7 +436,8 @@ def test_maintenance_cadence_is_settable_and_its_last_run_is_not(client):
         "maintenance": {"enabled": True, "platform_check_days": 90},
     }).json()
     assert out["settings"]["maintenance"] == {
-        "enabled": True, "contracts_days": 7, "platform_check_days": 90,
+        "enabled": True, "contracts_enabled": False, "platform_check_enabled": True,
+        "contracts_days": 7, "platform_check_days": 90,
     }
     assert "last_platform_check_on" not in out["settings"]["maintenance"]
 

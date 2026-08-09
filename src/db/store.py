@@ -54,7 +54,9 @@ DEFAULT_SETTINGS: Dict[str, dict] = {
     # Off by default, like auto-fetch and the digest: both jobs make hundreds of
     # requests to agency websites, and nothing in this build starts doing that
     # on its own until someone asks it to.
-    "maintenance": {"enabled": False, "contracts_days": 7, "platform_check_days": 30},
+    "maintenance": {"enabled": False, "contracts_enabled": False,
+                    "platform_check_enabled": True,
+                    "contracts_days": 7, "platform_check_days": 30},
     # Internal bookkeeping (not exposed for editing): last digest/deadline scan.
     "internal": {
         "last_digest_on": None,

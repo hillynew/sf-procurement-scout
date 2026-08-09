@@ -64,13 +64,20 @@ def test_an_unreadable_date_does_not_disable_the_job_forever():
 # -- which job runs --------------------------------------------------------
 
 
-def test_nothing_runs_until_upkeep_is_switched_on():
-    """Off by default: several hundred requests to agency sites is not
-    something this build starts doing on its own."""
+def test_defaults_run_the_platform_check_but_not_the_register():
+    """Split defaults: the platform check is what catches an agency migrating
+    off the portal we read — the silent failure that has cost five agencies —
+    so it runs unless switched off. The contract register (hundreds of
+    requests) stays opt-in."""
     settings = db.get_settings()
 
-    assert settings["maintenance"]["enabled"] is False
-    assert maintenance.next_job(settings) is None
+    assert settings["maintenance"]["contracts_enabled"] is False
+    assert maintenance.next_job(settings) == "platforms"
+
+
+def test_platform_check_can_be_switched_off():
+    db.update_settings({"maintenance": {"platform_check_enabled": False}})
+    assert maintenance.next_job(db.get_settings()) is None
 
 
 def test_contracts_goes_first_when_both_are_due():

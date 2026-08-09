@@ -26,6 +26,18 @@ def _bootstrap():
     db.bootstrap()
 
 
+@pytest.fixture(autouse=True)
+def _no_maintenance(monkeypatch):
+    """The platform check now defaults on; a tick must not sweep real sites
+    from inside an offline test."""
+    from web.services import maintenance
+
+    async def noop(settings, now=None):
+        return None
+
+    monkeypatch.setattr(maintenance, "maybe_run", noop)
+
+
 @pytest.mark.anyio
 async def test_deadline_scan_notifies_once_per_day():
     from web.services import scheduler
