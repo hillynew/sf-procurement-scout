@@ -9,6 +9,7 @@ import {
   Search,
   Settings,
   Star,
+  Trophy,
 } from "lucide-react";
 import { useOpportunities, useWatchlists } from "../api/hooks";
 import { fmtRelative } from "../lib/format";
@@ -19,6 +20,7 @@ import BidDrawer from "../features/BidDrawer";
 const NAV = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/bids", label: "All bids", icon: List },
+  { to: "/awards", label: "Awards", icon: Trophy },
   { to: "/pipeline", label: "Pipeline", icon: Kanban },
   { to: "/watchlists", label: "Watchlists", icon: Star },
   { to: "/network", label: "Network", icon: Handshake },

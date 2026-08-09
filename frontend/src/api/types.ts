@@ -46,6 +46,16 @@ export interface Opportunity {
   liquidated_damages: string | null;
   licenses: string | null;
   prior_cycles: number;
+  tier?: string | null;
+  raw_category?: string | null;
+  commodity_codes?: string[];
+  awarded_vendor?: string | null;
+  award_amount?: number | null;
+  award_date?: string | null;
+  linked_ref?: string | null;
+  award_linkage?: string | null;
+  contract_term?: string | null;
+  protest_deadline?: string | null;
   last_cycle_closed: string | null;
   days_until_due: number | null;
   detail_score: number;
@@ -294,6 +304,26 @@ export interface FetchStatus {
   new_count?: number;
   new_matches?: number;
   error?: string;
+}
+
+export interface ExpiringContract {
+  contract_id: string;
+  agency: string;
+  name: string;
+  vendor: string | null;
+  end_date: string | null;
+  days_left: number | null;
+  amount: number | null;
+  method: string | null;
+  extendable: boolean | null;
+  commodity: string | null;
+  url: string | null;
+}
+
+export interface AwardsResponse {
+  awards: Opportunity[];
+  contracts: ExpiringContract[];
+  contracts_total: number;
 }
 
 export interface QualityField {

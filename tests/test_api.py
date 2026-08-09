@@ -570,3 +570,31 @@ def test_stats_carries_open_protest_windows(client, monkeypatch):
     assert len(windows) == 1
     assert windows[0]["awarded_vendor"] == "MoveCo LLC"
     assert windows[0]["hours_left"] > 0
+
+
+def test_awards_endpoint_returns_awards_and_expiring_contracts(client):
+    from datetime import date, timedelta
+
+    from src.contracts import Contract
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    award = Opportunity(
+        source_id="legistar_broward", source_name="Broward awards",
+        title="MOTION TO AWARD to Crown USA, Inc.", url="https://broward.legistar.com/x",
+        county="broward", agency="Broward County", status="award",
+        awarded_vendor="Crown USA, Inc", award_amount=193_500,
+        award_date=date.today() - timedelta(days=3),
+    )
+    db.save_snapshot([award], [SourceHealth(source_id="legistar_broward", name="B", ok=True, count=1)])
+    db.save_contracts([Contract(
+        contract_id="C1", agency="Broward County", name="Janitorial",
+        source_id="broward_bpro", vendor="CleanCo",
+        end_date=date.today() + timedelta(days=90),
+    )])
+
+    data = client.get("/api/awards").json()
+    assert data["awards"][0]["awarded_vendor"] == "Crown USA, Inc"
+    assert data["awards"][0]["award_amount"] == 193_500
+    assert data["contracts"][0]["vendor"] == "CleanCo"
+    assert 0 <= data["contracts"][0]["days_left"] <= 90

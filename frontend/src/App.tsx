@@ -20,6 +20,7 @@ import SettingsScreen from "./screens/Settings";
 
 // Recharts is the heaviest dependency — keep it out of the main chunk.
 const Dashboard = lazy(() => import("./screens/Dashboard"));
+import Awards from "./screens/Awards";
 
 /** Friendly crash screen so a component error never white-pages the app. */
 function RouteError() {
@@ -77,6 +78,7 @@ const router = createBrowserRouter([
       // of the crash page.
       { path: "calendar", element: <Navigate to="/bids" replace /> },
       { path: "bids/:id", element: <Workroom /> },
+      { path: "awards", element: <Awards /> },
       { path: "pipeline", element: <Pipeline /> },
       { path: "watchlists", element: <Watchlists /> },
       { path: "network", element: <Network /> },
