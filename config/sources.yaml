@@ -646,6 +646,14 @@ sources:
   # Both carry Notices of Planned Advertisement — work FDOT has scheduled but
   # not yet advertised — which arrive as `upcoming` and are months earlier than
   # anything else this project sees.
+  - id: miami_dade_awards
+    name: Miami-Dade ISD award recommendations
+    county: miami-dade
+    agency: Miami-Dade County
+    live_fetch: true
+    adapter: miami_dade_awards
+    portal_url: https://www.miamidade.gov/apps/ISD/stratproc/Home/AwardRecommendations
+
   - id: fdot_lettings
     name: FDOT letting results (bid tabs)
     county: statewide
