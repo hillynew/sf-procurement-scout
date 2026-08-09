@@ -26,6 +26,18 @@ def _bootstrap():
     db.bootstrap()
 
 
+@pytest.fixture(autouse=True)
+def _no_maintenance(monkeypatch):
+    """The platform check now defaults on; a tick must not sweep real sites
+    from inside an offline test."""
+    from web.services import maintenance
+
+    async def noop(settings, now=None):
+        return None
+
+    monkeypatch.setattr(maintenance, "maybe_run", noop)
+
+
 @pytest.mark.anyio
 async def test_deadline_scan_notifies_once_per_day():
     from web.services import scheduler
@@ -200,3 +212,39 @@ def test_send_test_email_returns_recipient(monkeypatch):
 
     assert (sent, error, recipient) == (True, None, "buyer@example.com")
     assert seen["subject"] == "Scout: test email"
+
+
+def test_digest_carries_the_week_of_decided_awards():
+    from datetime import date, timedelta
+
+    from web.services.digest import _decided_section
+
+    fresh = make_opp(days=0)
+    fresh.status = "award"
+    fresh.awarded_vendor = "Crown USA, Inc"
+    fresh.award_amount = 193_500
+    fresh.award_date = date.today() - timedelta(days=2)
+
+    stale = make_opp(days=0)
+    stale.status = "award"
+    stale.award_date = date.today() - timedelta(days=30)
+
+    result = _decided_section([fresh, stale])
+    assert result is not None
+    count, html = result
+    assert count == 1
+    assert "Crown USA, Inc" in html
+    assert "$193,500" in html
+
+
+def test_decided_section_says_when_the_amount_is_missing():
+    from datetime import date, timedelta
+
+    from web.services.digest import _decided_section
+
+    o = make_opp(days=0)
+    o.status = "award"
+    o.award_date = date.today() - timedelta(days=1)
+    _, html = _decided_section([o])
+    assert "amount not published" in html
+    assert "$0" not in html

@@ -21,6 +21,7 @@ from .miami_dade_construction import (
     MiamiDadeFutureAdapter,
 )
 from .mdc_college import MdcCollegeAdapter
+from .miami_dade_govaction import MiamiDadeGovactionAdapter
 from .mfmp_vbs import MfmpVbsAdapter
 from .facts import FactsAdapter
 from .fdot_ads import FdotAdsAdapter
@@ -48,6 +49,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "miami_dade_construction": MiamiDadeConstructionAdapter,
     "miami_dade_future": MiamiDadeFutureAdapter,
     "miami_dade_awards": MiamiDadeAwardsAdapter,
+    "miami_dade_govaction": MiamiDadeGovactionAdapter,
     "mdc_college": MdcCollegeAdapter,
     "west_palm_beach": WestPalmBeachAdapter,
     "palm_beach_schools": PalmBeachSchoolsAdapter,

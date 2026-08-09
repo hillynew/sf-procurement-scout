@@ -276,3 +276,45 @@ def test_strict_robots_drops_the_override(monkeypatch):
 
     monkeypatch.setenv("SF_SCOUT_STRICT_ROBOTS", "1")
     assert netpolicy._override_reason("bids.sciquest.com") is None
+
+
+def test_award_docs_are_captured_and_parsed(monkeypatch):
+    """The tabulation XLSX names the winner and the price; the row never does."""
+    import io
+
+    from openpyxl import Workbook
+
+    from src.sources.jaggaer import _facts_from_xlsx
+
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["ITB 6835-3 Tabulation"])
+    ws.append(["BIDDER NAME", "TOTAL PRICE (INCLUDING RENEWALS)"])
+    ws.append(["Coherent", "327596.85"])
+    ws.append(["Runner-Up Corp", "401000.00"])
+    buf = io.BytesIO()
+    wb.save(buf)
+
+    vendor, amount = _facts_from_xlsx(buf.getvalue())
+    assert vendor == "Coherent"
+    assert amount == 327_597
+
+
+def test_cancellation_notice_flips_an_awarded_row(monkeypatch):
+    from src.models.opportunity import Opportunity
+    from src.sources.jaggaer import JaggaerAdapter
+
+    adapter = JaggaerAdapter({
+        "id": "jaggaer_fsu", "name": "FSU", "county": "leon",
+        "agency": "Florida State University",
+        "portal_url": "https://bids.sciquest.com/apps/Router/PublicEvent?CustomerOrg=FSU",
+        "jaggaer_org": "FSU",
+    })
+    opp = Opportunity(
+        source_id="jaggaer_fsu", source_name="FSU", title="ITN 6831-6",
+        url="https://bids.sciquest.com/x", county="leon",
+        agency="Florida State University", status="award",
+        raw={"jaggaer": {"award_docs": [["Notice of Cancellation Template.docx", "https://s3.amazonaws.com/x"]]}},
+    )
+    adapter._read_award_docs([opp])
+    assert opp.status == "cancelled"

@@ -50,6 +50,11 @@ DEFAULT_DISTRICTS = ("01", "02", "03", "04", "05", "06", "07", "99")
 #: history, and every report is one request.
 RECENT_DAYS = 60
 REPORTS_PER_DISTRICT = 1
+#: The history walk reaches back this far — enough lettings to make the
+#: price-intelligence medians mean something. Run from `run.py history`,
+#: never from the four-hourly fetch.
+HISTORY_DAYS = 730
+HISTORY_REPORTS_PER_DISTRICT = 12
 
 _LETTING_DIV = re.compile(r"^(?:\d{2}|CT)\d{6}$")
 _MONEY = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)")
@@ -60,9 +65,16 @@ class FdotLettingAdapter(SourceAdapter):
     provides_open_bids = False
 
     def fetch(self) -> List[Opportunity]:
+        return self._walk(RECENT_DAYS, REPORTS_PER_DISTRICT)
+
+    def fetch_history(self) -> List[Opportunity]:
+        """Two years of bid tabs per district — the price-history backfill."""
+        return self._walk(HISTORY_DAYS, HISTORY_REPORTS_PER_DISTRICT)
+
+    def _walk(self, days_back: int, per_district: int) -> List[Opportunity]:
         districts = self.cfg.get("districts") or list(DEFAULT_DISTRICTS)
         today = date.today()
-        cutoff = today - timedelta(days=RECENT_DAYS)
+        cutoff = today - timedelta(days=days_back)
 
         out: List[Opportunity] = []
         read = 0
@@ -72,7 +84,9 @@ class FdotLettingAdapter(SourceAdapter):
             except Exception:  # noqa: BLE001 — one district is not the source
                 continue
             read += 1
-            for letting_id, letting_date in self._recent_lettings(html, cutoff, today):
+            for letting_id, letting_date in self._recent_lettings(
+                html, cutoff, today, limit=per_district
+            ):
                 report_url = (
                     f"{BASE}/LettingResults/DisplayPreliminaryReport"
                     f"?id={letting_id}&lettingDate={letting_date:%m/%d/%Y}"
@@ -89,7 +103,7 @@ class FdotLettingAdapter(SourceAdapter):
             self.empty_note = f"no lettings in the last {RECENT_DAYS} days"
         return out
 
-    def _recent_lettings(self, html: str, cutoff: date, today: date):
+    def _recent_lettings(self, html: str, cutoff: date, today: date, *, limit: int = REPORTS_PER_DISTRICT):
         """(lettingID, date) pairs recent enough to fetch, newest first."""
         soup = BeautifulSoup(html, "lxml")
         found = []
@@ -102,7 +116,7 @@ class FdotLettingAdapter(SourceAdapter):
             if cutoff <= when <= today:
                 found.append((div["id"], when))
         found.sort(key=lambda pair: pair[1], reverse=True)
-        return found[:REPORTS_PER_DISTRICT]
+        return found[:limit]
 
     def _contracts(
         self, html: str, report_url: str, district: str, letting_date: date

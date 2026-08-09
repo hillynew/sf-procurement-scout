@@ -269,7 +269,13 @@ export interface Settings {
   notifications: { deadline_days: number; watchlist: boolean; fetch_events: boolean };
   digest: { enabled: boolean; cadence: string; hour: number; email: string };
   ai: { model: string; auto_summarize_tracked: boolean };
-  maintenance: { enabled: boolean; contracts_days: number; platform_check_days: number };
+  maintenance: {
+    enabled: boolean;
+    contracts_enabled: boolean;
+    platform_check_enabled: boolean;
+    contracts_days: number;
+    platform_check_days: number;
+  };
 }
 
 /** Read-only: when the slow walks last ran, and whether one is running now. */

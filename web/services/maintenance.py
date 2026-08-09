@@ -81,14 +81,27 @@ def due(last_iso: Optional[str], every_days: int, today: Optional[date] = None) 
 
 
 def next_job(settings: Dict[str, dict], today: Optional[date] = None) -> Optional[str]:
-    """Which job is due, or None. Contracts first — it is the cheaper walk."""
+    """Which job is due, or None. Contracts first — it is the cheaper walk.
+
+    Per-job switches, because the two jobs earn different defaults: the
+    platform check is what catches an agency migrating off the portal we
+    read — the failure that has cost this project five agencies — so it runs
+    unless switched off. The contract register stays opt-in; it is hundreds
+    of requests nobody asked for yet. The legacy `enabled` flag still means
+    "both on" for settings saved before the split.
+    """
     cfg = settings.get("maintenance") or {}
-    if not cfg.get("enabled"):
-        return None
+    legacy_all = bool(cfg.get("enabled"))
+    contracts_on = bool(cfg.get("contracts_enabled")) or legacy_all
+    platforms_on = bool(cfg.get("platform_check_enabled", True)) or legacy_all
     internal = settings.get("internal") or {}
-    if due(internal.get("last_contracts_refresh_on"), int(cfg.get("contracts_days") or 0), today):
+    if contracts_on and due(
+        internal.get("last_contracts_refresh_on"), int(cfg.get("contracts_days") or 0), today
+    ):
         return "contracts"
-    if due(internal.get("last_platform_check_on"), int(cfg.get("platform_check_days") or 0), today):
+    if platforms_on and due(
+        internal.get("last_platform_check_on"), int(cfg.get("platform_check_days") or 0), today
+    ):
         return "platforms"
     return None
 

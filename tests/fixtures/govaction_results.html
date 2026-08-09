@@ -1,0 +1,813 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="author" content="Miami-Dade County Online Services" />
+<meta name="description" content="Government Legislation - Requestor Form" />
+<meta name="keywords" content="requestor, form, online" />
+<title>Miami-Dade County - Legislative Information - Advanced Search - Miami-Dade County Commission Legislation</title>
+
+
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1">
+
+<link rel="shortcut icon" href="https://www.miamidade.gov/images/md.ico">
+<!--Font Awesome-->
+<link rel="stylesheet" href="https://www.miamidade.gov/global_assets/templates_v6/css/font-awesome.min.css">
+<!-- general styles -->
+<link href="https://www.miamidade.gov/global_assets/templates_v6/css/styles.css" rel="stylesheet" type="text/css" />
+<link href="https://www.miamidade.gov/global_assets/templates_v6/css/print.css" rel="stylesheet" type="text/css" media="print"/>
+<!--[if IE]>
+<![endif]-->
+
+ 
+	<link href="./css/local-styles.css?version=05" rel="stylesheet" type="text/css" />
+<!-- Removed in order to clear some SiteImprove issues
+	<link href="./css/local-print.css" rel="stylesheet" type="text/css" media="print" /> 
+-->
+
+<!--Font Icons-->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/weather-icons/2.0.5/css/weather-icons.min.css" rel="stylesheet" type="text/css"/>
+
+
+
+<!-- scripts used by all pages -->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js" type="text/javascript"></script>
+<script src="https://ajax.aspnetcdn.com/ajax/modernizr/modernizr-1.7-development-only.js" type="text/javascript"></script>
+
+<!-- for local access policy users -->
+<script>window.jQuery || document.write('<script src="http://www.miamidade.gov/global_assets/templates_v6/js/jquery.min.js"><\/script>')</script>
+
+<script type="text/javascript" src="https://www.miamidade.gov/global_assets/templates_v6/js/jquery.url.js"></script>
+
+<script src="https://www.miamidade.gov/global_assets/templates_v6/js/jquery.jSuggest.1.0.js" language="javascript" type="text/javascript" ></script>
+<script src="https://www.miamidade.gov/global_assets/templates_v6/js/jquery.jcrumb.js" type="text/javascript"></script>
+<script src="https://www.miamidade.gov/global_assets/templates_v6/js/jquery.json.js"></script>
+
+<script src="https://www.miamidade.gov/resources/js/jquery.url.js" type="text/javascript"></script>
+<script src="https://www.miamidade.gov/resources/js/1.4.1.jquery.cookie.min.js" type="text/javascript"></script>
+<script src="https://www.miamidade.gov/resources/js/purl.js" type="text/javascript"></script>
+<script src="https://www.miamidade.gov/resources/js/login-authenticate.js" type="text/javascript"></script>
+<script src="https://www.miamidade.gov/resources/js/login-api-prod.js" type="text/javascript"></script>
+
+
+
+
+<script type="text/javascript" src="https://www.miamidade.gov/global_assets/templates_v6/js/analytics/lunametrics-modified.js"></script>
+
+<script type="text/javascript" src="https://www.miamidade.gov/global_assets/templates_v6/js/analytics/analyzeEvents.js"></script>
+
+<script type="text/javascript" src="https://www.miamidade.gov/global_assets/templates_v6/js/functions.js"></script>
+
+<script type="text/javascript" src="https://www.miamidade.gov/global_assets/templates_v6/js/persist-min.js"></script>
+
+
+<script type="text/javascript" src="js/local.js?version=01"></script>
+
+<script>
+  
+  //if inside an iFrame add CSS to only show the selector on the page
+  if (window.top!=window.self) {
+    $('head').prepend('<link rel="stylesheet" href="/resources/css/iframe-document.css" type="text/css" />');
+  }
+
+  //Setting up redirects for all the pages with drop-downs that show PDF's that are also being iFramed into .pages
+
+
+  else if (window.location.href.indexOf("bondprogram/reports.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/management/building-better-communities.page");
+  }
+
+   else if (window.location.href.indexOf("bondprogram/citizens-advisory-committee.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/committees/bond-program-citizens-advisory.page");
+  }
+
+
+  else if (window.location.href.indexOf("procurement/architectural-engineering-reports.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/business/procurement/architectural-engineering-reports.page");
+  }
+
+  else if (window.location.href.indexOf("peoplewithdisabilities/codi-minutes.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/business/peoplewithdisabilities/codi-minutes.page");
+  }
+
+  else if (window.location.href.indexOf("peoplewithdisabilities/codi-archive-minutes.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/business/peoplewithdisabilities/codi-archived-minutes.page");
+  }
+
+  else if (window.location.href.indexOf("transit/paratransit-operations-reports.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/transportation/paratransit-reports.page");
+  }
+
+  else if (window.location.href.indexOf("citt/meetings.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/transportation-trust/meetings.page");
+  }
+
+  else if (window.location.href.indexOf("citt/presentations.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/transportation-trust/presentations.page");
+  } 
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=DVOB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/domestic-violence-oversight-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=LGBTQ") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/lgbtq-advisory-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=CFW") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/commission-for-women.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=BAAB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/black-affairs-advisory-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=AAAB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/asian-american-advisory-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=CRB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/community-relations-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=HAAB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/hispanic-affairs-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp?fldr1=EAAB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/elder-affairs-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/iab-agenda-minutes.asp?fldr1=IAB") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/interfaith-advisory-board.page");
+  }
+
+  else if (window.location.href.indexOf("advocacy/agenda-and-minutes.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/commission/community-advocacy/home.page");
+  }
+
+  else if (window.location.href.indexOf("planning/boards-historic-preservation.asp") > -1){
+    window.location.replace("https://www.miamidade.gov/global/government/boards/historic-preservation.page");
+  }
+  
+</script>
+
+
+
+
+<!--[if lt IE 9]>
+<script src="https://html5shim.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+
+<!-- Old GA Script
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  var branch = window.location.href.split('/')[3];;
+
+
+  ga('create', 'UA-22131309-1', 'miamidade.gov');
+
+  ga('set', 'dimension1', branch.toLowerCase());
+
+  ga('send', 'pageview');
+
+</script>
+-->
+
+<!-- Google Tag Manager -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WQX9LV"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+'//www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+})(window,document,'script','dataLayer','GTM-WQX9LV');</script>
+<!-- End Google Tag Manager -->
+
+<!-- Start Oracle Tracking Script -->
+<script type="text/javascript">
+    var _elqQ = _elqQ || [];
+    _elqQ.push(['elqSetSiteId', '720229373']);
+    _elqQ.push(['elqTrackPageView']);
+    
+    (function () {
+        function async_load() {
+            var s = document.createElement('script'); s.type = 'text/javascript'; s.async = true;
+            s.src = '//img04.en25.com/i/elqCfg.min.js';
+            var x = document.getElementsByTagName('script')[0]; x.parentNode.insertBefore(s, x);
+        }
+        if (window.addEventListener) window.addEventListener('DOMContentLoaded', async_load, false);
+        else if (window.attachEvent) window.attachEvent('onload', async_load); 
+    })();
+</script>
+<!-- End Oracle Tracking Script -->
+
+<!--BEGIN QUALTRICS SITE INTERCEPT-->
+<script type='text/javascript'>
+(function(){var g=function(e,h,f,g){
+this.get=function(a){for(var a=a+"=",c=document.cookie.split(";"),b=0,e=c.length;b<e;b++){for(var d=c[b];" "==d.charAt(0);)d=d.substring(1,d.length);if(0==d.indexOf(a))return d.substring(a.length,d.length)}return null};
+this.set=function(a,c){var b="",b=new Date;b.setTime(b.getTime()+6048E5);b="; expires="+b.toGMTString();document.cookie=a+"="+c+b+"; path=/; "};
+this.check=function(){var a=this.get(f);if(a)a=a.split(":");else if(100!=e)"v"==h&&(e=Math.random()>=e/100?0:100),a=[h,e,0],this.set(f,a.join(":"));else return!0;var c=a[1];if(100==c)return!0;switch(a[0]){case "v":return!1;case "r":return c=a[2]%Math.floor(100/c),a[2]++,this.set(f,a.join(":")),!c}return!0};
+this.go=function(){if(this.check()){var a=document.createElement("script");a.type="text/javascript";a.src=g+ "&t=" + (new Date()).getTime();document.body&&document.body.appendChild(a)}};
+this.start=function(){var a=this;window.addEventListener?window.addEventListener("load",function(){a.go()},!1):window.attachEvent&&window.attachEvent("onload",function(){a.go()})}};
+try{(new g(100,"r","QSI_S_ZN_a8zTa7cUf00EjMF","https://zna8zta7cuf00ejmf-miamidadecounty.siteintercept.qualtrics.com/WRSiteInterceptEngine/?Q_ZID=ZN_a8zTa7cUf00EjMF&Q_LOC="+encodeURIComponent(window.location.href))).start()}catch(i){}})();
+</script><div id='ZN_a8zTa7cUf00EjMF'><!--DO NOT REMOVE-CONTENTS PLACED HERE--></div>
+<!--END SITE INTERCEPT-->
+
+
+</head>
+
+<body>
+<div id="mainContainer">
+<!-- global portal navigation -->
+<div id="skipNav"><a href="#contentBody">Skip Navigation</a></div>
+
+<div id="navigation">
+<ul>
+<li>&nbsp;</li>
+<li><a href="https://miamidade.gov">miamidade.gov</a></li>
+<li><a href="https://www.miamidade.gov/global/navigation/your-government.page" target="_blank">Government</a></li>
+<li><a href="https://secure.miamidade.gov/employee/home.page" target="_blank">Employees</a></li>
+<li><a href="https://www.miamidade.gov/global/calendar/global.page" target="_blank">Calendar</a></li>
+</ul>
+
+
+<div class="searchBlock" id="search" style="margin-bottom: 10px;">
+
+	<span><a href="https://www.miamidade.gov/global/311.page" target="_blank" style="font-size:11px; font-weight:normal; padding-right:10px; color:#fff; text-decoration:none;">311 Contact Center</a></span>
+
+	<div class="bgsearch" style="display:inline">
+		<input name="" placeholder="Website Search" id="searchQuery" title="Website Search" class="searchtext" type="text">
+	  <input id="searchButton" class="searchbutton" name="" value="Search" type="submit">
+	</div>
+
+</div>
+<div class="clear">&nbsp;</div>
+</div>
+
+
+
+
+<div id="banner">
+<div class="main-log-in-container">
+	<!--Login -->
+	<div class="log-in-out hide-on-1100-below" style="display: none;">
+		<ul class="inline-list">
+		  <li><a id="loginId" class="loginAPI" href="#"><i class="fa fa-sign-in"></i>Login</a></li>
+		  <li><a id="createAccount" class="registrationAPI" href="#">Create Account</a></li>
+		</ul>
+	</div>
+	<!--/Login-->
+
+	<!--Login Dropdown -->
+	<ul class="login-container" style="display: none;">
+		<li class="login-dropdown">
+		  <a href="#"><div class="icon-circle"><i class="fa fa-user"></i></div></a>
+		  <ul>
+		    <div class="drop-arrow"></div>
+		    <li><a href="#" class="dashBoardAPI">Dashboard</a></li>
+		    <li><a href="#" class="updateProfileAPI">Update Profile</a></li>
+		    <li><a href="#" class="logoutAPI">Sign Out</a></li>
+		  </ul>
+		</li>
+		<li class="link-pip">|</li>
+		<li><a href="#" class="logoutAPI">Sign Out</a></li>
+	</ul>
+	<!--/Login Dropdown-->
+</div>
+<!-- action navigation -->
+
+<div id="actionNavigationContainer">
+<div id="logo"><a href="http://miamidade.gov"><img src="http://www.miamidade.gov/global_assets/templates_v6/images/mdLogo.png" width="250" height="45" alt="miamidade.gov logo" border="0" /></a></div>
+
+<ul id="actionNavigation">
+<li><a href="/govaction/online-services.asp">Online<br>Services</a></li>
+<li><a href="http://www.miamidade.gov/cob/county-commission-meetings.asp">Government<br>Meetings</a></li>
+<li><a href="/govaction/contact.asp">Contact<br>Us</a></li>
+</ul>
+
+<div class="clear">&nbsp;</div>
+</div>
+
+</div>
+
+<div id="contentBody">
+<!-- content body -->
+
+
+<div class="col-250 leftNavContainer">
+<div id="webName"><h2><a href="/govaction/home.asp">Legislative Information</a></h2></div><div id="leftNavigation">
+
+<span id="leftN1">
+<h4><a href="/govaction/search.asp">Legislation</a></h4>
+<ul class="leftLinks adaHide">
+<li><a href="/govaction/keywordsearch.asp">Keyword Search</a></li>
+<li><a href="/govaction/searchleg.asp">Advanced Search</a></li>
+</ul>
+</span>
+
+<span id="leftN2">
+<h4><a href="/govaction/agendas.asp?Action=Agendas&Oper=DisplayList">Agendas</a></h4>
+</span>
+
+<span id="leftN3">
+<h4><a href="/govaction/minutes.asp?Action=Minutes&Oper=DisplayList">Minutes</a></h4>
+</span>
+
+<span id="leftN4">
+<h4><a href="https://www.miamidadeclerk.gov/clerk/cob-lobbyist-registration.page" target="_blank">Online Lobbyist Registration</a></h4>
+</span>
+
+<span id="leftN5">
+<h4><a href="/govaction/legislative_reports.asp">Legislative Reports</a></h4>
+</span>
+<span id="leftN5">
+<h4><a href="/govaction/legislative-glossary.asp">Legislative Glossary</a></h4>
+</span>
+
+<span id="leftN6">
+<h4><a href="/govaction/Board_Directives.asp?function=reports&type=boarddirectives2&status=clear">Directives Reports</a></h4>
+</span>
+
+</div>
+
+</div>
+
+
+<div class="col-705 contentContainer">
+<!-- portal right container -->
+
+
+<div id="bc">Last Visited &raquo; </div>
+
+<div class="importantGlobal">
+
+<div class="weather-icon-container">
+    <i class="wi wi-hurricane"></i>
+</div>
+
+<div class="important-content-container">
+<h2>Hurricane Irma</h2>
+
+<!-- Link / Website -->
+
+<p>As we continue our recovery and cleanup efforts, please visit the <a href="http://www.miamidade.gov/emergency">Emergency website</a> for the latest information on openings and closings in Miami-Dade County.</p>
+
+
+</div>
+</div>
+
+
+<style type="text/css">
+.importantGlobal {
+background-color:#ffeaea;
+-moz-border-radius: 5px;
+-webkit-border-radius: 5px;
+border-radius: 5px;
+overflow: auto;
+line-height: 16px;
+margin: 5px 0;
+padding: 15px;
+ font-size: 12px;
+ line-height: 20px;
+
+/* Comment Out*/
+display:none;
+}
+
+.importantGlobal h2{
+    line-height: 38px;
+}
+
+.importantGlobal p{
+	margin-bottom: 10px;
+}
+
+.importantGlobal a:hover{
+    text-decoration: underline;
+    color: #006aa8;
+}
+
+/*--========================
+Weather Icons
+========================--*/
+
+.weather-icon-container i{
+    display: inline-block;
+    position: relative;
+    -moz-border-radius: 100px;
+    -webkit-border-radius: 100px;
+    border-radius: 100px;
+
+    background: #f44336;
+    color: #fff;
+    font-size: 34px;
+    width: 50px;
+    height: 50px;
+}
+
+.weather-icon-container i:before{
+   position: absolute;
+   top: 20%;
+   left: 35%;
+}
+
+.weather-icon-container, .important-content-container{
+   float: left;
+}
+
+.weather-icon-container{
+    width: 80px;
+    padding: 10px 0 0 10px;
+}
+
+ .important-content-container{
+    width: 550px;
+ }
+
+</style>
+
+
+
+<div class="contentNR">
+
+
+
+<h2 id="sp_pagetitle">Advanced Search - Miami-Dade County Commission Legislation</h2>
+
+
+
+
+
+
+
+
+
+
+
+
+<form method="POST" action="searchleg.asp" id="form2" name="form2">
+<!---<table cellSpacing="0" cellPadding="0" width="100%" background="images/back.jpg" border="0">  <tbody>    <tr>      <td width="140"><img height="68" src="images/seal.jpg" width="119" border="0"></td>      <td vAlign="bottom" width="100%"><img height="42" src="images/gia.jpg" width="472" border="0" alt="Miami-Dade County Government In Action"></td>    </tr>  </tbody></table><table cellSpacing="0" cellPadding="0" width="66%" border="0">  <tbody>    <tr>      <td width="24%"><img height="36" src="images/sealb.gif" width="119" border="0"></td>      <td width="76%"></td>    </tr>  </tbody></table>--->
+
+  <table border="0" cellspacing="1" width="440" height="82">
+    <tr>
+      
+      	<td width="20%"  rowspan="2">
+          <img border="0" src="images/county_seal_color.jpg" width="100" height="124">
+        </td>
+      <td width="502" height="78">
+        <p ><strong><b>Miami-Dade Legislative
+        Search Results</b></strong><br>
+        <b>
+        							4
+             Records
+         Found
+
+			
+        </b></p>
+      </td>
+    </tr>
+  </table>
+  <table border="0" cellspacing="1" width="121">
+    <tr>
+      <td width="113">
+        <p ><a href="http://www.miamidade.gov/info/disclaimer.asp"><b>Disclaimer</b></a>
+      </td>
+    </tr>
+  </table>
+  <hr>
+
+  <table border="0" cellspacing="1" width="78" height="30">
+    <tr>
+      <td width="70" height="26"></td>
+    </tr>
+  </table>
+    <table border="0" cellspacing="1" width="440">
+    
+      <tr>
+        <td width="70"></td>
+        <td valign="top" width="86">
+									<a href="matter.asp?matter=252422">252422 </a>
+								    
+		</td>
+		<td valign="top" width="64">12/8/2025</td>
+        <td valign="top" width="319">	 AXON (TASERS)<br><br>
+
+		</td>
+        <td width="24"></td>
+        <td width="57"></td>
+      </tr>
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319">
+		</td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319"></td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+     
+      <tr>
+        <td width="70"></td>
+        <td valign="top" width="86">
+									<a href="matter.asp?matter=252360">252360 </a>
+								    
+		</td>
+		<td valign="top" width="64">11/24/2025</td>
+        <td valign="top" width="319">	 PSA BLACK & VEATCH (E24WS05)<br><br>
+
+		</td>
+        <td width="24"></td>
+        <td width="57"></td>
+      </tr>
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319">
+		</td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319"></td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+     
+      <tr>
+        <td width="70"></td>
+        <td valign="top" width="86">
+									<a href="matter.asp?matter=252327">252327 </a>
+								    
+		</td>
+		<td valign="top" width="64">11/19/2025</td>
+        <td valign="top" width="319">	 AWARD OF $31,366,638.18 TO H&R PAVING, INC<br><br>
+
+		</td>
+        <td width="24"></td>
+        <td width="57"></td>
+      </tr>
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319">
+		</td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319"></td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+     
+      <tr>
+        <td width="70"></td>
+        <td valign="top" width="86">
+									<a href="matter.asp?matter=251897">251897 </a>
+								    
+		</td>
+		<td valign="top" width="64">9/24/2025</td>
+        <td valign="top" width="319">	RECAPTURE AND REALLOCATE CDBG, HOME, AND ESG FUNDS CENTRO CAMPESINO<br><br>
+
+		</td>
+        <td width="24"></td>
+        <td width="57"></td>
+      </tr>
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319">
+		</td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+
+      <tr>
+        <td width="70"></td>
+        <td width="86"></td>
+        <td width="319"></td>
+        <td width="64"></td>
+        <td width="57"></td>
+      </tr>
+     
+    </table>
+
+	<br>
+  <table border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td >
+        <input type="submit" value="Search Again" name="btnSubmit"> <input type="submit" value="Home" name="btnSubmit"> </td>
+    </tr>
+  </table>
+
+</form>
+
+
+
+
+
+<p>&nbsp;</p>
+
+
+
+
+
+<span class="top"><a href="#top">Back to Top</a></span>
+<span class="lastEdited">Page Last Edited: Wed Sep 27, 2017 3:20:39 PM</span>
+
+
+<div id="sp_webname">govaction</div>
+<div id="sp_section"></div>
+<!-- type "closed" in the previous div to close all left navigation sections -->
+</div>
+
+
+
+<div class="clear">&nbsp;</div>
+<!-- portal right container -->
+</div>
+
+<div class="clear15">&nbsp;</div>
+
+<!-- footer -->
+<div id="footer">
+<span class="links">
+<img src="https://www.miamidade.gov/global_assets/templates_v6/images/logo.png" alt="Miami-Dade County Logo"/>
+<span> <!-- additional span for print page formatting -->
+<a href="https://miamidade.gov" title="Miami-Dade Home">Home</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="https://www.miamidade.gov/global/disclaimer/privacy-and-security.page" target="_blank">Privacy Statement</a>&nbsp;&nbsp;|&nbsp;&nbsp;<a href="https://www.miamidade.gov/global/disclaimer/disclaimer.page" target="_blank">Disclaimer</a><!--&nbsp;&nbsp;|&nbsp;&nbsp;<a href="http://www.miamidade.gov/info/using_our_site.asp" target="_blank">Using Our Site</a>-->&nbsp;&nbsp;|&nbsp;&nbsp;
+<a href="https://www.miamidade.gov/global/disclaimer/about-miami-dade-county.page" target="_blank">About Us</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+<a href="https://www.miamidade.gov/global/disclaimer/ada-notice.page" target="_blank">ADA Notice</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+<a href="https://www.miamidade.gov/global/navigation/agency-directory.page" target="_blank">Agency Directory</a>&nbsp;&nbsp;|&nbsp;&nbsp;
+<a href="https://www.miamidade.gov/global/311.page" target="_blank">Contact Us</a><br><br>
+
+
+<p>Under Florida law, e-mail addresses are public records. If you do not want your e-mail address released in response to a public records request, do not send electronic mail to this entity. Instead, contact this office by phone or in writing.</p>
+
+<span class="copyright_info">&copy; <span id="copyright_year">year</span> Miami-Dade County. All rights reserved.</span>
+</span>
+
+</span>
+<div class="clear">&nbsp;</div>
+</div>
+
+
+<!-- bottom bar -->
+<div id="floatingBar">
+<div id="fbInside">
+<img src="https://www.miamidade.gov/global_assets/templates_v5/images/blueLeft.png" id="fbLeftimage" width="21" height="44" alt="Corner" style="float:left;margin-left:-21px" />
+<div id="fbMiddle">
+<script><!--
+function googleTranslateElementInit() {
+  new google.translate.TranslateElement({
+    pageLanguage: 'en',
+    layout: google.translate.TranslateElement.InlineLayout.SIMPLE
+  }, 'google_translate_element');
+}
+//-->
+</script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
+<style type="text/css">iframe.goog-te-banner-frame { display:none !important; }</style>
+<style type="text/css">body {position: static !important; top: 0 !important;}</style>
+<ul>
+<!-- google translator -->
+<li id="google_translate_element" class="googleTranslationBox" style="height:28px;line-height:18px;padding-bottom:2px;padding-top:8px;padding-left:5px;"></li>
+<!-- social media icons -->
+<li class="socialM_icons">
+<a href="https://www.facebook.com/miami.dade.county" target="_blank"><img src="https://www.miamidade.gov/global_assets/templates_v5/images/facebook_32.png" alt="Facebook"></a>
+<a href="https://twitter.com/MiamiDadeCounty" target="_blank"><img src="https://www.miamidade.gov/global_assets/templates_v5/images/twitter_32.png" alt="Twitter"></a>
+<a href="https://www.youtube.com/user/MiamiDadeTV" target="_blank"><img src="https://www.miamidade.gov/global_assets/templates_v5/images/youtube_32.png" alt="YouTube"></a>
+
+
+<a href="https://instagram.com/miamidademedia/?hl=en" target="_blank"><img src="https://www.miamidade.gov/global_assets/templates_v5/images/instagram_round.png" height="32" width="32" alt="Link to Miami-Dade County's Instagram Feed"></a>
+
+
+<a href="https://feeds2.feedburner.com/miami-dade-county-headline-news" target="_blank"><img src="https://www.miamidade.gov/global_assets/templates_v5/images/rss_32.png" alt="RSS"></a>
+</li>
+<li>
+<a id="social-media-center" href="https://www.miamidade.gov/global/social-media.page" style="color: #fff; font-weight: bold; text-decoration: none">
+	Social Media Center
+	</a>
+</li>
+
+<li>
+<a id="mobile-application-center" href="https://www.miamidade.gov/global/mobile-applications.page" style="color: #fff; font-weight: bold; text-decoration: none">
+	Mobile Application Center
+	</a>
+</li>
+<!-- print / email / share -->
+<li class="printEmailShare_icons">
+<img src="https://www.miamidade.gov/global_assets/templates_v5/images/script-text.png" alt="Print" width="16" height="16"> <a href="#" style="font-size:11px;color:#fff;text-decoration:none;" onClick="window.print();return false;">Print</a> <img src="https://www.miamidade.gov/global_assets/templates_v5/images/mail-send.png" style="padding-left:5px;" alt="Email this page" width="16" height="16"> <a href="javascript:popupWindow('https://www.miamidade.gov/global_assets/sendEmail.asp')" style="font-size:11px;color:#fff;text-decoration:none;">Email Page</a> &nbsp; |
+
+<!-- AddThis Button BEGIN -->
+		<script type="text/javascript">
+			var addthis_pub="portaladmin";
+			var addthis_options = 'facebook, myspace, twitter, google, live, aim, more';
+			var addthis_exclude = 'digg, email, print';
+		</script>
+
+        <script type="text/javascript">
+		$('#shareButton').click(function(e){return false})
+		</script>
+
+<a href="#" id="shareButton" class="exception" onclick="return addthis_open(this, '', '[URL]', '[TITLE]')" onmouseout="addthis_close()" onclick="return addthis_sendto()"><img src="https://www.miamidade.gov/global_assets/templates_v5/images/share_button.png" alt="Bookmark and Share" width="52" height="21" style="border:0; margin:0 0 0 5px;"/></a>
+<script type="text/javascript" src="https://s7.addthis.com/js/200/addthis_widget.js"></script>
+<!-- AddThis Button END -->
+
+</li>
+<!-- open / close div -->
+<li style="float:right;">
+<a href="#" style="color:#fff; font-weight:bold; text-decoration:none;" id="min">Minimize Tools</a>
+</li>
+<!-- feedback -->
+<li class="feedback_icon" style="float:right;">
+<img src="https://www.miamidade.gov/global_assets/templates_v5/images/feedback.png" width="27" height="26" alt=""style="padding:0 5px 0 0" />
+<!--<a id="feedback_survey_link" href="#" style="font-weight:bold;">Feedback</a>-->
+<a id="feedback_survey" class="exception" href="https://www.miamidade.gov/global/311.page" style="font-weight:bold;">Feedback</a>
+</li>
+</ul>
+</div>
+<img src="https://www.miamidade.gov/global_assets/templates_v5/images/blueRight.png" id="fbRightimage" width="21" height="44" alt="Corner" style="float:right;margin-right:-21px;" />
+</div>
+</div>
+<!-- open / close tab -->
+<div id="floatingBarOpen">
+<div id="fbInsideOpen">
+<a href="#" style="color:#fff; font-weight:bold; text-decoration:none; display:block; padding:5px; height:27px;line-height:30px; text-align:center;" id="max">Tools</a>
+</div>
+</div>
+<script>
+
+$(document).ready(function()
+{
+	var title = document.title
+	var link = "https://feedback.miamidade.gov/Community/se.ashx?s=57F314581DBCF72C&title="+document.title+"&link="+ window.location.href +""
+
+	$("#feedback_survey_link").click(function()
+	{
+		window.open(link)
+		return false;
+	});
+
+
+});
+
+</script>
+<!-- end bottom bar -->
+<style type="text/css">
+<!--
+#pwBackgroundPopup{
+display:none;position:fixed;_position:absolute; /* hack for internet explorer 6*/height:100%;width:100%;top:0;left:0;background:#666;border:1px solid #cecece;z-index:598;}
+#popupWarning{display:none;position: fixed;_position:absolute; /* hack for internet explorer 6*/height:250px;width:400px;z-index:599;}
+#contactArea a{text-decoration:none;color:#1e9bde;}
+#contactArea a:hover{text-decoration:underline;}
+div#alert{background-image:url(http://www.miamidade.gov/images/alertBGImage-trans.png);background-repeat:no-repeat;width: 400px;height:250px;text-align: left;}
+div#alert p{font-size: 11px;width: 360px;text-align:center;padding: 60px 0 0 0;margin: 0 0 0 15px;}
+#alert p#buttons{margin-top: 10px;padding: 0;}
+-->
+</style>
+     
+<!-- Leaving MDC warning modal -->
+<div id="popupWarning">
+<div id="alert"> 
+   	<p id="contactArea"> 
+	You are now leaving the official website of Miami-Dade County government. Please be aware that when you exit this site, you are no longer protected by our privacy or security policies. Miami-Dade County is not responsible for the content provided on linked sites. The provision of links to these external sites does not constitute an endorsement. <br /> 
+<br /> 
+<strong>Please click 'OK' to be sent to the new site, or Click 'Cancel' to go back.</strong> 
+ 	</p> 
+	<p id="buttons">
+    <input type="button" value="Ok" id="pwAlertButton"/> 
+    <input type="button" value="Cancel" id="cancelButton"/> 
+	</p>
+</div> 
+</div>
+<div id="pwBackgroundPopup"></div>
+<!-- end footer -->
+<!-- portal body -->
+</div>
+
+</div>
+</body>
+
+
+
+</html>

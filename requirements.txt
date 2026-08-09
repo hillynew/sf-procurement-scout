@@ -2,6 +2,8 @@ typer>=0.12.0
 pydantic>=2.0
 pyyaml>=6.0
 pandas>=2.0
+# Jaggaer award tabulations arrive as .xlsx; pandas does not pull this itself.
+openpyxl>=3.1
 rich>=13.0
 requests>=2.31
 beautifulsoup4>=4.12

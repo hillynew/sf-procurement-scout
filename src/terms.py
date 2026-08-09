@@ -90,6 +90,7 @@ TERMS: Dict[str, Verdict] = {
     "miami_dade_construction": Verdict(AGENCY_SITE, note="miamidade.gov"),
     "miami_dade_future": Verdict(AGENCY_SITE, note="miamidade.gov"),
     "miami_dade_awards": Verdict(AGENCY_SITE, note="miamidade.gov"),
+    "miami_dade_govaction": Verdict(AGENCY_SITE, note="miamidade.gov"),
     "west_palm_beach": Verdict(AGENCY_SITE, note="wpb.org"),
     "mdc_college": Verdict(AGENCY_SITE, note="mdc.edu"),
     "palm_beach_schools": Verdict(AGENCY_SITE, note="palmbeachschools.org"),

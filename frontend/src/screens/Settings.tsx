@@ -268,10 +268,15 @@ export default function SettingsScreen() {
           still runs the portal we read; when one moves, its feed goes quiet
           rather than breaking, and nothing else would notice.
         </div>
-        <Row label="Run them in the background"
-             hint="One at a time, never during a fetch. Findings arrive as notifications.">
-          <Toggle checked={settings.maintenance.enabled}
-                  onChange={(v) => patch("maintenance", { enabled: v })} />
+        <Row label="Contract register runs"
+             hint="Hundreds of requests per pass, so it stays opt-in.">
+          <Toggle checked={settings.maintenance.contracts_enabled || settings.maintenance.enabled}
+                  onChange={(v) => patch("maintenance", { contracts_enabled: v })} />
+        </Row>
+        <Row label="Platform check runs"
+             hint="On by default: a migrated agency looks like a quiet one, and nothing else catches that.">
+          <Toggle checked={settings.maintenance.platform_check_enabled || settings.maintenance.enabled}
+                  onChange={(v) => patch("maintenance", { platform_check_enabled: v })} />
         </Row>
         <Row label="Contract register"
              hint={maintenance_status.last_contracts_refresh_on

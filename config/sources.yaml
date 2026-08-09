@@ -654,6 +654,14 @@ sources:
     adapter: miami_dade_awards
     portal_url: https://www.miamidade.gov/apps/ISD/stratproc/Home/AwardRecommendations
 
+  - id: miami_dade_govaction
+    name: Miami-Dade BCC awards (govaction)
+    county: miami-dade
+    agency: Miami-Dade County
+    live_fetch: true
+    adapter: miami_dade_govaction
+    portal_url: https://www.miamidade.gov/govaction/searchleg.asp
+
   - id: fdot_lettings
     name: FDOT letting results (bid tabs)
     county: statewide

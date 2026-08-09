@@ -219,6 +219,41 @@ def _award_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
     return len(live), html
 
 
+def _decided_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
+    """(count, html) for what was decided in the last week, with real dollars.
+
+    The trailing indicator the digest never carried: who won and for how much.
+    Only awards decided inside the last seven days appear — this is news, not
+    an archive — and a missing amount says "amount not published" rather than
+    showing zero.
+    """
+    cutoff = date.today() - timedelta(days=7)
+    fresh = [
+        o for o in opps
+        if o.status == "award" and (o.award_date or o.posted_date)
+        and (o.award_date or o.posted_date) >= cutoff
+    ]
+    if not fresh:
+        return None
+    fresh.sort(key=lambda o: ((o.award_amount or 0), o.award_date or o.posted_date), reverse=True)
+
+    rows = []
+    for o in fresh[:10]:
+        amount = f"${o.award_amount:,}" if o.award_amount is not None else "amount not published"
+        winner = o.awarded_vendor or "winner not published"
+        rows.append(
+            f'<div style="margin:6px 0"><a href="{o.url}" style="font-weight:600">{o.title[:90]}</a>'
+            f'<br><span style="color:#667085;font-size:13px">{o.agency} · {winner} · '
+            f'<b>{amount}</b></span></div>'
+        )
+    overflow = f'<p style="color:#667085;font-size:13px">+{len(fresh) - 10} more in the app</p>' if len(fresh) > 10 else ""
+    html = (
+        '<h3 style="margin:20px 0 8px">Decided this week</h3>'
+        + "".join(rows) + overflow
+    )
+    return len(fresh), html
+
+
 def _records_section(opps: List[Opportunity]) -> Optional[Tuple[int, str]]:
     """(count, html) for tabulations that crossed day 31 today.
 
@@ -322,6 +357,10 @@ def build_daily_digest(
     records = _records_section(opps)
     if records:
         sections.append(records[1])
+
+    decided = _decided_section(opps)
+    if decided:
+        sections.append(decided[1])
 
     contracts = _contracts_section()
     if contracts:
