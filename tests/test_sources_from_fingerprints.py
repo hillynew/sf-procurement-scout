@@ -188,7 +188,7 @@ def test_the_platforms_with_their_own_discoverer_are_left_to_it(workspace, capsy
     mod.main()
 
     out = capsys.readouterr().out
-    assert "discover_vendorlink.py" in out
+    assert "terms prohibit" in out
     assert "candidates on a platform we can fetch: 0" in out
 
 

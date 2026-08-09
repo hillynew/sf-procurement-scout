@@ -282,31 +282,27 @@ def test_filters_select_subsets():
     assert [a.source_id for a in get_adapters(only=["broward_bpro"])] == ["broward_bpro"]
 
 
-def test_the_sheriffs_co_op_is_covered_by_vendorlink_not_its_own_feed():
-    """FSA needs no adapter, and this is the fact that makes that true.
-
-    The research scored `flsheriffs.org/purchasingprogram/feed/` as a bid feed
-    worth two hours. It is a WordPress *product* catalog — ten equipment
-    categories, all dated October 2024. FSA's real solicitations are bid
-    through VendorLink, which its own announcement letter says outright, and
-    `vl_296` has carried them since the VendorLink sweep.
-
-    If that source ever disappears the co-op goes uncovered silently, because
-    nothing else in this build looks at flsheriffs.org.
+def test_the_sheriffs_co_op_keeps_a_visible_pointer():
+    """FSA bids through VendorLink, whose terms now forbid automated reading
+    (src/terms.py, 2026-08-09) — so `vl_296` became a catalog pointer. The
+    point of this test survives the change: if that entry ever disappears the
+    co-op goes uncovered *silently*, because nothing else in this build looks
+    at flsheriffs.org.
     """
     from src.sources.registry import load_source_config
 
     configs = {c["id"]: c for c in load_source_config() if isinstance(c, dict)}
 
     fsa = configs.get("vl_296")
-    assert fsa is not None, "the Florida Sheriffs Association co-op lost its source"
-    assert fsa["adapter"] == "vendorlink"
+    assert fsa is not None, "the Florida Sheriffs Association co-op lost its pointer"
+    assert fsa["adapter"] == "catalog"
     assert "sheriffs association" in fsa["agency"].lower()
 
 
-def test_the_duplicate_sheriffs_pointer_stays_suppressed():
-    """`pp_flsheriffs` says "go register at Public Purchase" for an agency whose
-    bids are already on the board."""
+def test_the_duplicate_sheriffs_pointer_is_no_longer_suppressed():
+    """When `vl_296` was a live feed it superseded `pp_flsheriffs`. With
+    VendorLink terms-prohibited (2026-08-09) nothing reads FSA's bids live,
+    so both pointers rightly show — suppression only follows live coverage."""
     from src.sources.registry import _superseded_catalog_ids, load_source_config
 
-    assert "pp_flsheriffs" in _superseded_catalog_ids(load_source_config())
+    assert "pp_flsheriffs" not in _superseded_catalog_ids(load_source_config())

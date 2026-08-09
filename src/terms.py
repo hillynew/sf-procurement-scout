@@ -162,8 +162,22 @@ TERMS: Dict[str, Verdict] = {
              "restrictions section; the operative document was not found",
     ),
     "vendorlink": Verdict(
-        UNCHECKED, checked_on="2026-08-07",
-        note="myvendorlink.com/terms redirects to the login page",
+        PROHIBITED, source="https://www.myvendorlink.com/external/termsandconditions",
+        checked_on="2026-08-09",
+        note="§5 User Conduct: 'When you use any Services or the Site, you "
+             "represent, warrant and agree that you will not: … (H) use any "
+             "robot, spider, other automatic device, or manual process to "
+             "monitor or copy LinkSystems, LLC's web pages or content "
+             "contained herein.' A browse-wrap binding on use of the Site — "
+             "the DemandStar shape exactly. The 2026-08-07 check followed "
+             "/terms, which redirects to login; the operative document is "
+             "linked from every page footer at /external/termsandconditions. "
+             "The 66-source adapter was removed the day this was read, per "
+             "this module's own rule. robots.txt Allowing /external/ does not "
+             "override prose terms — robots is not the test, in either "
+             "direction. The sanctioned path back is their statewide "
+             "subscription (~$175/yr), which docs/statewide-coverage.md "
+             "already ranks as the single best purchase.",
     ),
     "workday_sourcing": Verdict(
         UNCHECKED, checked_on="2026-08-07",
@@ -181,7 +195,7 @@ TERMS: Dict[str, Verdict] = {
 #: the same is not true of DemandStar or Vendor Registry, whose agencies post
 #: elsewhere too. That is a reason to prioritise reading its terms, not a
 #: reason to treat 403 as consent.
-GRANDFATHERED = frozenset({"opengov", "vendorlink", "workday_sourcing", "jaggaer"})
+GRANDFATHERED = frozenset({"opengov", "workday_sourcing", "jaggaer"})
 
 
 def verdict_for(platform: str) -> Optional[Verdict]:
