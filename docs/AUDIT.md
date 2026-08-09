@@ -207,3 +207,52 @@ Critical first: A1 (Bonfire UTC), A2 (history retention), A3 (award statuses),
 A4 (mailbox attribution) → B5–B11 (silent failures) → C12–C23 (capture, in the
 SOURCES.md §5 ranking, schema first) → D/E as they intersect touched files → F only
 where a touched file makes it free. G49 as a one-line default change.
+
+---
+
+## Phase 4 resolution log (2026-08-09)
+
+**Fixed** — A1 Bonfire UTC · A2 retention (nothing deleted; vanished untracked
+rows age to closed) · A3 award statuses (opengov/civicplus/bonfire/wpb; SAM
+awards added) · A4 email attribution · B5 INFORMS hardening · B8 summarizer
+package headers+selection · B9 whole-table unread count · B10 deadline dedupe ·
+C12 OpenGov capture (codes, qaDeadline, contacts, pre-bid, est. cost, addenda,
+full raw) · C13 MFMP capture (+`linkedAdNumber` linkage, award notices join the
+detail pass) · C15 SAM full capture + `ptype=a` awards · C16 FACTS width ·
+C17 CivicPlus raw category + awarded status + award-rec vendor parse ·
+C18 Bonfire posted-date note stands, `IsExtendable` captured · C19 Workday
+description+codes · C20 FDOT work types/prequal/BDI · C21 Jaggaer protest
+clock · C22 notice-links document · C23 schema (tier, raw_category,
+commodity_codes, awarded_vendor/amount/date, linked_ref/award_linkage,
+contract_term) · G49 fetch log on by default with rotation. Plus, beyond the
+audit: an award↔solicitation linkage pass (`src/pipeline/linkage.py`), source
+drop detection against each source's own norm, per-run field-coverage stamps,
+a `/api/quality` + `run.py quality` report, and three new award sources
+(Legistar ×6 bodies, FDOT bidletting, Miami-Dade award recommendations).
+
+**Withdrawn** — B6: `jaggaer_uf`/`jaggaer_usf` use tenant keys (`Florida`,
+`USFlorida`) the universities' own pages link, verified live answering with UF
+branding; the module docstring's probe table describes the *wrong* keys and
+should be read with that in mind. D32: `split(":", 1)` keeps everything after
+the first colon, so a contract id containing a colon round-trips correctly.
+D/B11: the in-memory AI job state self-heals — sets clear in a `finally`, a
+restart empties them, and the UI's "none" state invites a re-run.
+
+**Resolved differently** — C14 VendorLink: the detail pass was never built.
+Reading the terms it required (the gate the audit set) found §5(H) forbidding
+"any robot, spider, other automatic device, or manual process to monitor or
+copy" their pages — a browse-wrap binding on use. Recorded PROHIBITED in
+`src/terms.py`; the existing 66-source list adapter was removed per the
+repo's own rule and every agency converted to a catalog pointer. The
+sanctioned restore path is VendorLink's statewide subscription (~$175/yr) —
+an owner decision.
+
+**Open (deferred, tracked for later phases)** — B7 CivicPlus tenant drift
+(needs a fingerprint recheck sweep — recommend running
+`scripts/fingerprint_agencies.py --recheck`) · D24 `include_statewide`
+watchlist flag (frontend, Phase 6) · D25 preview-count divergence (Phase 6) ·
+D26 dead auto-fetch options (Phase 6 settings rework) · D27 award status
+invisible in UI (Phase 6, now with real award data to show) · D28-D31 UI
+niceties (Phase 6) · E35 pdf-cache disk pruning · E37 `datetime.utcnow()`
+deprecation sweep · F38-F46 dead code (removed opportunistically as files are
+touched).
