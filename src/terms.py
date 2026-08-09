@@ -83,6 +83,7 @@ TERMS: Dict[str, Verdict] = {
     "civicplus": Verdict(AGENCY_SITE, note="CMS module served on each city's own domain"),
     "mfmp_vbs": Verdict(AGENCY_SITE, note="MyFloridaMarketPlace, the state's own system"),
     "fdot_ads": Verdict(AGENCY_SITE, note="FDOT's own advertisement host"),
+    "fdot_letting": Verdict(AGENCY_SITE, note="FDOT's own letting-results host, robots Allow: /"),
     "facts": Verdict(AGENCY_SITE, note="the state contract register under s. 215.985(14)"),
     "sam_gov": Verdict(AGENCY_SITE, note="the federal government's own system"),
     "miami_dade_informs": Verdict(AGENCY_SITE, note="Miami-Dade's own supplier portal"),

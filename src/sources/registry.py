@@ -20,6 +20,7 @@ from .mdc_college import MdcCollegeAdapter
 from .mfmp_vbs import MfmpVbsAdapter
 from .facts import FactsAdapter
 from .fdot_ads import FdotAdsAdapter
+from .fdot_letting import FdotLettingAdapter
 from .ionwave import IonwaveAdapter
 from .jaggaer import JaggaerAdapter
 from .legistar import LegistarAwardsAdapter
@@ -37,6 +38,7 @@ ADAPTERS: Dict[str, Type[SourceAdapter]] = {
     "ionwave": IonwaveAdapter,
     "facts": FactsAdapter,
     "fdot_ads": FdotAdsAdapter,
+    "fdot_letting": FdotLettingAdapter,
     "jaggaer": JaggaerAdapter,
     "legistar": LegistarAwardsAdapter,
     "miami_dade_informs": MiamiDadeInformsAdapter,
