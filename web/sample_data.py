@@ -310,6 +310,65 @@ def build_sample() -> Tuple[Dict[str, Opportunity], List[SourceHealth]]:
         documents=[Document(name="MDC bid posting.pdf", url="#", kind="document")],
     )
 
+    # Award records — the decided side of the market. Without these the
+    # Awards screen, the protest card, and the price medians all demo as
+    # empty states, which reads as "the feature does not exist" on a first
+    # look. One carries a live 72-hour protest window.
+    from src.protest import protest_deadline
+
+    add(
+        "a1",
+        title="Intended award: Roof repairs — Fire Station 12",
+        agency="City of Hollywood",
+        county="broward",
+        solicitation_type="ITB",
+        offer_type="construction",
+        status="award",
+        external_id="ITB-26-104",
+        posted_date=today,
+        award_date=today,
+        awarded_vendor="Crown Roofing & Sheet Metal, Inc",
+        award_amount=487_500,
+        linked_ref="ITB-26-104",
+        award_linkage="ref",
+        protest_deadline=protest_deadline(datetime.combine(today, time(14, 0))),
+        description="Notice of intended decision posted; 72-hour protest clock running.",
+    )
+    add(
+        "a2",
+        title="MOTION TO AWARD open-end contract to low bidder, Sunshine Custodial "
+              "Services, LLC, for Janitorial Services, Bid No. JN-25-011, in the "
+              "initial one-year estimated amount of $193,500",
+        agency="Broward County",
+        county="broward",
+        solicitation_type="ITB",
+        offer_type="services",
+        status="award",
+        external_id="2026-0412",
+        posted_date=today - timedelta(days=3),
+        award_date=today - timedelta(days=3),
+        awarded_vendor="Sunshine Custodial Services, LLC",
+        award_amount=193_500,
+        linked_ref="JN-25-011",
+        award_linkage="ref",
+    )
+    add(
+        "a3",
+        title="FDOT letting 07/31: contract E4Y08 — Miami-Dade County",
+        agency="Florida Department of Transportation",
+        county="miami-dade",
+        offer_type="construction",
+        status="award",
+        external_id="E4Y08",
+        posted_date=today - timedelta(days=9),
+        award_date=today - timedelta(days=9),
+        awarded_vendor="H&R Paving, Inc",
+        award_amount=31_366_638,
+        linked_ref="429487-2-52-01",
+        award_linkage="ref",
+        description="Preliminary letting results (apparent low bid first). 4 bids.",
+    )
+
     return bids, _sample_health()
 
 
@@ -363,6 +422,28 @@ def load_sample() -> dict:
         "p1": "submitted", "p2": "submitted",
         "p3": "result", "b1": "result",
     }
+    # A small contract register so "expiring — likely rebids" demos too.
+    from src.contracts import Contract
+
+    db.save_contracts([
+        Contract(
+            contract_id="SAMPLE-JAN-22", agency="Broward County",
+            name="Janitorial Services — Government Center", source_id="sample",
+            vendor="Sparkle Building Services, Inc",
+            start_date=date.today() - timedelta(days=1000),
+            end_date=date.today() + timedelta(days=55),
+            extendable=False, amount=612_000.0,
+        ),
+        Contract(
+            contract_id="SAMPLE-HVAC-19", agency="City of Hollywood",
+            name="HVAC Preventive Maintenance, citywide", source_id="sample",
+            vendor="Polar Air Mechanical Corp",
+            start_date=date.today() - timedelta(days=700),
+            end_date=date.today() + timedelta(days=130),
+            extendable=True,
+        ),
+    ])
+
     for key, stage in seed_stages.items():
         oid = bids[key].opportunity_id
         db.set_tracked(oid, True)
