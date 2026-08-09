@@ -288,6 +288,11 @@ class SourceHealth(BaseModel):
     elapsed_ms: int = 0
     status: HealthStatus = HealthStatus.OK
     note: Optional[str] = None
+    # Per-run field coverage for this source: how many of its records carried
+    # a category, documents, a due date, a budget, an award amount. Stored on
+    # every run so a source that quietly stops yielding a field is visible
+    # against its own history, not just against zero.
+    coverage: Optional[dict] = None
 
     model_config = {"use_enum_values": True}
 

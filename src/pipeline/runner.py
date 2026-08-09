@@ -425,6 +425,7 @@ def run_fetch(
             )
     progress({"event": "phase", "phase": "finalize"})
     derive_fields(all_opps)
+    _stamp_coverage(all_opps, health)
     # Recurrence comes from a separately-refreshed archive (run.py history),
     # so a missing file simply leaves prior_cycles at zero.
     if with_history:
@@ -441,6 +442,39 @@ def run_fetch(
         query=query,
     )
     return filtered, health
+
+
+def _stamp_coverage(opps: List[Opportunity], health: List[SourceHealth]) -> None:
+    """Field-coverage counts per source, onto that run's health row.
+
+    Computed after every enrichment pass so the numbers describe what a user
+    would actually see. These are what the drop detector in the store compares
+    across runs — a scraper that keeps returning rows but loses its dates or
+    documents is broken in a way a bare row count can't show.
+    """
+    by_source: Dict[str, List[Opportunity]] = {}
+    for o in opps:
+        by_source.setdefault(o.source_id, []).append(o)
+    for h in health:
+        rows = by_source.get(h.source_id, [])
+        h.coverage = coverage_counts(rows)
+
+
+def coverage_counts(rows: List[Opportunity]) -> dict:
+    awards = [o for o in rows if o.status == "award"]
+    return {
+        "records": len(rows),
+        "with_category": sum(
+            1 for o in rows
+            if o.raw_category or o.commodity_codes or any(c != "general" for c in o.categories)
+        ),
+        "with_documents": sum(1 for o in rows if o.documents),
+        "with_due_date": sum(1 for o in rows if o.due_date),
+        "with_budget": sum(1 for o in rows if o.budget),
+        "awards": len(awards),
+        "with_award_amount": sum(1 for o in awards if o.award_amount is not None),
+        "with_award_vendor": sum(1 for o in awards if o.awarded_vendor),
+    }
 
 
 def _health_line(h: SourceHealth) -> str:

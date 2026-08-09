@@ -296,3 +296,28 @@ def test_unread_count_spans_the_whole_table(db):
     unread, items = db.list_notifications(limit=50)
     assert len(items) == 50
     assert unread == 60
+
+
+def _health(count, status="ok"):
+    return [SourceHealth(source_id="test-src", name="Test Source",
+                         ok=status == "ok", count=count, status=status)]
+
+
+def test_source_going_quiet_is_flagged_against_its_own_norm(db):
+    """Zero rows from a source that usually yields ten is a breakage, not an
+    empty result."""
+    for _ in range(4):
+        db.save_snapshot([make_opp(f"Bid {_}")], _health(10))
+
+    quiet = _health(0, status="empty")
+    db.save_snapshot([], quiet)
+    assert str(quiet[0].status) == "degraded"
+    assert "recent norm is 10" in (quiet[0].note or "")
+    unread, items = db.list_notifications()
+    assert any(i["kind"] == "source_drop" for i in items)
+
+
+def test_first_run_has_no_history_and_no_flag(db):
+    fresh = _health(0, status="empty")
+    db.save_snapshot([], fresh)
+    assert str(fresh[0].status) == "empty"

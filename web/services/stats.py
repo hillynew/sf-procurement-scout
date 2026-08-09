@@ -152,3 +152,73 @@ def build_stats(opps: List[Opportunity], workflow: Dict[str, dict]) -> dict:
         "trend": trend,
         "attention": attention[:8],
     }
+
+
+# ---------------------------------------------------------------------------
+# Data quality
+# ---------------------------------------------------------------------------
+
+#: The fields a record is judged on, in display order. Each is (key, label,
+#: predicate). "Category" counts anything better than the classifier's
+#: "general" fallback; "contact" counts any of the three contact fields.
+_QUALITY_FIELDS = (
+    ("due_date", "Close date", lambda o: o.due_date is not None),
+    ("posted_date", "Issue date", lambda o: o.posted_date is not None),
+    ("description", "Description", lambda o: bool(o.description or o.scope)),
+    ("category", "Category", lambda o: bool(
+        o.raw_category or o.commodity_codes
+        or any(c != "general" for c in o.categories))),
+    ("commodity_codes", "Commodity codes", lambda o: bool(o.commodity_codes)),
+    ("documents", "Documents", lambda o: bool(o.documents)),
+    ("budget", "Est. value", lambda o: bool(o.budget)),
+    ("contact", "Contact", lambda o: bool(o.contact or o.contact_email or o.contact_phone)),
+    ("external_id", "Solicitation #", lambda o: bool(o.external_id)),
+    ("tier", "Agency tier", lambda o: bool(o.tier and o.tier != "unknown")),
+)
+
+#: Judged over award-status records only.
+_AWARD_FIELDS = (
+    ("awarded_vendor", "Awarded vendor", lambda o: bool(o.awarded_vendor)),
+    ("award_amount", "Award amount", lambda o: o.award_amount is not None),
+)
+
+
+def quality_report(opps: List[Opportunity]) -> dict:
+    """Percent of records with each field populated, broken out by source.
+
+    This is the honesty meter: capture fixes and scraper breakage both move
+    these numbers, and nothing else in the app states them.
+    """
+    by_source: Dict[str, List[Opportunity]] = {}
+    for o in opps:
+        if o.status == "catalog":
+            continue
+        by_source.setdefault(o.source_id, []).append(o)
+
+    def block(rows: List[Opportunity]) -> dict:
+        awards = [o for o in rows if o.status == "award"]
+        fields = {
+            key: {
+                "label": label,
+                "count": sum(1 for o in rows if pred(o)),
+                "pct": round(100 * sum(1 for o in rows if pred(o)) / len(rows)) if rows else 0,
+            }
+            for key, label, pred in _QUALITY_FIELDS
+        }
+        for key, label, pred in _AWARD_FIELDS:
+            fields[key] = {
+                "label": label,
+                "count": sum(1 for o in awards if pred(o)),
+                "pct": round(100 * sum(1 for o in awards if pred(o)) / len(awards)) if awards else None,
+            }
+        return {"records": len(rows), "awards": len(awards), "fields": fields}
+
+    sources = []
+    for source_id, rows in sorted(by_source.items(), key=lambda kv: -len(kv[1])):
+        entry = block(rows)
+        entry["source_id"] = source_id
+        entry["source_name"] = rows[0].source_name
+        sources.append(entry)
+
+    everything = [o for rows in by_source.values() for o in rows]
+    return {"overall": block(everything), "sources": sources}

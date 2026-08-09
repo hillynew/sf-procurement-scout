@@ -8,7 +8,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.db import store as db
-from web.services.stats import build_stats
+from web.services.stats import build_stats, quality_report
 
 router = APIRouter()
 
@@ -21,6 +21,12 @@ router = APIRouter()
 @router.get("/stats")
 def stats():
     return build_stats(db.load_opportunities(), db.workflow_state())
+
+
+@router.get("/quality")
+def quality():
+    """Field-population percentages per source — the honesty meter."""
+    return quality_report(db.load_opportunities())
 
 
 # ---------------------------------------------------------------------------

@@ -536,3 +536,14 @@ def test_research_unknown_bid_is_404(seeded):
     assert seeded.get("/api/bids/nope/research").status_code == 404
     assert seeded.post("/api/bids/nope/research",
                        json={"question": "?"}).status_code == 404
+
+
+def test_quality_report_endpoint(client):
+    r = client.get("/api/quality")
+    assert r.status_code == 200
+    data = r.json()
+    assert "overall" in data and "sources" in data
+    if data["overall"]["records"]:
+        fields = data["overall"]["fields"]
+        assert "due_date" in fields and "award_amount" in fields
+        assert 0 <= fields["due_date"]["pct"] <= 100
