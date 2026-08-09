@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from ..models.opportunity import Opportunity, SourceHealth
 from .engine import init_db, session_scope
@@ -475,8 +475,22 @@ def delete_watchlist(wl_id: str) -> bool:
 
 
 def add_notification(kind: str, title: str, body: str = "",
-                     opportunity_id: Optional[str] = None) -> None:
+                     opportunity_id: Optional[str] = None,
+                     dedupe: bool = False) -> None:
     with session_scope() as s:
+        if dedupe and opportunity_id:
+            # One live notification per (kind, bid): re-raising the same alarm
+            # every day buried the bell in near-identical rows.
+            existing = s.execute(
+                select(Notification)
+                .where(Notification.kind == kind)
+                .where(Notification.opportunity_id == opportunity_id)
+                .where(Notification.read.is_(False))
+            ).scalars().first()
+            if existing is not None:
+                existing.title, existing.body = title, body
+                existing.created_at = datetime.utcnow()
+                return
         s.add(Notification(created_at=datetime.utcnow(), kind=kind, title=title,
                            body=body, opportunity_id=opportunity_id, read=False))
 
@@ -486,7 +500,11 @@ def list_notifications(limit: int = 50) -> Tuple[int, List[dict]]:
         rows = s.execute(
             select(Notification).order_by(Notification.id.desc()).limit(limit)
         ).scalars().all()
-        unread = sum(1 for r in rows if not r.read)
+        # Counted over the whole table, not the visible slice — the badge was
+        # capping out (wrongly) once more than `limit` unread rows piled up.
+        unread = s.execute(
+            select(func.count()).select_from(Notification).where(Notification.read.is_(False))
+        ).scalar() or 0
     items = [
         {
             "id": r.id, "kind": r.kind, "title": r.title, "body": r.body,

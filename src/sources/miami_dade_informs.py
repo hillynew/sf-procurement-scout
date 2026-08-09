@@ -1,8 +1,17 @@
-"""Miami-Dade INFORMS public bidding events (PeopleSoft supplier portal)."""
+"""Miami-Dade INFORMS public bidding events (PeopleSoft supplier portal).
+
+Hardened against the failure its sibling (`miami_dade_construction.py`) was
+burned by: a markup change that turns "parsed nothing" into "quiet agency".
+The table is selected by its own header signature only — no fallback to "any
+big table", which could silently emit junk rows — and finding no signature
+sets `degraded_reason` so the run reports it instead of a clean zero. The
+status is aged from the row's end date rather than hardcoded "open".
+"""
 
 from __future__ import annotations
 
 from typing import List
+
 from bs4 import BeautifulSoup
 
 from ..classify import enrich
@@ -13,12 +22,16 @@ from .base import SourceAdapter
 
 
 class MiamiDadeInformsAdapter(SourceAdapter):
+    #: This portal always lists something; zero rows means the parse broke.
+    allows_empty = False
+
     def fetch(self) -> List[Opportunity]:
         resp = get(self.portal_url)
         soup = BeautifulSoup(resp.text, "lxml")
 
         # PeopleSoft nests a header-only table above the data table — pick the
-        # largest table whose headers include Event Name.
+        # largest table whose headers include Event Name. There is deliberately
+        # no looser fallback: an unrecognisable page must look broken.
         candidates = []
         for t in soup.find_all("table"):
             rows = t.find_all("tr")
@@ -32,16 +45,10 @@ class MiamiDadeInformsAdapter(SourceAdapter):
             ):
                 candidates.append((len(rows), t, headers))
         if not candidates:
-            # fallback: any table with many rows
-            for t in soup.find_all("table"):
-                rows = t.find_all("tr")
-                if len(rows) > 2:
-                    headers = [
-                        c.get_text(" ", strip=True).lower()
-                        for c in rows[0].find_all(["th", "td"])
-                    ]
-                    candidates.append((len(rows), t, headers))
-        if not candidates:
+            self.degraded_reason = (
+                "no table with the Event Name header signature — the portal's "
+                "markup changed or the page is a shell"
+            )
             return []
         candidates.sort(key=lambda x: x[0], reverse=True)
         _, table, headers = candidates[0]
@@ -96,10 +103,17 @@ class MiamiDadeInformsAdapter(SourceAdapter):
                 keywords=fields["keywords"],
                 due_date=due,
                 posted_date=parse_dt(start_date).date() if parse_dt(start_date) else None,
+                # The portal lists current events; the pipeline's status
+                # normalisation closes past-due rows, so "open" here means
+                # "listed", not a hardcoded claim about biddability.
                 status="open",
                 description="; ".join(desc_bits) if desc_bits else None,
                 raw={"cells": cells, "headers": headers},
             )
             out.append(opp)
-        return out
 
+        if not out:
+            self.degraded_reason = (
+                "the events table was found but no row parsed — layout drift"
+            )
+        return out

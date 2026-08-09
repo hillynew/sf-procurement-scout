@@ -92,4 +92,5 @@ def _deadline_scan(settings: dict) -> None:
                 f"{opp.title}",
                 f"{opp.agency} · stage: {wf['stage']}",
                 opportunity_id=oid,
+                dedupe=True,
             )

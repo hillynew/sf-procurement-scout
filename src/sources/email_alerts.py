@@ -79,6 +79,7 @@ def looks_like_a_bid_notice(subject: str) -> bool:
 
 
 class EmailAlertsAdapter(SourceAdapter):
+    _host_map = None
     """Turns subscribed bid-notice emails into opportunities.
 
     Optional config keys:
@@ -90,6 +91,7 @@ class EmailAlertsAdapter(SourceAdapter):
     allows_empty = True
 
     def fetch(self) -> List[Opportunity]:
+        self._host_map = None  # rebuilt per fetch; config can change between runs
         try:
             messages = read_messages(
                 folder=self.cfg.get("imap_folder"),
@@ -126,9 +128,19 @@ class EmailAlertsAdapter(SourceAdapter):
         ref_match = _REF.search(subject) or _REF.search(body)
         ref = ref_match.group(1).strip() if ref_match else None
 
+        # Attribute the alert to the city that actually sent it. One mailbox
+        # serves every subscribed city, so stamping the config entry's county
+        # on all of them filed every alert under one county regardless of
+        # sender. The bid link's host is the strongest signal, the From
+        # domain second; a mail that matches neither is `unknown`, never a
+        # fixed default.
+        base = self._base_kwargs()
+        agency, county = self._attribute(url, str(msg.get("From") or ""))
+        base["agency"], base["county"] = agency, county
+
         fields = enrich(title, body[:600], external_id=ref)
         return Opportunity(
-            **self._base_kwargs(),
+            **base,
             external_id=fields["external_id"] or ref,
             title=title,
             url=url,
@@ -142,6 +154,47 @@ class EmailAlertsAdapter(SourceAdapter):
             description=_summary(body),
             raw={"subject": subject[:300], "via": "email-alert"},
         )
+
+
+    def _attribute(self, url: str, sender: str):
+        hosts = self._hosts()
+        for candidate in (_host_of(url), _sender_domain(sender)):
+            if not candidate:
+                continue
+            for host, (agency, county) in hosts.items():
+                if candidate == host or candidate.endswith("." + host) or host.endswith("." + candidate):
+                    return agency, county
+        domain = _sender_domain(sender)
+        return (f"Email alert ({domain})" if domain else self.agency), "unknown"
+
+    def _hosts(self):
+        if self._host_map is None:
+            # Imported lazily: registry imports this module to register the
+            # adapter, so a module-level import would be a cycle.
+            from .registry import load_source_config
+
+            out = {}
+            for cfg in load_source_config():
+                host = _host_of(str(cfg.get("portal_url") or ""))
+                if host and cfg.get("agency"):
+                    out.setdefault(host, (cfg["agency"], cfg.get("county") or "unknown"))
+            self._host_map = out
+        return self._host_map
+
+
+def _host_of(url: str) -> str:
+    from urllib.parse import urlparse
+
+    host = urlparse(url or "").netloc.lower()
+    return host[4:] if host.startswith("www.") else host
+
+
+def _sender_domain(sender: str) -> str:
+    m = re.search(r"@([\w.-]+)", sender or "")
+    if not m:
+        return ""
+    domain = m.group(1).lower().rstrip(">").strip()
+    return domain[4:] if domain.startswith("www.") else domain
 
 
 # ---------------------------------------------------------------------------

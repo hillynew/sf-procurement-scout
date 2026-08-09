@@ -280,3 +280,19 @@ def test_save_opportunity_keeps_the_filter_columns_in_step(db):
         row = s.get(OpportunityRow, opp.opportunity_id)
         assert row.county == "duval"
         assert row.status == "closed"
+
+
+def test_deduped_notification_updates_in_place(db):
+    db.add_notification("deadline_soon", "Due in 3 days: A", "x", opportunity_id="o1", dedupe=True)
+    db.add_notification("deadline_soon", "Due in 2 days: A", "x", opportunity_id="o1", dedupe=True)
+    unread, items = db.list_notifications()
+    assert unread == 1
+    assert [i["title"] for i in items] == ["Due in 2 days: A"]
+
+
+def test_unread_count_spans_the_whole_table(db):
+    for i in range(60):
+        db.add_notification("fetch_done", f"n{i}")
+    unread, items = db.list_notifications(limit=50)
+    assert len(items) == 50
+    assert unread == 60
