@@ -98,8 +98,24 @@ def is_florida(client: str, entity_name: str) -> bool:
     text = resp.text[:20000].lower()
     # The entity's own name proves nothing — every city's page carries it,
     # whichever state the city is in (this check shipped with a bare-name
-    # fallback and configured Madison, Wisconsin). Florida must be named.
-    return "florida" in text or ", fl" in text
+    # fallback and configured Madison, Wisconsin). Florida must be named —
+    # but landing pages often don't name their state at all (Clearwater,
+    # Ocala, Pensacola), so matter titles are the tiebreaker: a Florida
+    # municipality names its state in resolutions constantly, and Madison WI
+    # / San Antonio TX / Parkland AB never do.
+    if "florida" in text or ", fl" in text:
+        return True
+    resp = _get(
+        f"{API}/{client}/matters",
+        **{"$top": "3", "$filter": "substringof('Florida', MatterTitle)"},
+    )
+    if resp is None or resp.status_code != 200:
+        return False
+    try:
+        rows = resp.json()
+    except ValueError:
+        return False
+    return isinstance(rows, list) and len(rows) > 0
 
 
 def fresh(modified: str) -> bool:

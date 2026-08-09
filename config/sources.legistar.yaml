@@ -219,3 +219,66 @@ sources:
   platform: legistar
   legistar_client: gainesville
   portal_url: https://gainesville.legistar.com/Legislation.aspx
+- id: legistar_pinecrest
+  name: Village of Pinecrest commission awards
+  county: miami-dade
+  agency: Village of Pinecrest
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: pinecrest
+  portal_url: https://pinecrest.legistar.com/Legislation.aspx
+- id: legistar_wellington
+  name: Village of Wellington commission awards
+  county: palm-beach
+  agency: Village of Wellington
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: wellington
+  portal_url: https://wellington.legistar.com/Legislation.aspx
+- id: legistar_venice
+  name: City of Venice commission awards
+  county: sarasota
+  agency: City of Venice
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: venice
+  portal_url: https://venice.legistar.com/Legislation.aspx
+- id: legistar_plantcity
+  name: Plant City commission awards
+  county: hillsborough
+  agency: Plant City
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: plantcity
+  portal_url: https://plantcity.legistar.com/Legislation.aspx
+- id: legistar_pinellaspark
+  name: Pinellas Park commission awards
+  county: pinellas
+  agency: Pinellas Park
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: pinellaspark
+  portal_url: https://pinellaspark.legistar.com/Legislation.aspx
+- id: legistar_ocala
+  name: City of Ocala commission awards
+  county: marion
+  agency: City of Ocala
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: ocala
+  portal_url: https://ocala.legistar.com/Legislation.aspx
+- id: legistar_pensacola
+  name: City of Pensacola commission awards
+  county: escambia
+  agency: City of Pensacola
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: pensacola
+  portal_url: https://pensacola.legistar.com/Legislation.aspx
