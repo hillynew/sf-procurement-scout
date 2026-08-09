@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { useSourceMutation, useSources, useTaxonomy } from "../api/hooks";
+import { useQuality, useSourceMutation, useSources, useTaxonomy } from "../api/hooks";
 import type { DetectResponse, SourceInfo } from "../api/types";
 import SortControl from "../components/SortControl";
 import { Button, FilterChip, Spinner, StatCard } from "../components/ui";
@@ -52,6 +52,77 @@ const STATUS_META: Record<string, { label: string; color: string; icon: string }
   degraded: { label: "Degraded", color: "var(--color-warn)", icon: "◒" },
   error: { label: "Error", color: "var(--color-danger)", icon: "✗" },
 };
+
+const QUALITY_COLS = ["due_date", "category", "documents", "budget", "contact", "award_amount"] as const;
+
+function pctTone(pct: number | null): string {
+  if (pct == null) return "var(--color-ink-faint)";
+  if (pct >= 70) return "var(--color-open)";
+  if (pct >= 35) return "var(--color-warn)";
+  return "var(--color-danger)";
+}
+
+function QualityCell({ pct }: { pct: number | null }) {
+  return (
+    <td className="px-2 py-1.5 text-right text-xs font-semibold tabular-nums"
+        style={{ color: pctTone(pct) }}>
+      {pct == null ? "—" : `${pct}%`}
+    </td>
+  );
+}
+
+function QualityPanel() {
+  const { data } = useQuality();
+  const [open, setOpen] = useState(false);
+  if (!data || data.overall.records === 0) return null;
+  const o = data.overall;
+  const shown = open ? data.sources : data.sources.slice(0, 8);
+  return (
+    <div className="card mb-4 p-4">
+      <div className="mb-2.5 flex items-baseline justify-between">
+        <div className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+          Data quality — % of records with each field
+        </div>
+        <div className="text-xs text-ink-faint">{o.records} records · {o.awards} awards</div>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[560px]">
+          <thead>
+            <tr className="text-[11px] uppercase tracking-wide text-ink-faint">
+              <th className="px-2 py-1 text-left font-semibold">Source</th>
+              <th className="px-2 py-1 text-right font-semibold">Records</th>
+              {QUALITY_COLS.map((k) => (
+                <th key={k} className="px-2 py-1 text-right font-semibold">{o.fields[k]?.label ?? k}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-t border-line font-bold">
+              <td className="px-2 py-1.5 text-sm">All sources</td>
+              <td className="px-2 py-1.5 text-right text-xs tabular-nums">{o.records}</td>
+              {QUALITY_COLS.map((k) => <QualityCell key={k} pct={o.fields[k]?.pct ?? null} />)}
+            </tr>
+            {shown.map((s) => (
+              <tr key={s.source_id} className="border-t border-line">
+                <td className="max-w-[220px] truncate px-2 py-1.5 text-sm">{s.source_name}</td>
+                <td className="px-2 py-1.5 text-right text-xs tabular-nums">{s.records}</td>
+                {QUALITY_COLS.map((k) => <QualityCell key={k} pct={s.fields[k]?.pct ?? null} />)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {data.sources.length > 8 && (
+        <button className="mt-2 text-xs font-semibold text-accent" onClick={() => setOpen(!open)}>
+          {open ? "Show fewer" : `Show all ${data.sources.length} sources`}
+        </button>
+      )}
+      <p className="mt-2 text-[11px] text-ink-faint">
+        Award columns are judged over award records only; “—” means the source has none.
+      </p>
+    </div>
+  );
+}
 
 export default function Sources() {
   const { data, isLoading } = useSources();
@@ -127,6 +198,8 @@ export default function Sources() {
         <StatCard label="Degraded" value={counts.degraded} />
         <StatCard label="Errors" value={counts.error} />
       </div>
+
+      <QualityPanel />
 
       {(counts.degraded > 0 || counts.error > 0) && (
         <div className="mb-4 rounded-[14px] border border-warn/40 bg-warn-soft px-4 py-3 text-sm font-medium text-warn">

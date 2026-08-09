@@ -13,6 +13,7 @@ import type {
   NotificationItem,
   Opportunity,
   OpportunityDetail,
+  QualityReport,
   ResearchStatus,
   SettingsResponse,
   SnapshotResponse,
@@ -95,6 +96,14 @@ export function useWatchlistMatches(id: string | null) {
         `/api/watchlists/${id}/matches`,
       ),
     enabled: !!id,
+  });
+}
+
+export function useQuality() {
+  return useQuery({
+    queryKey: ["quality"],
+    queryFn: () => api.get<QualityReport>("/api/quality"),
+    staleTime: 60_000,
   });
 }
 

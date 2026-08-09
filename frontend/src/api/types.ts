@@ -296,6 +296,23 @@ export interface FetchStatus {
   error?: string;
 }
 
+export interface QualityField {
+  label: string;
+  count: number;
+  pct: number | null;
+}
+
+export interface QualityBlock {
+  records: number;
+  awards: number;
+  fields: Record<string, QualityField>;
+}
+
+export interface QualityReport {
+  overall: QualityBlock;
+  sources: (QualityBlock & { source_id: string; source_name: string })[];
+}
+
 export interface ProtestWindow {
   opportunity_id: string;
   title: string;
