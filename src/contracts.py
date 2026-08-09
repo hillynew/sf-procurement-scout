@@ -67,6 +67,18 @@ class Contract:
     #: Renewal option remaining, where the register says (Bonfire's
     #: IsExtendable column). None = the register doesn't publish it.
     extendable: Optional[bool] = None
+    #: The register's own classification (FACTS: UNSPSC segment code + name).
+    commodity: Optional[str] = None
+    #: When the contract was signed — distinct from when service begins.
+    executed: Optional[date] = None
+    #: The agency's stated justification for a non-competitive buy. This is
+    #: the field that separates an openable rebid from a captive one.
+    justification: Optional[str] = None
+    #: State Term Contract the buy rode on, where it did.
+    state_term_id: Optional[str] = None
+    #: The agency's own reference — occasionally the originating solicitation
+    #: number, which makes it a linkage candidate.
+    agency_ref: Optional[str] = None
 
     def days_until_expiry(self, today: Optional[date] = None) -> Optional[int]:
         if self.end_date is None:

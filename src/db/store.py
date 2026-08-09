@@ -1020,6 +1020,11 @@ def save_contracts(contracts: Iterable["Contract"]) -> int:
             row.amount = c.amount
             row.method = c.method
             row.extendable = c.extendable
+            row.commodity = c.commodity
+            row.executed = c.executed
+            row.justification = c.justification
+            row.state_term_id = c.state_term_id
+            row.agency_ref = c.agency_ref
             row.refreshed_at = now
             count += 1
     return count
@@ -1047,6 +1052,11 @@ def load_contracts() -> List["Contract"]:
             amount=row.amount,
             method=row.method,
             extendable=row.extendable,
+            commodity=row.commodity,
+            executed=row.executed,
+            justification=row.justification,
+            state_term_id=row.state_term_id,
+            agency_ref=row.agency_ref,
         )
         for row in rows
     ]
