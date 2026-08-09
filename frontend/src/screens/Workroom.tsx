@@ -22,6 +22,7 @@ import {
   useContractorMatches,
   useDeepDive,
   useOpportunity,
+  usePricing,
   useResearch,
   useSetMatchStatus,
   useSettings,
@@ -46,6 +47,7 @@ import {
   ValueTag,
 } from "../components/ui";
 import { fmtDate, fmtDateTime, fmtMoney, MATCH_STATUS_LABEL, STAGE_LABEL, STAGES } from "../lib/format";
+import { priceHint } from "../lib/pricing";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -442,6 +444,7 @@ function DeepDiveCard({ bid }: { bid: OpportunityDetail }) {
 export default function Workroom() {
   const { id } = useParams<{ id: string }>();
   const { data: bid, isLoading } = useOpportunity(id ?? null);
+  const { data: pricingData } = usePricing();
   const mutate = useBidMutation();
   const [notes, setNotes] = useState<string | null>(null);
   const [scopeOpen, setScopeOpen] = useState(false);
@@ -671,6 +674,34 @@ export default function Workroom() {
               {!bid.budget && !bid.duration_days && !bid.liquidated_damages && (
                 <div className="text-xs text-ink-faint">Nothing extracted yet — check the bid package.</div>
               )}
+              {(() => {
+                const hint = priceHint(bid, pricingData);
+                if (!hint) return null;
+                return (
+                  <div className="rounded-[10px] bg-bg px-3 py-2 text-xs">
+                    <span className="font-bold">Going rate</span>{" "}
+                    <span className="text-ink-soft">
+                      {hint.label}{hint.scope === "county" ? " in this county" : ""} has awarded at{" "}
+                      <b>{fmtMoney(hint.median)}</b> median ({fmtMoney(hint.low)}–{fmtMoney(hint.high)},{" "}
+                      {hint.count} data points).
+                    </span>
+                  </div>
+                );
+              })()}
+              {(() => {
+                const hint = priceHint(bid, pricingData);
+                if (!hint) return null;
+                return (
+                  <div className="rounded-[10px] bg-bg px-3 py-2 text-xs">
+                    <span className="font-bold">Going rate</span>{" "}
+                    <span className="text-ink-soft">
+                      {hint.label}{hint.scope === "county" ? " in this county" : ""} has awarded at{" "}
+                      <b>{fmtMoney(hint.median)}</b> median ({fmtMoney(hint.low)}–{fmtMoney(hint.high)},{" "}
+                      {hint.count} data points).
+                    </span>
+                  </div>
+                );
+              })()}
               {(bid.commodity_codes ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1 pt-1">
                   {(bid.commodity_codes ?? []).map((c) => (

@@ -598,3 +598,48 @@ def test_awards_endpoint_returns_awards_and_expiring_contracts(client):
     assert data["awards"][0]["award_amount"] == 193_500
     assert data["contracts"][0]["vendor"] == "CleanCo"
     assert 0 <= data["contracts"][0]["days_left"] <= 90
+
+
+def test_pricing_endpoint_builds_category_medians(client):
+    from datetime import date
+
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    awards = [
+        Opportunity(
+            source_id="s", source_name="S", title=f"Janitorial Services {i}",
+            url=f"https://x.gov/{i}", county="broward", agency="Broward County",
+            status="award", categories=["janitorial_custodial"], award_amount=amount,
+            award_date=date.today(),
+        )
+        for i, amount in enumerate([90_000, 120_000, 150_000, 200_000])
+    ]
+    db.save_snapshot(awards, [SourceHealth(source_id="s", name="S", ok=True, count=4)])
+    # A FACTS-style contract with an amount joins the same category pool.
+    from src.contracts import Contract
+
+    db.save_contracts([Contract(
+        contract_id="J1", agency="DMS", name="Custodial Services Contract",
+        source_id="facts", vendor="CleanCo", amount=110_000.0,
+    )])
+
+    data = client.get("/api/pricing").json()
+    jan = next(c for c in data["categories"] if c["slug"] == "janitorial_custodial")
+    assert jan["count"] == 5
+    assert 120_000 <= jan["median"] <= 150_000
+    assert jan["by_county"]["broward"]["count"] == 4
+
+
+def test_thin_samples_stay_out_of_pricing(client):
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    lonely = Opportunity(
+        source_id="s", source_name="S", title="Roof Repair", url="https://x.gov/1",
+        county="broward", agency="X", status="award",
+        categories=["roofing"], award_amount=50_000,
+    )
+    db.save_snapshot([lonely], [SourceHealth(source_id="s", name="S", ok=True, count=1)])
+    data = client.get("/api/pricing").json()
+    assert not any(c["slug"] == "roofing" for c in data["categories"])

@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAwards } from "../api/hooks";
+import { useAwards, usePricing } from "../api/hooks";
 import { CountyPill, EmptyState, Spinner, StatCard, LoadFailed } from "../components/ui";
 import { fmtDate, fmtMoney } from "../lib/format";
 
@@ -12,6 +12,7 @@ import { fmtDate, fmtMoney } from "../lib/format";
  */
 export default function Awards() {
   const { data, isLoading, isError, refetch } = useAwards();
+  const { data: pricing } = usePricing();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
 
@@ -64,6 +65,42 @@ export default function Awards() {
         placeholder="Filter by title, agency, or vendor…"
         className="input mb-4 w-full max-w-md"
       />
+
+      {pricing && pricing.categories.length > 0 && (
+        <div className="card mb-4 p-4">
+          <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+            Going rates — median of real awards and contracts, by category
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-ink-faint">
+                  <th className="px-2 py-1 text-left font-semibold">Category</th>
+                  <th className="px-2 py-1 text-right font-semibold">Median</th>
+                  <th className="px-2 py-1 text-right font-semibold">Typical range</th>
+                  <th className="px-2 py-1 text-right font-semibold">Data points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pricing.categories.slice(0, 12).map((c) => (
+                  <tr key={c.slug} className="border-t border-line">
+                    <td className="px-2 py-1.5 text-sm font-semibold">{c.label}</td>
+                    <td className="px-2 py-1.5 text-right text-sm font-bold tabular-nums">{fmtMoney(c.median)}</td>
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums text-ink-soft">
+                      {fmtMoney(c.low)} – {fmtMoney(c.high)}
+                    </td>
+                    <td className="px-2 py-1.5 text-right text-xs tabular-nums text-ink-faint">{c.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px] text-ink-faint">
+            Medians, not means — categories with fewer than {pricing.min_samples} real
+            numbers stay out rather than dress an anecdote as a statistic.
+          </p>
+        </div>
+      )}
 
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="card p-4">

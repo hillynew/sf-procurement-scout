@@ -331,6 +331,24 @@ export interface AwardsResponse {
   contracts_total: number;
 }
 
+export interface PriceBucket {
+  count: number;
+  median: number;
+  low: number;
+  high: number;
+}
+
+export interface PriceCategory extends PriceBucket {
+  slug: string;
+  label: string;
+  by_county: Record<string, PriceBucket>;
+}
+
+export interface PricingReport {
+  categories: PriceCategory[];
+  min_samples: number;
+}
+
 export interface QualityField {
   label: string;
   count: number;

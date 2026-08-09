@@ -9,9 +9,16 @@ from fastapi import APIRouter
 from src.contracts import expiring_within
 from src.db import store as db
 
+from ..services.pricing import build_pricing
 from ..services.serialize import opp_out
 
 router = APIRouter()
+
+
+@router.get("/pricing")
+def pricing():
+    """What similar work has gone for — medians from real awards and contracts."""
+    return build_pricing()
 
 #: How far ahead the expiring-contracts list looks. Long enough to prepare a
 #: bid, short enough to stay a work queue.
