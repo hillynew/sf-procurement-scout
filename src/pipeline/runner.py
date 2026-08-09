@@ -42,8 +42,11 @@ MAX_WORKERS = 12
 STALE_OPEN_DAYS = 180
 
 # The detail pass costs one request per bid, so it is bounded and applies only
-# to listings someone could still act on.
-DETAIL_STATUSES = {"open", "upcoming"}
+# to listings someone could still act on. Award notices count: their detail
+# carries the linkage back to the solicitation (MFMP's linkedAdNumber) and the
+# tabulation attachments, and the 72-hour protest clock makes them the most
+# time-critical rows in the system.
+DETAIL_STATUSES = {"open", "upcoming", "award"}
 # Raised from 150 when the source list went statewide: 150 no longer covered a
 # single run's open bids, so the tail of every fetch went un-enriched. The cap
 # still exists to bound run time, but `_fair_share` now decides *which* bids

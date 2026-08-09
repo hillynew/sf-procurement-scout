@@ -302,6 +302,60 @@ class MfmpVbsAdapter(SourceAdapter):
             else:
                 opp.contact = str(val)
 
+        # The live payload nests the buyer under `responseContact`; the flat
+        # keys above are a legacy shape kept as a fallback.
+        rc = data.get("responseContact")
+        if isinstance(rc, dict):
+            name = str(rc.get("responseContact") or rc.get("name") or "").strip()
+            if name and not opp.contact:
+                opp.contact = name
+            email = str(rc.get("email") or "").strip()
+            if email and not opp.contact_email:
+                opp.contact_email = email
+            phone = str(rc.get("ph") or rc.get("phone") or "").strip()
+            if phone and not opp.contact_phone:
+                opp.contact_phone = phone
+
+        # UNSPSC codes — the portal's own classification of the buy.
+        codes = [
+            f"UNSPSC {c.get('id')} {c.get('value') or ''}".strip()
+            for c in data.get("commodityCodes") or []
+            if isinstance(c, dict) and c.get("id")
+        ]
+        if codes:
+            opp.commodity_codes = codes
+            opp.raw_category = "; ".join(
+                str(c.get("value") or c.get("id"))
+                for c in data["commodityCodes"]
+                if isinstance(c, dict)
+            )
+
+        if data.get("responseDate") and opp.questions_due is None:
+            opp.questions_due = parse_dt(str(data["responseDate"]))
+
+        indicators = data.get("indicators")
+        if (
+            isinstance(indicators, dict)
+            and indicators.get("preSolicitationConference")
+            and not opp.pre_bid_meeting
+        ):
+            opp.pre_bid_meeting = "Pre-solicitation conference — see the bid package"
+
+        # An Agency Decision names the ad it decides. This is the one explicit
+        # solicitation↔award key any Florida source publishes; keep it.
+        linked = str(data.get("linkedAdNumber") or "").strip()
+        if linked and linked.lower() not in ("none", "null"):
+            opp.linked_ref = linked
+            if opp.status == "award":
+                opp.award_linkage = "ref"
+
+        if isinstance(opp.raw, dict):
+            opp.raw["detail"] = {
+                k: data.get(k)
+                for k in ("commodityCodes", "linkedAdNumber", "responseDate", "indicators")
+                if data.get(k) is not None
+            }
+
         opp.detail_fetched = True
 
     # -- mapping -----------------------------------------------------------
