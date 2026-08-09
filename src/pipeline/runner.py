@@ -12,6 +12,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ..fl_geo import infer_tier
+from .linkage import link_awards
 from ..http_util import SourceBlocked
 from ..models.opportunity import HealthStatus, Opportunity, SourceHealth
 from ..pdf_extract import fetch_text, parse_facts
@@ -425,6 +426,7 @@ def run_fetch(
             )
     progress({"event": "phase", "phase": "finalize"})
     derive_fields(all_opps)
+    link_awards(all_opps)
     _stamp_coverage(all_opps, health)
     # Recurrence comes from a separately-refreshed archive (run.py history),
     # so a missing file simply leaves prior_cycles at zero.
