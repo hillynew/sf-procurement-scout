@@ -45,7 +45,7 @@ import {
   TypeTag,
   ValueTag,
 } from "../components/ui";
-import { fmtDateTime, MATCH_STATUS_LABEL, STAGE_LABEL, STAGES } from "../lib/format";
+import { fmtDate, fmtDateTime, fmtMoney, MATCH_STATUS_LABEL, STAGE_LABEL, STAGES } from "../lib/format";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -485,6 +485,30 @@ export default function Workroom() {
         <ArrowLeft size={15} /> All bids
       </Link>
 
+      {bid.status === "award" && (
+        <div className="card mb-4 border-2 p-4" style={{ borderColor: "var(--color-warn)" }}>
+          <div className="text-[11px] font-bold uppercase tracking-wide" style={{ color: "var(--color-warn)" }}>
+            Award record
+          </div>
+          <div className="mt-1 text-sm">
+            {bid.awarded_vendor ? <>Won by <b>{bid.awarded_vendor}</b></> : "Winner not published by the source"}
+            {bid.award_amount != null && <> · <b>{fmtMoney(bid.award_amount)}</b></>}
+            {bid.award_date && <> · awarded {fmtDate(bid.award_date)}</>}
+            {bid.linked_ref && (
+              <> · decides solicitation <b>#{bid.linked_ref}</b>
+                {bid.award_linkage && <span className="text-ink-faint"> (linked by {bid.award_linkage === "ref" ? "reference" : "title match"})</span>}
+              </>
+            )}
+          </div>
+          {bid.protest_deadline && (
+            <div className="mt-2 text-sm font-semibold" style={{ color: "var(--color-warn)" }}>
+              ⏱ Notice of protest due {fmtDateTime(bid.protest_deadline)} — 72 business hours
+              from posting under s. 120.57(3)(b), weekends and state holidays excluded.
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
@@ -636,6 +660,8 @@ export default function Workroom() {
                 { label: "Liquidated damages", value: bid.liquidated_damages },
                 { label: "License", value: bid.licenses },
                 { label: "Location", value: bid.project_location },
+                { label: "Contract term", value: bid.contract_term },
+                { label: "Source category", value: bid.raw_category },
               ].filter((d) => d.value).map((d) => (
                 <div key={d.label} className="flex items-baseline justify-between gap-2">
                   <span className="text-xs font-semibold text-ink-faint">{d.label}</span>
@@ -644,6 +670,15 @@ export default function Workroom() {
               ))}
               {!bid.budget && !bid.duration_days && !bid.liquidated_damages && (
                 <div className="text-xs text-ink-faint">Nothing extracted yet — check the bid package.</div>
+              )}
+              {(bid.commodity_codes ?? []).length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-1">
+                  {(bid.commodity_codes ?? []).map((c) => (
+                    <span key={c} className="rounded-md border border-line px-1.5 py-0.5 text-[11px] font-medium text-ink-soft">
+                      {c}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           </Section>
