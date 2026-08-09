@@ -8,6 +8,7 @@ import type {
   AwardsResponse,
   Contractor,
   PricingReport,
+  RecordsResponse,
   VendorsResponse,
   ContractorMatchesStatus,
   DeepDiveStatus,
@@ -107,6 +108,23 @@ export function useAwards() {
     queryKey: ["awards"],
     queryFn: () => api.get<AwardsResponse>("/api/awards"),
     staleTime: 60_000,
+  });
+}
+
+export function useRecordsQueue() {
+  return useQuery({
+    queryKey: ["records"],
+    queryFn: () => api.get<RecordsResponse>("/api/records"),
+    staleTime: 60_000,
+  });
+}
+
+export function useRecordsMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Record<string, string> }) =>
+      api.put(`/api/records/${id}`, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["records"] }),
   });
 }
 

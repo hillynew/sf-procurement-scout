@@ -331,6 +331,25 @@ export interface AwardsResponse {
   contracts_total: number;
 }
 
+export interface RecordsRequest {
+  opportunity_id: string;
+  agency: string;
+  title: string;
+  external_id: string | null;
+  contact_email: string | null;
+  letter: string;
+  status: string;
+  ripe_on: string | null;
+  sent_on: string | null;
+  received_on: string | null;
+  notes: string;
+}
+
+export interface RecordsResponse {
+  added: number;
+  requests: RecordsRequest[];
+}
+
 export interface VendorProfile {
   name: string;
   awards: number;

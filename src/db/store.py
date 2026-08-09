@@ -1146,3 +1146,98 @@ def load_contracts() -> List["Contract"]:
         )
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Records requests (Chapter 119)
+# ---------------------------------------------------------------------------
+
+RECORDS_STATUSES = ("ready", "sent", "received", "no_response", "skipped")
+
+
+def refresh_records_queue() -> int:
+    """Mint a ready request for every newly-ripe lead. Returns rows added.
+
+    The letter is generated once, at minting, and stored — the text a user
+    actually sent must never drift under them when the generator changes.
+    """
+    from ..records import request_text, ripe_for_request
+    from .models import RecordsRequest
+
+    leads = ripe_for_request(load_opportunities())
+    added = 0
+    with session_scope() as s:
+        existing = set(s.execute(select(RecordsRequest.opportunity_id)).scalars())
+        for lead in leads:
+            opp = lead.opportunity
+            if opp.opportunity_id in existing:
+                continue
+            s.add(RecordsRequest(
+                opportunity_id=opp.opportunity_id,
+                agency=opp.agency,
+                title=opp.title,
+                external_id=opp.external_id,
+                contact_email=opp.contact_email,
+                letter=request_text(opp),
+                status="ready",
+                ripe_on=lead.ripe_on,
+                created_at=datetime.utcnow(),
+            ))
+            added += 1
+    return added
+
+
+def list_records_requests() -> List[dict]:
+    from .models import RecordsRequest
+
+    with session_scope() as s:
+        rows = s.execute(
+            select(RecordsRequest).order_by(RecordsRequest.ripe_on.desc())
+        ).scalars().all()
+        return [
+            {
+                "opportunity_id": r.opportunity_id,
+                "agency": r.agency,
+                "title": r.title,
+                "external_id": r.external_id,
+                "contact_email": r.contact_email,
+                "letter": r.letter,
+                "status": r.status,
+                "ripe_on": r.ripe_on.isoformat() if r.ripe_on else None,
+                "sent_on": r.sent_on.isoformat() if r.sent_on else None,
+                "received_on": r.received_on.isoformat() if r.received_on else None,
+                "notes": r.notes,
+            }
+            for r in rows
+        ]
+
+
+def update_records_request(opportunity_id: str, **patch) -> Optional[dict]:
+    """Patch status/notes/contact_email; date stamps follow the status."""
+    from .models import RecordsRequest
+
+    with session_scope() as s:
+        row = s.get(RecordsRequest, opportunity_id)
+        if row is None:
+            return None
+        if "status" in patch:
+            status = patch["status"]
+            if status not in RECORDS_STATUSES:
+                raise ValueError(f"unknown status {status!r}")
+            row.status = status
+            today = date.today()
+            if status == "sent" and row.sent_on is None:
+                row.sent_on = today
+            if status == "received" and row.received_on is None:
+                row.received_on = today
+        if "notes" in patch and patch["notes"] is not None:
+            row.notes = str(patch["notes"])
+        if "contact_email" in patch and patch["contact_email"] is not None:
+            row.contact_email = str(patch["contact_email"]).strip() or None
+        s.flush()
+        return {
+            "opportunity_id": row.opportunity_id, "status": row.status,
+            "sent_on": row.sent_on.isoformat() if row.sent_on else None,
+            "received_on": row.received_on.isoformat() if row.received_on else None,
+            "notes": row.notes, "contact_email": row.contact_email,
+        }

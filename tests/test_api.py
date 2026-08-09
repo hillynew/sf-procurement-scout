@@ -673,3 +673,38 @@ def test_vendor_profiles_group_name_variants(client):
     assert apex["contracts"] == 1
     assert apex["awarded_total"] == 200_000
     assert "Broward County" in apex["agencies"]
+
+
+def test_records_queue_mints_letters_for_ripe_leads(client):
+    from datetime import datetime, timedelta
+
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    stale = Opportunity(
+        source_id="s", source_name="S", title="Sidewalk Grinding ITB",
+        url="https://x.gov/sg", county="broward", agency="City of Testville",
+        status="closed", external_id="ITB-25-77",
+        due_date=datetime.now() - timedelta(days=45),
+        contact_email="clerk@testville.gov",
+    )
+    db.save_snapshot([stale], [SourceHealth(source_id="s", name="S", ok=True, count=1)])
+
+    data = client.get("/api/records").json()
+    assert data["added"] == 1
+    (req,) = [r for r in data["requests"] if r["opportunity_id"] == stale.opportunity_id]
+    assert req["status"] == "ready"
+    assert "119.01(2)(f)" in req["letter"]
+    assert req["contact_email"] == "clerk@testville.gov"
+
+    # Second read must not re-mint.
+    again = client.get("/api/records").json()
+    assert again["added"] == 0
+
+    # Marking sent stamps the date.
+    r = client.put(f"/api/records/{stale.opportunity_id}", json={"status": "sent"})
+    assert r.status_code == 200
+    assert r.json()["sent_on"] is not None
+
+    r = client.put(f"/api/records/{stale.opportunity_id}", json={"status": "bogus"})
+    assert r.status_code == 422
