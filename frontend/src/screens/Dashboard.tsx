@@ -108,6 +108,37 @@ export default function Dashboard() {
                   sub={t.revenue_cents > 0 ? `${fmtMoneyCents(t.revenue_cents)} won` : `${t.won}W – ${t.lost}L`} />
       </div>
 
+      {stats.protest_windows.length > 0 && (
+        <div className="card border-2 p-4" style={{ borderColor: "var(--color-warn)" }}>
+          <div className="mb-2.5 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide"
+               style={{ color: "var(--color-warn)" }}>
+            <span aria-hidden>⏱</span> Protest windows open — 72-hour clocks running
+          </div>
+          <div className="space-y-1.5">
+            {stats.protest_windows.map((w) => (
+              <button key={w.opportunity_id}
+                      onClick={() => navigate(`/bids/${w.opportunity_id}`)}
+                      className="flex w-full items-center gap-3 rounded-[10px] px-2.5 py-2 text-left hover:bg-bg">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{w.title}</span>
+                  <span className="block truncate text-xs text-ink-soft">
+                    {w.agency}
+                    {w.awarded_vendor ? ` · to ${w.awarded_vendor}` : ""}
+                    {w.award_amount != null ? ` · ${fmtMoney(w.award_amount)}` : ""}
+                  </span>
+                </span>
+                <span className="shrink-0 rounded-full px-2.5 py-1 text-xs font-bold"
+                      style={{ background: "var(--color-warn-soft)", color: "var(--color-warn)" }}>
+                  {w.hours_left < 24
+                    ? `${Math.round(w.hours_left)}h left`
+                    : `~${Math.round(w.hours_left / 24)} business days`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {stats.attention.length > 0 && (
         <div className="card p-4">
           <div className="mb-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">

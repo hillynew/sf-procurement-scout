@@ -296,7 +296,20 @@ export interface FetchStatus {
   error?: string;
 }
 
+export interface ProtestWindow {
+  opportunity_id: string;
+  title: string;
+  agency: string;
+  county: string;
+  deadline: string;
+  hours_left: number;
+  awarded_vendor: string | null;
+  award_amount: number | null;
+  url: string;
+}
+
 export interface Stats {
+  protest_windows: ProtestWindow[];
   totals: {
     open_count: number;
     upcoming_count: number;

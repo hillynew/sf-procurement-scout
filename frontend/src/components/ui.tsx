@@ -34,6 +34,9 @@ const STATUS_STYLE: Record<string, { bg: string; fg: string }> = {
   upcoming: { bg: "var(--color-upcoming-soft)", fg: "var(--color-upcoming)" },
   closed: { bg: "var(--color-closed-soft)", fg: "var(--color-closed)" },
   cancelled: { bg: "var(--color-danger-soft)", fg: "var(--color-danger)" },
+  // Award notices were falling through to the grey closed style, which made
+  // the most time-critical status in the system invisible.
+  award: { bg: "var(--color-warn-soft)", fg: "var(--color-warn)" },
   catalog: { bg: "var(--color-closed-soft)", fg: "var(--color-ink-soft)" },
 };
 

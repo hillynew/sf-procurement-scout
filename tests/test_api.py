@@ -547,3 +547,26 @@ def test_quality_report_endpoint(client):
         fields = data["overall"]["fields"]
         assert "due_date" in fields and "award_amount" in fields
         assert 0 <= fields["due_date"]["pct"] <= 100
+
+
+def test_stats_carries_open_protest_windows(client, monkeypatch):
+    """An award notice with a live 72-hour window must reach the dashboard."""
+    from datetime import datetime, timedelta
+
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    award = Opportunity(
+        source_id="mfmp_vbs", source_name="MFMP", title="Intended Award: Moving Services",
+        url="https://vendor.myfloridamarketplace.com/ad/1", county="statewide",
+        agency="Department of Legal Affairs", status="award",
+        awarded_vendor="MoveCo LLC", award_amount=250_000,
+        protest_deadline=datetime.now() + timedelta(days=2),
+    )
+    db.save_snapshot([award], [SourceHealth(source_id="mfmp_vbs", name="MFMP", ok=True, count=1)])
+
+    data = client.get("/api/stats").json()
+    windows = data["protest_windows"]
+    assert len(windows) == 1
+    assert windows[0]["awarded_vendor"] == "MoveCo LLC"
+    assert windows[0]["hours_left"] > 0

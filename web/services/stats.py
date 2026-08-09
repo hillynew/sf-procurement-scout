@@ -7,6 +7,7 @@ from typing import Dict, List
 
 from src.db import store as db
 from src.models.opportunity import Opportunity
+from src.protest import business_hours_left
 
 from .matching import offer_key
 
@@ -130,7 +131,31 @@ def build_stats(opps: List[Opportunity], workflow: Dict[str, dict]) -> dict:
             })
     attention.sort(key=lambda a: a["days_until_due"])
 
+    # Award notices whose 72-hour protest window is still open — the most
+    # time-critical rows in the system, sorted by hours remaining. Kept small
+    # and pre-digested so the dashboard needs no date math of its own.
+    protest_windows = []
+    for o in opps:
+        if o.status != "award" or not o.protest_deadline:
+            continue
+        hours = business_hours_left(o.protest_deadline)
+        if hours is None or hours <= 0:
+            continue
+        protest_windows.append({
+            "opportunity_id": o.opportunity_id,
+            "title": o.title,
+            "agency": o.agency,
+            "county": o.county,
+            "deadline": o.protest_deadline.isoformat(),
+            "hours_left": round(hours, 1),
+            "awarded_vendor": o.awarded_vendor,
+            "award_amount": o.award_amount,
+            "url": o.url,
+        })
+    protest_windows.sort(key=lambda w: w["hours_left"])
+
     return {
+        "protest_windows": protest_windows[:8],
         "totals": {
             "open_count": len(open_opps),
             "upcoming_count": len(upcoming),
