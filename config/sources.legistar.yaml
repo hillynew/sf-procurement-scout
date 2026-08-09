@@ -1,0 +1,64 @@
+# Commission award approvals via the Legistar Web API — the only free,
+# structured path to LOCAL award amounts found in the 2026-08-09 statewide
+# survey (docs/SOURCES.md). Clients below were live-verified that day.
+# Miami-Dade's instance is dead (frozen July 2018) and deliberately absent.
+sources:
+  - id: legistar_broward
+    name: Broward County commission awards
+    county: broward
+    agency: Broward County
+    live_fetch: true
+    adapter: legistar
+    platform: legistar
+    legistar_client: broward
+    portal_url: https://broward.legistar.com/Legislation.aspx
+
+  - id: legistar_fortlauderdale
+    name: Fort Lauderdale commission awards
+    county: broward
+    agency: City of Fort Lauderdale
+    live_fetch: true
+    adapter: legistar
+    platform: legistar
+    legistar_client: fortlauderdale
+    portal_url: https://fortlauderdale.legistar.com/Legislation.aspx
+
+  - id: legistar_miami
+    name: City of Miami commission awards
+    county: miami-dade
+    agency: City of Miami
+    live_fetch: true
+    adapter: legistar
+    platform: legistar
+    legistar_client: miamifl
+    portal_url: https://miamifl.legistar.com/Legislation.aspx
+
+  - id: legistar_coralgables
+    name: Coral Gables commission awards
+    county: miami-dade
+    agency: City of Coral Gables
+    live_fetch: true
+    adapter: legistar
+    platform: legistar
+    legistar_client: coralgables
+    portal_url: https://coralgables.legistar.com/Legislation.aspx
+
+  - id: legistar_polk
+    name: Polk County commission awards
+    county: polk
+    agency: Polk County
+    live_fetch: true
+    adapter: legistar
+    platform: legistar
+    legistar_client: polkcountyfl
+    portal_url: https://polkcountyfl.legistar.com/Legislation.aspx
+
+  - id: legistar_jacksonville
+    name: Jacksonville council awards
+    county: duval
+    agency: City of Jacksonville
+    live_fetch: true
+    adapter: legistar
+    platform: legistar
+    legistar_client: jaxcityc
+    portal_url: https://jaxcityc.legistar.com/Legislation.aspx

@@ -111,6 +111,15 @@ TERMS: Dict[str, Verdict] = {
              "data; no clause on copying, downloading or automated reading",
     ),
 
+    "legistar": Verdict(
+        PERMITTED, source="https://webapi.legistar.com/",
+        checked_on="2026-08-09",
+        note="Granicus's public read-only web API, self-documenting (Home / "
+             "API / Examples), no auth, no robots.txt, no terms of use served "
+             "on the host — published precisely so civic data can be read "
+             "programmatically",
+    ),
+
     # -- vendor platforms that forbid it ---------------------------------
     "demandstar": Verdict(
         PROHIBITED, source="https://network.demandstar.com/terms-of-use/",
