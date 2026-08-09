@@ -2,12 +2,18 @@
 # Deploy: Dashboard → New → Blueprint → connect this repo
 #
 # One web service (React SPA + FastAPI, built by the repo's Dockerfile) plus
-# a free Postgres database so tracked bids, notes, results, watchlists, and
+# a Postgres database so tracked bids, notes, results, watchlists, and
 # snapshots survive restarts and deploys.
+#
+# No `plan` fields on purpose: instance plans are managed in the Render
+# dashboard, and an omitted plan makes a sync RETAIN the existing resource's
+# plan instead of fighting it (a declared plan is enforced on every sync —
+# which is how a leftover `plan: free` broke the sync after the database and
+# web service were upgraded). Fresh deploys get Render's defaults:
+# basic-256mb for the database, starter for services.
 
 databases:
   - name: scout-db
-    plan: free
     databaseName: scout
     user: scout
 
@@ -15,7 +21,6 @@ services:
   - type: web
     name: sf-procurement-scout
     runtime: docker
-    plan: free
     region: oregon
     branch: main
     dockerfilePath: ./Dockerfile
@@ -47,15 +52,14 @@ services:
       - key: SF_SCOUT_BONFIRE_COOKIE  # enables an authenticated Bonfire session
         sync: false
 
-  # Scheduled fetch — wakes the (possibly sleeping) web service and kicks a
-  # background fetch every 4 hours, so data stays fresh around the clock even
-  # on the free web tier. Stdlib-only; a 409 means a fetch is already running
-  # and counts as success. Created live on 2026-08-09 (scout-fetch-cron);
-  # this block keeps the Blueprint in step with it.
+  # Scheduled fetch — wakes the web service and kicks a background fetch
+  # every 4 hours, so data stays fresh around the clock. Stdlib-only; a 409
+  # means a fetch is already running and counts as success. Created live on
+  # 2026-08-09 (scout-fetch-cron); syncs adopt it by name rather than
+  # creating a duplicate.
   - type: cron
     name: scout-fetch-cron
     runtime: python
-    plan: starter
     region: oregon
     branch: main
     schedule: "0 */4 * * *"
