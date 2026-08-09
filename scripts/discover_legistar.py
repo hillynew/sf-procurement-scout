@@ -96,8 +96,10 @@ def is_florida(client: str, entity_name: str) -> bool:
     if resp is None or resp.status_code != 200:
         return False
     text = resp.text[:20000].lower()
-    needle = entity_name.lower().split(" county")[0]
-    return "florida" in text or ", fl" in text or needle in text
+    # The entity's own name proves nothing — every city's page carries it,
+    # whichever state the city is in (this check shipped with a bare-name
+    # fallback and configured Madison, Wisconsin). Florida must be named.
+    return "florida" in text or ", fl" in text
 
 
 def fresh(modified: str) -> bool:

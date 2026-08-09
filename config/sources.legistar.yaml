@@ -102,3 +102,120 @@ sources:
   platform: legistar
   legistar_client: lakecounty
   portal_url: https://lakecounty.legistar.com/Legislation.aspx
+- id: legistar_doral
+  name: Doral commission awards
+  county: miami-dade
+  agency: Doral
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: doral
+  portal_url: https://doral.legistar.com/Legislation.aspx
+- id: legistar_hollywoodfl
+  name: Hollywood commission awards
+  county: broward
+  agency: Hollywood
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: hollywoodfl
+  portal_url: https://hollywoodfl.legistar.com/Legislation.aspx
+- id: legistar_miramar
+  name: Miramar commission awards
+  county: broward
+  agency: Miramar
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: miramar
+  portal_url: https://miramar.legistar.com/Legislation.aspx
+- id: legistar_margatefl
+  name: Margate commission awards
+  county: broward
+  agency: Margate
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: margatefl
+  portal_url: https://margatefl.legistar.com/Legislation.aspx
+- id: legistar_coconutcreek
+  name: Coconut Creek commission awards
+  county: broward
+  agency: Coconut Creek
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: coconutcreek
+  portal_url: https://coconutcreek.legistar.com/Legislation.aspx
+- id: legistar_hallandalebeach
+  name: Hallandale Beach commission awards
+  county: broward
+  agency: Hallandale Beach
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: hallandalebeach
+  portal_url: https://hallandalebeach.legistar.com/Legislation.aspx
+- id: legistar_delraybeach
+  name: Delray Beach commission awards
+  county: palm-beach
+  agency: Delray Beach
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: delraybeach
+  portal_url: https://delraybeach.legistar.com/Legislation.aspx
+- id: legistar_keywest
+  name: Key West commission awards
+  county: monroe
+  agency: Key West
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: keywest
+  portal_url: https://keywest.legistar.com/Legislation.aspx
+- id: legistar_marcoisland
+  name: Marco Island commission awards
+  county: collier
+  agency: Marco Island
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: marcoisland
+  portal_url: https://marcoisland.legistar.com/Legislation.aspx
+- id: legistar_clearwater
+  name: Clearwater commission awards
+  county: pinellas
+  agency: Clearwater
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: clearwater
+  portal_url: https://clearwater.legistar.com/Legislation.aspx
+- id: legistar_deltona
+  name: Deltona commission awards
+  county: volusia
+  agency: Deltona
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: deltona
+  portal_url: https://deltona.legistar.com/Legislation.aspx
+- id: legistar_cocoa
+  name: Cocoa commission awards
+  county: brevard
+  agency: Cocoa
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: cocoa
+  portal_url: https://cocoa.legistar.com/Legislation.aspx
+- id: legistar_gainesville
+  name: Gainesville commission awards
+  county: alachua
+  agency: Gainesville
+  live_fetch: true
+  adapter: legistar
+  platform: legistar
+  legistar_client: gainesville
+  portal_url: https://gainesville.legistar.com/Legislation.aspx
