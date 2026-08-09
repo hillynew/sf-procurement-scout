@@ -168,6 +168,12 @@ class OpenGovAdapter(SourceAdapter):
         fields = enrich(title, external_id=ref)
 
         summary = _text(row.get("summary"))
+        status, award_date = _ended_status(row) if not is_open else ("open", None)
+        # Everything except the two bulky, row-identical objects is kept, so a
+        # field this mapping missed can still be recovered from `raw` later.
+        raw = {k: v for k, v in row.items() if k not in ("government", "summary")}
+        raw["project_id"] = project_id
+        raw["opengov_status"] = row.get("status")
         return Opportunity(
             **self._base_kwargs(),
             external_id=fields["external_id"] or ref,
@@ -180,9 +186,10 @@ class OpenGovAdapter(SourceAdapter):
             keywords=fields["keywords"],
             posted_date=_as_date(row.get("releaseProjectDate")),
             due_date=parse_dt(row.get("proposalDeadline")),
-            status="open" if is_open else "closed",
+            status=status,
+            award_date=award_date,
             description=summary[:600] or None,
-            raw={"project_id": project_id, "opengov_status": row.get("status")},
+            raw=raw,
         )
 
     # -- detail ------------------------------------------------------------
@@ -208,11 +215,47 @@ class OpenGovAdapter(SourceAdapter):
         contact = _contact(data)
         if contact:
             opp.contact = contact
-        if data.get("questionDeadline") and opp.questions_due is None:
-            opp.questions_due = parse_dt(data.get("questionDeadline"))
+        email = str(data.get("contactEmail") or data.get("procurementContactEmail") or "").strip()
+        if email and not opp.contact_email:
+            opp.contact_email = email
+        phone = str(
+            data.get("contactPhoneComplete") or data.get("procurementContactPhoneComplete") or ""
+        ).strip()
+        if phone and not opp.contact_phone:
+            opp.contact_phone = phone
+
+        # The question deadline is `qaDeadline`; `questionDeadline` is kept as
+        # a fallback only — reading it alone meant questions_due was never set.
+        qa = data.get("qaDeadline") or data.get("questionDeadline")
+        if qa and opp.questions_due is None:
+            opp.questions_due = parse_dt(qa)
+
+        if not opp.pre_bid_meeting:
+            opp.pre_bid_meeting = _pre_bid(data)
+
+        # The portal's own classification: NIGP class-item codes.
+        codes = [
+            f"NIGP {c.get('code')} {c.get('title') or ''}".strip()
+            for c in (data.get("categories") or [])
+            if isinstance(c, dict) and c.get("code")
+        ]
+        if codes:
+            opp.commodity_codes = codes
+            opp.raw_category = "; ".join(
+                str(c.get("title") or c.get("code")) for c in data["categories"] if isinstance(c, dict)
+            )
+
+        if not opp.budget:
+            opp.budget = _estimated_cost(data)
 
         docs = _documents(data)
-        docs += self._addenda(project_id)
+        # The detail payload's own addendum records carry stable attachment
+        # URLs; the /addendums endpoint's records carry none at all, so it is
+        # only worth a request when the payload had nothing inline.
+        addenda = _inline_addenda(data)
+        if not addenda:
+            addenda = self._addenda(project_id)
+        docs += addenda
         if docs:
             opp.documents = docs
         opp.detail_fetched = True
@@ -388,7 +431,22 @@ def _department(value: Any) -> Optional[str]:
 
 
 def _contact(data: Dict[str, Any]) -> Optional[str]:
-    """Best available human, from the several shapes the payload uses."""
+    """Best available human.
+
+    The live payload carries contacts as *flat* fields (`contactFullName`,
+    `contactTitle`, with a `procurement*` mirror) — the nested shapes tried
+    below are kept as fallbacks, but reading only them meant detail contacts
+    were effectively never captured.
+    """
+    for prefix in ("contact", "procurementContact"):
+        name = str(
+            data.get(f"{prefix}FullName")
+            or data.get(f"{prefix}DisplayName")
+            or ""
+        ).strip()
+        if name:
+            title = str(data.get(f"{prefix}Title") or "").strip()
+            return f"{name} — {title}" if title else name
     for key in ("contact", "contactInfo", "projectContact", "owner"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
@@ -403,6 +461,72 @@ def _contact(data: Dict[str, Any]) -> Optional[str]:
             if joined:
                 return joined
     return None
+
+
+#: closeOutReason is free text an agent typed: "awarded", "Contract Awarded",
+#: "Project Awarded", "Complete", "Closed", "Project will be re-solicited"…
+_AWARD_WORDS = ("award",)
+_CANCEL_WORDS = ("cancel", "re-solicit", "resolicit", "rejected")
+
+
+def _ended_status(row: Dict[str, Any]):
+    """(status, award_date) for a non-open row.
+
+    The platform's own signals: `closedSubstatus` "canceled", free-text
+    `closeOutReason`, and the `awardPending` status. Collapsing all of these
+    to "closed" hid every award the platform reports.
+    """
+    reason = str(row.get("closeOutReason") or "").lower()
+    sub = str(row.get("closedSubstatus") or "").lower()
+    if any(w in reason for w in _AWARD_WORDS):
+        return "award", _as_date(row.get("closedAt") or row.get("solicitationClosedDate"))
+    if sub in ("canceled", "cancelled") or any(w in reason for w in _CANCEL_WORDS):
+        return "cancelled", None
+    return "closed", None
+
+
+def _pre_bid(data: Dict[str, Any]) -> Optional[str]:
+    date = data.get("preProposalDate")
+    if not date:
+        return None
+    parts = [str(parse_dt(date) or date)]
+    text = str(data.get("preProposalText") or "").strip()
+    if text:
+        parts.append(text)
+    location = str(data.get("preProposalLocation") or "").strip()
+    if location:
+        parts.append(location)
+    return " · ".join(parts)
+
+
+def _estimated_cost(data: Dict[str, Any]) -> Optional[str]:
+    """Estimated value hides in template variables, when it appears at all."""
+    from ..requirements import extract_estimated_value
+
+    for q in data.get("upfrontQuestions") or []:
+        if not isinstance(q, dict):
+            continue
+        title = str(q.get("title") or "").lower()
+        if "cost" not in title and "budget" not in title and "value" not in title:
+            continue
+        value = str(((q.get("inputData") or {}) if isinstance(q.get("inputData"), dict) else {}).get("value") or "")
+        found = extract_estimated_value(value)
+        if found:
+            return found
+    return None
+
+
+def _inline_addenda(data: Dict[str, Any]) -> List[Document]:
+    out: List[Document] = []
+    for i, row in enumerate(data.get("addendums") or [], start=1):
+        if not isinstance(row, dict):
+            continue
+        for doc in _documents(row):
+            doc.kind = "addendum"
+            if doc.name == _DEFAULT_DOC_NAME:
+                doc.name = str(row.get("titleDisplay") or row.get("title") or f"Addendum {i}")
+            out.append(doc)
+    return out
 
 
 def _as_date(value: Any):

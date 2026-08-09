@@ -35,7 +35,10 @@ def test_fixture_mapping(monkeypatch, fixture_payload):
 
     def fake_get_json(url, params=None, **kwargs):
         captured["url"] = url
-        captured["params"] = dict(params)
+        # First call is the solicitation query; the award pass follows it.
+        captured.setdefault("params", dict(params))
+        if params.get("ptype") == "a":
+            return {"totalRecords": 0, "opportunitiesData": []}
         return fixture_payload
 
     monkeypatch.setattr("src.sources.sam_gov.get_json", fake_get_json)
@@ -70,8 +73,52 @@ def test_pagination_stops_at_total(monkeypatch, fixture_payload):
 
     def fake_get_json(url, params=None, **kwargs):
         calls.append(dict(params))
+        if params.get("ptype") == "a":
+            return {"totalRecords": 0, "opportunitiesData": []}
         return fixture_payload  # totalRecords=2 < PAGE_SIZE → one call only
 
     monkeypatch.setattr("src.sources.sam_gov.get_json", fake_get_json)
     SamGovAdapter(CFG).fetch()
-    assert len(calls) == 1
+    # One solicitation page + one award page.
+    assert [c.get("ptype") for c in calls] == ["o,k,p", "a"]
+
+
+def test_award_notices_carry_the_structured_award(monkeypatch):
+    """ptype=a rows map vendor, amount, date, and the solicitation linkage."""
+    monkeypatch.setenv("SF_SCOUT_SAM_KEY", "test-key")
+
+    award_row = {
+        "title": "Runway Repair — Award",
+        "noticeId": "n1",
+        "solicitationNumber": "FA648726B0011",
+        "postedDate": "2026-08-01",
+        "type": "Award Notice",
+        "active": "No",
+        "fullParentPathName": "DEPT OF DEFENSE.DEPT OF THE AIR FORCE",
+        "naicsCode": "237310",
+        "classificationCode": "Z2AZ",
+        "resourceLinks": ["https://sam.gov/api/prod/opps/v3/opportunities/resources/files/x/download"],
+        "award": {
+            "date": "2026-07-28",
+            "number": "FA6487-26-C-0001",
+            "amount": "1234567.89",
+            "awardee": {"name": "Acme Paving LLC"},
+        },
+    }
+
+    def fake_get_json(url, params=None, **kwargs):
+        if params.get("ptype") == "a":
+            return {"totalRecords": 1, "opportunitiesData": [award_row]}
+        return {"totalRecords": 0, "opportunitiesData": []}
+
+    monkeypatch.setattr("src.sources.sam_gov.get_json", fake_get_json)
+    (opp,) = SamGovAdapter(CFG).fetch()
+
+    assert opp.status == "award"
+    assert opp.awarded_vendor == "Acme Paving LLC"
+    assert opp.award_amount == 1234568
+    assert str(opp.award_date) == "2026-07-28"
+    assert opp.linked_ref == "FA648726B0011"
+    assert opp.award_linkage == "ref"
+    assert opp.commodity_codes == ["NAICS 237310", "PSC Z2AZ"]
+    assert len(opp.documents) == 1

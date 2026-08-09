@@ -216,6 +216,60 @@ def _clean(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").replace("\xa0", " ")).strip()
 
 
+class MiamiDadeAwardsAdapter(SourceAdapter):
+    """ISD award recommendations — the county's own award-notice feed.
+
+    Same DataTables pattern as the solicitation lists, at
+    `Home/AwardRecommendationsList`, with recommendation PDFs under
+    `/Apps/ISD/StratProc/ProcurementNAS/pdf_Files/AwardRecommendation`. The
+    list is empty between recommendation windows (verified live 2026-08-09)
+    — that is a normal state, not a breakage. Vendor and amount live inside
+    the PDF; the row itself carries a title and a posting date.
+    """
+
+    list_path = "/apps/ISD/stratproc/Home/AwardRecommendationsList"
+    page_url = "https://www.miamidade.gov/apps/ISD/stratproc/Home/AwardRecommendations"
+    allows_empty = True
+    provides_open_bids = False
+
+    def fetch(self) -> List[Opportunity]:
+        rows = _fetch_list(self.list_path, self.page_url)
+        out = [o for o in (self._from_row(r) for r in rows) if o]
+        if not out:
+            self.empty_note = "no award recommendations posted right now"
+        return out
+
+    def _from_row(self, r: Dict[str, Any]) -> Optional[Opportunity]:
+        title = str(r.get("title") or r.get("documentTitle") or "").strip()
+        if not title:
+            return None
+        posted = parse_dt(str(r.get("datePosted") or r.get("postedDate") or r.get("releaseDate") or ""))
+        fields = enrich(title)
+        doc_url = str(r.get("url") or r.get("pdfUrl") or "").strip()
+        documents = (
+            [Document(name=title[:160], url=f"{MD_HOST}{doc_url}" if doc_url.startswith("/") else doc_url)]
+            if doc_url
+            else []
+        )
+        return Opportunity(
+            **self._base_kwargs(),
+            external_id=fields["external_id"],
+            title=title[:200],
+            url=self.page_url,
+            solicitation_type=fields["solicitation_type"],
+            offer_type=fields["offer_type"],
+            categories=fields["categories"],
+            keywords=fields["keywords"],
+            status="award",
+            posted_date=posted.date() if posted else None,
+            award_date=posted.date() if posted else None,
+            documents=documents,
+            description="Award recommendation posted by ISD Strategic Procurement; "
+                        "the recommendation document names the vendor.",
+            raw=r,
+        )
+
+
 def _fetch_list(path: str, referer: str) -> List[Dict[str, Any]]:
     """Call the DataTables JSON endpoint. Returns [] when the shape is unexpected."""
     s = session()

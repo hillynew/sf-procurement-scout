@@ -85,7 +85,7 @@ PLATFORM_ADAPTERS: Dict[str, tuple] = {
 #: `a=` agency id — they point at login pages, home pages, an agency-named path,
 #: and in one case a JavaScript file.
 DISCOVERED_ELSEWHERE = {
-    "vendorlink": "scripts/discover_vendorlink.py owns these — it reads the agency dropdown",
+    "vendorlink": "terms prohibit automated reading (src/terms.py); catalog pointers only",
 }
 
 HEADER = (

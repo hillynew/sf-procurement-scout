@@ -124,6 +124,14 @@ export default function BidDrawer() {
               </div>
             )}
 
+            {bid.documents.length === 0 && bid.status !== "catalog" && (
+              <div className="mt-4 rounded-[10px] border border-dashed border-line px-3 py-2 text-xs text-ink-faint">
+                {bid.detail_fetched
+                  ? "No documents published on the portal for this bid."
+                  : "Packet not fetched yet — the portal may hold documents this pass hasn't read. Check the portal link."}
+              </div>
+            )}
+
             {bid.documents.length > 0 && (
               <div className="mt-4">
                 <div className="mb-1.5 text-[10px] font-bold uppercase tracking-wide text-ink-faint">

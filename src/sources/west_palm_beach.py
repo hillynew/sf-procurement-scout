@@ -91,7 +91,13 @@ class WestPalmBeachAdapter(SourceAdapter):
                     if status_el
                     else ""
                 )
-                if status_txt != "open":
+                # Awarded rows are records worth keeping, not noise: they are
+                # the only award signal this walled portal publishes.
+                if status_txt == "awarded":
+                    status = "award"
+                elif status_txt == "open":
+                    status = "open"
+                else:
                     continue
 
                 title = re.sub(r"\s+", " ", title_el.get_text(" ", strip=True))[:200]
@@ -141,7 +147,7 @@ class WestPalmBeachAdapter(SourceAdapter):
                         categories=fields["categories"],
                         keywords=fields["keywords"],
                         due_date=due,
-                        status="open",
+                        status=status,
                         description=" | ".join(desc_parts) if desc_parts else None,
                         raw={"status": status_txt, "ref": ref},
                     )

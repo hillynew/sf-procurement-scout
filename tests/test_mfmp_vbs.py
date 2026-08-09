@@ -249,3 +249,47 @@ def test_session_is_built_once_under_concurrency():
     with ThreadPoolExecutor(max_workers=8) as pool:
         sessions = list(pool.map(lambda _: a._session(), range(8)))
     assert len({id(s) for s in sessions}) == 1
+
+
+def test_detail_captures_codes_linkage_and_nested_contact(monkeypatch):
+    """The live detail payload: responseContact nested, UNSPSC codes,
+    responseDate as the question deadline, linkedAdNumber on decisions."""
+    from src.sources.mfmp_vbs import MfmpVbsAdapter as MfmpAdapter
+    from src.models.opportunity import Opportunity
+
+    detail = {
+        "description": "<p>Full scope.</p>",
+        "commodityCodes": [{"id": "78101804", "value": "Relocation services"}],
+        "responseDate": "2026-08-20T18:30:00.000+00:00",
+        "responseContact": {
+            "responseContact": "Monique Manns",
+            "email": "monique.manns@myfloridalegal.com",
+            "ph": "(850) 414-3419",
+        },
+        "linkedAdNumber": "16460",
+        "indicators": {"preSolicitationConference": True},
+        "docs": [],
+    }
+    monkeypatch.setattr(MfmpAdapter, "_get", lambda self, s, url: detail)
+
+    adapter = MfmpAdapter({
+        "id": "mfmp_vbs", "name": "MFMP", "county": "statewide",
+        "agency": "State of Florida", "portal_url": "https://vendor.myfloridamarketplace.com",
+    })
+    opp = Opportunity(
+        source_id="mfmp_vbs", source_name="MFMP", title="Intended Decision",
+        url="https://vendor.myfloridamarketplace.com/ad/16593",
+        county="statewide", agency="State of Florida", status="award",
+        raw={"advertisementId": 16593},
+    )
+    adapter.fetch_detail(opp)
+
+    assert opp.commodity_codes == ["UNSPSC 78101804 Relocation services"]
+    assert opp.raw_category == "Relocation services"
+    assert opp.contact == "Monique Manns"
+    assert opp.contact_email == "monique.manns@myfloridalegal.com"
+    assert opp.contact_phone == "(850) 414-3419"
+    assert opp.questions_due is not None
+    assert opp.pre_bid_meeting
+    assert opp.linked_ref == "16460"
+    assert opp.award_linkage == "ref"

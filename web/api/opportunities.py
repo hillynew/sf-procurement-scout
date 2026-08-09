@@ -20,11 +20,19 @@ def list_opportunities():
     opps = db.load_opportunities()
     workflow = db.workflow_state()
     summarized = db.summarized_ids(PROMPT_VERSION)
+    first_seen = db.first_seen_map()
     run = db.latest_run()
+    out = []
+    for o in opps:
+        data = opp_out(o, workflow, summarized)
+        # When the *scout* first saw it — the anchor for "new since my last
+        # visit", which posted_date cannot serve (agencies backdate).
+        data["first_seen_at"] = first_seen.get(o.opportunity_id)
+        out.append(data)
     return {
         "fetched_at": run["finished_at"].isoformat() if run and run["finished_at"] else None,
         "count": len(opps),
-        "opportunities": [opp_out(o, workflow, summarized) for o in opps],
+        "opportunities": out,
     }
 
 

@@ -5,6 +5,7 @@ import {
 } from "@tanstack/react-query";
 import { api } from "./client";
 import type {
+  AwardsResponse,
   Contractor,
   ContractorMatchesStatus,
   DeepDiveStatus,
@@ -13,6 +14,7 @@ import type {
   NotificationItem,
   Opportunity,
   OpportunityDetail,
+  QualityReport,
   ResearchStatus,
   SettingsResponse,
   SnapshotResponse,
@@ -95,6 +97,22 @@ export function useWatchlistMatches(id: string | null) {
         `/api/watchlists/${id}/matches`,
       ),
     enabled: !!id,
+  });
+}
+
+export function useAwards() {
+  return useQuery({
+    queryKey: ["awards"],
+    queryFn: () => api.get<AwardsResponse>("/api/awards"),
+    staleTime: 60_000,
+  });
+}
+
+export function useQuality() {
+  return useQuery({
+    queryKey: ["quality"],
+    queryFn: () => api.get<QualityReport>("/api/quality"),
+    staleTime: 60_000,
   });
 }
 

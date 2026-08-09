@@ -65,7 +65,8 @@ def test_second_snapshot_counts_only_new(db):
     assert result.new_ids == [b.opportunity_id]
 
 
-def test_tracked_rows_survive_snapshot_replace(db):
+def test_vanished_rows_are_kept_not_deleted(db):
+    """A captured record is the archive — nothing is deleted on replace."""
     a, b = make_opp("Guardrail Install"), make_opp("Fleet Fuel Contract")
     db.save_snapshot([a, b], HEALTH)
     db.set_tracked(a.opportunity_id, True)
@@ -73,9 +74,14 @@ def test_tracked_rows_survive_snapshot_replace(db):
     # Next fetch: both bids fell off the portals.
     db.save_snapshot([], HEALTH)
     loaded = db.load_opportunities()
-    assert [o.opportunity_id for o in loaded] == [a.opportunity_id]
-    # ...and the retained row is flagged as no longer present.
+    assert {o.opportunity_id for o in loaded} == {a.opportunity_id, b.opportunity_id}
+    # ...and every retained row is flagged as no longer present.
     assert db.load_opportunities(present_only=True) == []
+    # The untracked one is aged to closed — a bid the portal no longer lists
+    # is over; the tracked one keeps its status for the user's pipeline.
+    by_id = {o.opportunity_id: o for o in loaded}
+    assert by_id[b.opportunity_id].status == "closed"
+    assert by_id[a.opportunity_id].status == "open"
 
 
 def test_untrack_removes_result_too(db):
@@ -274,3 +280,44 @@ def test_save_opportunity_keeps_the_filter_columns_in_step(db):
         row = s.get(OpportunityRow, opp.opportunity_id)
         assert row.county == "duval"
         assert row.status == "closed"
+
+
+def test_deduped_notification_updates_in_place(db):
+    db.add_notification("deadline_soon", "Due in 3 days: A", "x", opportunity_id="o1", dedupe=True)
+    db.add_notification("deadline_soon", "Due in 2 days: A", "x", opportunity_id="o1", dedupe=True)
+    unread, items = db.list_notifications()
+    assert unread == 1
+    assert [i["title"] for i in items] == ["Due in 2 days: A"]
+
+
+def test_unread_count_spans_the_whole_table(db):
+    for i in range(60):
+        db.add_notification("fetch_done", f"n{i}")
+    unread, items = db.list_notifications(limit=50)
+    assert len(items) == 50
+    assert unread == 60
+
+
+def _health(count, status="ok"):
+    return [SourceHealth(source_id="test-src", name="Test Source",
+                         ok=status == "ok", count=count, status=status)]
+
+
+def test_source_going_quiet_is_flagged_against_its_own_norm(db):
+    """Zero rows from a source that usually yields ten is a breakage, not an
+    empty result."""
+    for _ in range(4):
+        db.save_snapshot([make_opp(f"Bid {_}")], _health(10))
+
+    quiet = _health(0, status="empty")
+    db.save_snapshot([], quiet)
+    assert str(quiet[0].status) == "degraded"
+    assert "recent norm is 10" in (quiet[0].note or "")
+    unread, items = db.list_notifications()
+    assert any(i["kind"] == "source_drop" for i in items)
+
+
+def test_first_run_has_no_history_and_no_flag(db):
+    fresh = _health(0, status="empty")
+    db.save_snapshot([], fresh)
+    assert str(fresh[0].status) == "empty"

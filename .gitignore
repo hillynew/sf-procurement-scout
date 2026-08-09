@@ -14,3 +14,4 @@ data/pdf_cache/
 data/*.db
 node_modules/
 frontend/dist/
+data/fetches.jsonl

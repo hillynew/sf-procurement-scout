@@ -66,7 +66,7 @@ def test_a_new_adapter_must_clear_the_bar():
 
 def test_the_grandfathered_set_does_not_grow():
     """Debt that can grow is not debt, it is a habit."""
-    assert GRANDFATHERED == {"opengov", "vendorlink", "workday_sourcing", "jaggaer"}
+    assert GRANDFATHERED == {"opengov", "workday_sourcing", "jaggaer"}
 
 
 def test_the_grandfathered_platforms_still_have_adapters():

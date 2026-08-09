@@ -11,6 +11,8 @@ from typing import Callable, Dict, List, Optional, Tuple
 from rich.console import Console
 from rich.table import Table
 
+from ..fl_geo import infer_tier
+from .linkage import link_awards
 from ..http_util import SourceBlocked
 from ..models.opportunity import HealthStatus, Opportunity, SourceHealth
 from ..pdf_extract import fetch_text, parse_facts
@@ -41,8 +43,11 @@ MAX_WORKERS = 12
 STALE_OPEN_DAYS = 180
 
 # The detail pass costs one request per bid, so it is bounded and applies only
-# to listings someone could still act on.
-DETAIL_STATUSES = {"open", "upcoming"}
+# to listings someone could still act on. Award notices count: their detail
+# carries the linkage back to the solicitation (MFMP's linkedAdNumber) and the
+# tabulation attachments, and the 72-hour protest clock makes them the most
+# time-critical rows in the system.
+DETAIL_STATUSES = {"open", "upcoming", "award"}
 # Raised from 150 when the source list went statewide: 150 no longer covered a
 # single run's open bids, so the tail of every fetch went un-enriched. The cap
 # still exists to bound run time, but `_fair_share` now decides *which* bids
@@ -155,6 +160,8 @@ def derive_fields(opps: List[Opportunity]) -> None:
         o.contact_phone = o.contact_phone or extract_contact_phone(*texts)
         # Prose and package extractors overlap; show one chip per obligation.
         o.requirements = dedupe_requirements(o.requirements)
+        if not o.tier:
+            o.tier = infer_tier(o.agency, county=o.county)
 
 
 def _primary_package(opp: Opportunity) -> Optional[str]:
@@ -419,6 +426,8 @@ def run_fetch(
             )
     progress({"event": "phase", "phase": "finalize"})
     derive_fields(all_opps)
+    link_awards(all_opps)
+    _stamp_coverage(all_opps, health)
     # Recurrence comes from a separately-refreshed archive (run.py history),
     # so a missing file simply leaves prior_cycles at zero.
     if with_history:
@@ -435,6 +444,39 @@ def run_fetch(
         query=query,
     )
     return filtered, health
+
+
+def _stamp_coverage(opps: List[Opportunity], health: List[SourceHealth]) -> None:
+    """Field-coverage counts per source, onto that run's health row.
+
+    Computed after every enrichment pass so the numbers describe what a user
+    would actually see. These are what the drop detector in the store compares
+    across runs — a scraper that keeps returning rows but loses its dates or
+    documents is broken in a way a bare row count can't show.
+    """
+    by_source: Dict[str, List[Opportunity]] = {}
+    for o in opps:
+        by_source.setdefault(o.source_id, []).append(o)
+    for h in health:
+        rows = by_source.get(h.source_id, [])
+        h.coverage = coverage_counts(rows)
+
+
+def coverage_counts(rows: List[Opportunity]) -> dict:
+    awards = [o for o in rows if o.status == "award"]
+    return {
+        "records": len(rows),
+        "with_category": sum(
+            1 for o in rows
+            if o.raw_category or o.commodity_codes or any(c != "general" for c in o.categories)
+        ),
+        "with_documents": sum(1 for o in rows if o.documents),
+        "with_due_date": sum(1 for o in rows if o.due_date),
+        "with_budget": sum(1 for o in rows if o.budget),
+        "awards": len(awards),
+        "with_award_amount": sum(1 for o in awards if o.award_amount is not None),
+        "with_award_vendor": sum(1 for o in awards if o.awarded_vendor),
+    }
 
 
 def _health_line(h: SourceHealth) -> str:

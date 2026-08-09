@@ -203,16 +203,24 @@ def content_hash(text: str) -> str:
 
 
 def _package_text(opp: Opportunity) -> str:
-    """Cached text of the first non-addendum package document, if any."""
+    """Cached text of the bid's primary package document, if any.
+
+    Shares the runner's selection (ref-matching filename first, addenda last)
+    and — critically — the source's document headers: without them MFMP
+    answers with its SPA shell instead of the PDF, and the brief silently
+    summarizes a listing while looking like it read the package.
+    """
+    from src.pipeline.runner import _primary_package
+    from src.sources.registry import document_headers
     from src.pdf_extract import fetch_text
 
-    for doc in opp.documents:
-        if doc.kind != "addendum" and doc.url.lower().endswith(".pdf"):
-            try:
-                return fetch_text(doc.url)
-            except Exception:  # noqa: BLE001
-                return ""
-    return ""
+    url = _primary_package(opp)
+    if not url:
+        return ""
+    try:
+        return fetch_text(url, headers=document_headers(opp.source_id))
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _call_claude(model: str, text: str) -> Dict:

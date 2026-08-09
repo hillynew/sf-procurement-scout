@@ -354,3 +354,90 @@ class _FakeResp:
 
     def json(self):
         return self._payload
+
+
+def test_awarded_closeout_becomes_award_status(monkeypatch):
+    """closeOutReason free text is the platform's only award signal."""
+    awarded = _row(
+        pid=7, status="closed", closeOutReason="Contract Awarded",
+        closedAt="2026-07-22T12:00:00.000Z",
+    )
+    _stub(monkeypatch, pages=[{"count": 1, "rows": [awarded]}])
+    (o,) = OpenGovAdapter(CFG).fetch_history()
+    assert o.status == "award"
+    assert str(o.award_date) == "2026-07-22"
+
+
+def test_cancelled_substatus_becomes_cancelled(monkeypatch):
+    cancelled = _row(pid=8, status="closed", closedSubstatus="canceled")
+    _stub(monkeypatch, pages=[{"count": 1, "rows": [cancelled]}])
+    (o,) = OpenGovAdapter(CFG).fetch_history()
+    assert o.status == "cancelled"
+
+
+def test_detail_reads_flat_contacts_qa_deadline_and_nigp_codes(monkeypatch):
+    """The live payload's real field names: flat contact*, qaDeadline, categories[]."""
+    _stub(
+        monkeypatch,
+        pages=[{"count": 1, "rows": [_row()]}],
+        detail={
+            "summary": "<p>Scope.</p>",
+            "contactFullName": "Corie Cummings",
+            "contactTitle": "Contracting Agent",
+            "contactEmail": "corie.cummings@ocfl.net",
+            "contactPhoneComplete": "(407) 836-5597",
+            "qaDeadline": "2026-08-31T15:00:00.000Z",
+            "preProposalDate": "2026-08-12T14:00:00.000Z",
+            "preProposalText": "Non-Mandatory",
+            "categories": [
+                {"code": "91450", "title": "HVAC"},
+                {"code": "22014", "title": "Energy Control Systems"},
+            ],
+            "upfrontQuestions": [
+                {
+                    "type": "customVariable",
+                    "title": "ESTIMATED COST",
+                    "inputData": {"value": "The estimated budget of $4,652,763.34 applies."},
+                }
+            ],
+        },
+    )
+    adapter = OpenGovAdapter(CFG)
+    (opp,) = adapter.fetch()
+    adapter.fetch_detail(opp)
+
+    assert opp.contact == "Corie Cummings — Contracting Agent"
+    assert opp.contact_email == "corie.cummings@ocfl.net"
+    assert opp.contact_phone == "(407) 836-5597"
+    assert opp.questions_due is not None
+    assert opp.pre_bid_meeting and "Non-Mandatory" in opp.pre_bid_meeting
+    assert opp.commodity_codes == ["NIGP 91450 HVAC", "NIGP 22014 Energy Control Systems"]
+    assert opp.raw_category == "HVAC; Energy Control Systems"
+    assert opp.budget and "4,652,763" in opp.budget
+
+
+def test_inline_addenda_win_over_the_bare_endpoint(monkeypatch):
+    """The detail payload's addendums carry stable URLs; the endpoint's carry none."""
+    calls = _stub(
+        monkeypatch,
+        pages=[{"count": 1, "rows": [_row()]}],
+        detail={
+            "summary": "<p>Scope.</p>",
+            "addendums": [
+                {
+                    "titleDisplay": "Addendum #1",
+                    "attachments": [
+                        {"url": "https://api.procurement.opengov.com/api/v1/attachments/55", "filename": "add1.pdf"}
+                    ],
+                }
+            ],
+        },
+    )
+    adapter = OpenGovAdapter(CFG)
+    (opp,) = adapter.fetch()
+    adapter.fetch_detail(opp)
+
+    addenda = [d for d in opp.documents if d.kind == "addendum"]
+    assert [d.name for d in addenda] == ["add1.pdf"]
+    # No wasted request against the URL-less endpoint.
+    assert not [u for u in calls["get"] if u.endswith("/addendums")]

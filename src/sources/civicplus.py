@@ -53,12 +53,18 @@ _STATUS_MAP = {
     "closed": "closed",
     "cancelled": "cancelled",
     "canceled": "cancelled",
-    "awarded": "closed",
-    "intent to award": "closed",
+    # An awarded bid is an award record, not a generic close — Davie's board
+    # alone carried 725 of them filed invisibly as "closed".
+    "awarded": "award",
+    "intent to award": "award",
     "pending": "closed",
     "archived": "closed",
     "upcoming": "upcoming",
 }
+
+#: "Awarded To: Fortiline, Inc. dba Fortiline Waterworks" — the phrasing the
+#: module's award-recommendation pages and PDFs both use.
+_AWARDED_TO = re.compile(r"awarded\s+to[:\s]+([^\n\r;]{3,120})", re.I)
 
 # "Upon Contract", "See Documents" etc. are not dates.
 _NON_DATE = re.compile(r"upon|see |n/?a|tbd|until|contract|award", re.I)
@@ -116,9 +122,40 @@ class CivicPlusAdapter(SourceAdapter):
             parsed = parse_dt(published)
             opp.posted_date = parsed.date() if parsed else None
 
+        # The raw category sits in the *other* span family the module renders
+        # (`BidDetail`/`BidDetailSpec`), which `_detail_fields` cannot see.
+        raw_cat = _spec_fields(soup).get("category")
+        if raw_cat and not opp.raw_category:
+            opp.raw_category = raw_cat
+
         opp.documents = _documents(soup, opp.url)
+        if opp.status == "award":
+            self._award_facts(opp, soup)
         _apply_extracted(opp, scope, fields.get("special requirements"))
         opp.detail_fetched = True
+
+    def _award_facts(self, opp: Opportunity, soup: BeautifulSoup) -> None:
+        """Winner's name, from the page text or the award-recommendation PDF.
+
+        The board never publishes a structured vendor field; the award lives
+        in prose ("Awarded To: …") on the page or inside a linked
+        recommendation document. Best-effort and bounded to one PDF.
+        """
+        page_text = soup.get_text("\n", strip=True)
+        m = _AWARDED_TO.search(page_text)
+        if not m:
+            for doc in opp.documents:
+                if not re.search(r"award|recommendation|tabulation", doc.name, re.I):
+                    continue
+                try:
+                    from ..pdf_extract import fetch_text
+
+                    m = _AWARDED_TO.search(fetch_text(doc.url) or "")
+                except Exception:  # noqa: BLE001 — a bad PDF must not lose the listing
+                    m = None
+                break
+        if m:
+            opp.awarded_vendor = m.group(1).strip().rstrip(".")
 
     def fetch(self) -> List[Opportunity]:
         resp = get(self.portal_url)
@@ -180,6 +217,26 @@ class CivicPlusAdapter(SourceAdapter):
             description=description,
             raw={"ref": ref},
         )
+
+
+def _spec_fields(soup: BeautifulSoup) -> dict:
+    """The top summary table: `span.BidDetail` label → `span.BidDetailSpec` value.
+
+    A second, different span pairing from `_detail_fields` below — Bid Number,
+    Bid Title, Category and Status live here and nowhere else.
+    """
+    fields: dict = {}
+    for label_el in soup.select("span.BidDetail"):
+        label = _clean(label_el.get_text(" ", strip=True)).rstrip(":").lower()
+        if not label or label in fields:
+            continue
+        value_el = label_el.find_next("span", class_="BidDetailSpec")
+        if value_el is None:
+            continue
+        value = _clean(value_el.get_text(" ", strip=True))
+        if value and value.lower() != label:
+            fields[label] = value
+    return fields
 
 
 def _detail_fields(soup: BeautifulSoup) -> dict:

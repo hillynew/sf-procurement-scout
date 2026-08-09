@@ -219,3 +219,50 @@ def test_an_unconfigured_source_is_inactive_not_degraded():
     assert health.status == "empty"
     assert health.ok
     assert "inactive" in health.note
+
+
+def test_alert_is_attributed_to_the_sending_city(monkeypatch):
+    """A Hialeah alert must not be filed under the config entry's county."""
+    from email.message import EmailMessage
+
+    from src.sources.email_alerts import EmailAlertsAdapter
+
+    msg = EmailMessage()
+    msg["Subject"] = "Bid Posting: ITB 2026-14 Sidewalk Repairs"
+    msg["From"] = "City of Hialeah <notifications@hialeahfl.gov>"
+    msg["Date"] = "Sat, 08 Aug 2026 09:00:00 -0400"
+    msg.set_content("New bid posted: https://www.hialeahfl.gov/bids.aspx?bidID=88\nClosing: 8/29/2026 2:00 PM")
+
+    adapter = EmailAlertsAdapter(CFG)
+    adapter._host_map = None
+    monkeypatch.setattr(
+        "src.sources.registry.load_source_config",
+        lambda *a, **k: [{
+            "id": "hialeah", "agency": "City of Hialeah", "county": "miami-dade",
+            "portal_url": "https://www.hialeahfl.gov/bids.aspx", "adapter": "civicplus",
+        }],
+    )
+    opp = adapter._from_message(msg)
+    assert opp is not None
+    assert opp.agency == "City of Hialeah"
+    assert opp.county == "miami-dade"
+
+
+def test_unmatched_sender_lands_in_unknown_not_a_default_county(monkeypatch):
+    from email.message import EmailMessage
+
+    from src.sources.email_alerts import EmailAlertsAdapter
+
+    msg = EmailMessage()
+    msg["Subject"] = "Bid Posting: RFP 9 Consulting"
+    msg["From"] = "alerts@somewherefar.gov"
+    msg["Date"] = "Sat, 08 Aug 2026 09:00:00 -0400"
+    msg.set_content("New solicitation: https://www.somewherefar.gov/bid/9")
+
+    adapter = EmailAlertsAdapter(CFG)
+    adapter._host_map = None
+    monkeypatch.setattr("src.sources.registry.load_source_config", lambda *a, **k: [])
+    opp = adapter._from_message(msg)
+    assert opp is not None
+    assert opp.county == "unknown"
+    assert "somewherefar.gov" in opp.agency

@@ -3,9 +3,10 @@ import type { Opportunity } from "../api/types";
 /** Every dimension the All Bids filter panel can constrain.
  *  Sections combine with AND; selections within a section are OR. */
 export interface BidFilters {
-  statuses: string[]; // open | upcoming | closed (closed includes cancelled)
+  statuses: string[]; // open | upcoming | award | closed (closed includes cancelled)
   regions: string[]; // county slugs — any of the 67 plus statewide/federal/unknown
   types: string[];
+  tiers: string[]; // state | county | municipal | school_district | higher_ed | special_district | federal
   categories: string[]; // taxonomy slugs (roofing, mosquito_control, ...)
   minValue: number | null;
   maxValue: number | null;
@@ -20,6 +21,7 @@ export const EMPTY_FILTERS: BidFilters = {
   statuses: [],
   regions: [],
   types: [],
+  tiers: [],
   categories: [],
   minValue: null,
   maxValue: null,
@@ -61,6 +63,7 @@ export function parseFilters(params: URLSearchParams): BidFilters {
   const flags = new Set(list(params, "flags"));
   return {
     statuses: list(params, "f").filter((s) => s !== "all"),
+    tiers: list(params, "tier"),
     regions: list(params, "c"),
     types: list(params, "t"),
     categories: list(params, "cat"),
@@ -84,10 +87,11 @@ export function writeFilters(params: URLSearchParams, filters: BidFilters): URLS
   // "f=" (present but empty) distinguishes "no status filter" from "default".
   const isDefault = JSON.stringify(filters) === JSON.stringify(DEFAULT_FILTERS);
   if (isDefault) {
-    ["f", "c", "t", "cat", "vmin", "vmax", "due", "flags"].forEach((k) => next.delete(k));
+    ["f", "tier", "c", "t", "cat", "vmin", "vmax", "due", "flags"].forEach((k) => next.delete(k));
     return next;
   }
   next.set("f", filters.statuses.join(","));
+  setOrDelete("tier", filters.tiers.join(","));
   setOrDelete("c", filters.regions.join(","));
   setOrDelete("t", filters.types.join(","));
   setOrDelete("cat", filters.categories.join(","));
@@ -111,6 +115,7 @@ export function applyFilters(opps: Opportunity[], f: BidFilters): Opportunity[] 
     if (!statusMatches(o, f.statuses)) return false;
     if (f.regions.length && !f.regions.includes(o.county)) return false;
     if (f.types.length && !f.types.includes(o.offer_type)) return false;
+    if (f.tiers.length && !f.tiers.includes(o.tier ?? "unknown")) return false;
     if (f.categories.length && !o.categories.some((c) => f.categories.includes(c))) {
       return false;
     }
@@ -138,6 +143,7 @@ export function applyFilters(opps: Opportunity[], f: BidFilters): Opportunity[] 
 export function countActive(f: BidFilters): number {
   let n = 0;
   if (f.statuses.length) n += 1;
+  if (f.tiers.length) n += 1;
   if (f.regions.length) n += 1;
   if (f.types.length) n += 1;
   if (f.categories.length) n += 1;

@@ -428,3 +428,56 @@ def summarise_coverage(county_slugs) -> Tuple[int, int]:
     """(counties covered, 67) — for the dashboard's coverage meter."""
     real = {c for c in county_slugs if c in COUNTY_NAMES}
     return len(real), len(COUNTY_NAMES)
+
+
+# Tier detection runs most-specific first: "Miami-Dade County Public Schools"
+# is a school district, not a county, and "Broward College" is higher ed, not
+# a municipality that happens to contain "Broward".
+_TIER_HIGHER_ED = re.compile(r"\b(university|college|polytechnic)\b", re.I)
+_TIER_SCHOOL = re.compile(
+    r"\b(school district|school board|public schools|county schools|schools of|"
+    r"district school)\b", re.I,
+)
+_TIER_SPECIAL = re.compile(
+    r"\b(authority|special district|water control|drainage|inlet|mosquito|"
+    r"hospital district|health care district|fire district|fire control|"
+    r"community development district|cdd|improvement district|sanitary|"
+    r"utility district|utilities commission|housing|port|airport|aviation|"
+    r"transit|transportation authority|expressway|metropolitan planning|"
+    r"children's services|library district|soil and water)\b", re.I,
+)
+_TIER_MUNICIPAL = re.compile(r"^(?:the\s+)?(city|town|village)\s+of\b", re.I)
+_TIER_COUNTY = re.compile(r"\bcounty\b", re.I)
+
+
+@lru_cache(maxsize=4096)
+def infer_tier(agency_name: str, *, county: Optional[str] = None) -> str:
+    """Best-effort government tier for an agency name.
+
+    Returns one of: state, county, municipal, school_district, higher_ed,
+    special_district, federal, unknown. Never guesses past the name: an
+    ambiguous agency stays ``unknown`` rather than being mis-shelved.
+    """
+    if county == "federal":
+        return "federal"
+    name = _normalise(agency_name or "")
+    if not name:
+        return "unknown"
+    if _TIER_SCHOOL.search(name):
+        return "school_district"
+    if _TIER_HIGHER_ED.search(name):
+        return "higher_ed"
+    lowered = name.lower()
+    if any(marker in lowered for marker in STATEWIDE_MARKERS) or _STATE_BODY.match(name):
+        return "state"
+    if _TIER_SPECIAL.search(name):
+        return "special_district"
+    if _TIER_MUNICIPAL.match(name):
+        return "municipal"
+    if _TIER_COUNTY.search(name):
+        return "county"
+    # A bare city name ("Hialeah", "Boca Raton") is municipal.
+    for city in sorted(CITY_COUNTY, key=len, reverse=True):
+        if re.search(rf"\b{re.escape(city)}\b", name):
+            return "municipal"
+    return "unknown"

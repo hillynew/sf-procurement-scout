@@ -115,6 +115,12 @@ class ContractRow(Base):
     #: would be lost. This column only ever gets added, never widened, so the
     #: room has to be there from the start.
     method: Mapped[Optional[str]] = mapped_column(String(320), nullable=True)
+    extendable: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    commodity: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    executed: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    justification: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    state_term_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    agency_ref: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     refreshed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 

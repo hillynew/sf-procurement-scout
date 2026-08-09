@@ -83,11 +83,13 @@ TERMS: Dict[str, Verdict] = {
     "civicplus": Verdict(AGENCY_SITE, note="CMS module served on each city's own domain"),
     "mfmp_vbs": Verdict(AGENCY_SITE, note="MyFloridaMarketPlace, the state's own system"),
     "fdot_ads": Verdict(AGENCY_SITE, note="FDOT's own advertisement host"),
+    "fdot_letting": Verdict(AGENCY_SITE, note="FDOT's own letting-results host, robots Allow: /"),
     "facts": Verdict(AGENCY_SITE, note="the state contract register under s. 215.985(14)"),
     "sam_gov": Verdict(AGENCY_SITE, note="the federal government's own system"),
     "miami_dade_informs": Verdict(AGENCY_SITE, note="Miami-Dade's own supplier portal"),
     "miami_dade_construction": Verdict(AGENCY_SITE, note="miamidade.gov"),
     "miami_dade_future": Verdict(AGENCY_SITE, note="miamidade.gov"),
+    "miami_dade_awards": Verdict(AGENCY_SITE, note="miamidade.gov"),
     "west_palm_beach": Verdict(AGENCY_SITE, note="wpb.org"),
     "mdc_college": Verdict(AGENCY_SITE, note="mdc.edu"),
     "palm_beach_schools": Verdict(AGENCY_SITE, note="palmbeachschools.org"),
@@ -109,6 +111,15 @@ TERMS: Dict[str, Verdict] = {
         checked_on="2026-08-07",
         note="browse-wrap, but its restrictions cover reselling and user-submitted "
              "data; no clause on copying, downloading or automated reading",
+    ),
+
+    "legistar": Verdict(
+        PERMITTED, source="https://webapi.legistar.com/",
+        checked_on="2026-08-09",
+        note="Granicus's public read-only web API, self-documenting (Home / "
+             "API / Examples), no auth, no robots.txt, no terms of use served "
+             "on the host — published precisely so civic data can be read "
+             "programmatically",
     ),
 
     # -- vendor platforms that forbid it ---------------------------------
@@ -151,8 +162,22 @@ TERMS: Dict[str, Verdict] = {
              "restrictions section; the operative document was not found",
     ),
     "vendorlink": Verdict(
-        UNCHECKED, checked_on="2026-08-07",
-        note="myvendorlink.com/terms redirects to the login page",
+        PROHIBITED, source="https://www.myvendorlink.com/external/termsandconditions",
+        checked_on="2026-08-09",
+        note="§5 User Conduct: 'When you use any Services or the Site, you "
+             "represent, warrant and agree that you will not: … (H) use any "
+             "robot, spider, other automatic device, or manual process to "
+             "monitor or copy LinkSystems, LLC's web pages or content "
+             "contained herein.' A browse-wrap binding on use of the Site — "
+             "the DemandStar shape exactly. The 2026-08-07 check followed "
+             "/terms, which redirects to login; the operative document is "
+             "linked from every page footer at /external/termsandconditions. "
+             "The 66-source adapter was removed the day this was read, per "
+             "this module's own rule. robots.txt Allowing /external/ does not "
+             "override prose terms — robots is not the test, in either "
+             "direction. The sanctioned path back is their statewide "
+             "subscription (~$175/yr), which docs/statewide-coverage.md "
+             "already ranks as the single best purchase.",
     ),
     "workday_sourcing": Verdict(
         UNCHECKED, checked_on="2026-08-07",
@@ -170,7 +195,7 @@ TERMS: Dict[str, Verdict] = {
 #: the same is not true of DemandStar or Vendor Registry, whose agencies post
 #: elsewhere too. That is a reason to prioritise reading its terms, not a
 #: reason to treat 403 as consent.
-GRANDFATHERED = frozenset({"opengov", "vendorlink", "workday_sourcing", "jaggaer"})
+GRANDFATHERED = frozenset({"opengov", "workday_sourcing", "jaggaer"})
 
 
 def verdict_for(platform: str) -> Optional[Verdict]:

@@ -14,7 +14,9 @@ separate source per agency.
 
 from __future__ import annotations
 
+from datetime import timezone
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
 
 from ..auth import bonfire_cookie
 from ..classify import enrich
@@ -23,6 +25,8 @@ from ..dates import parse_dt
 from ..http_util import get, get_json, session
 from ..models.opportunity import Opportunity
 from .base import SourceAdapter
+
+_NEW_YORK = ZoneInfo("America/New_York")
 
 OPEN_ENDPOINT = "getOpenPublicOpportunitiesSectionData"
 PAST_ENDPOINT = "getPastPublicOpportunitiesSectionData"
@@ -91,6 +95,7 @@ class BonfireAdapter(SourceAdapter):
                     start_date=parse_date(row.get("StartDate")),
                     end_date=parse_date(row.get("EndDate")),
                     url=f"https://{host}/portal/",
+                    extendable=_as_bool(row.get("IsExtendable")),
                 )
             )
         return out
@@ -176,6 +181,17 @@ class BonfireAdapter(SourceAdapter):
         project_id = str(p.get("ProjectID") or "")
         url = f"https://{host}/opportunities/{project_id}" if project_id else self.portal_url
 
+        # Past rows say how they ended: SubStatus 3 (with IsPublicAward) is an
+        # award, SubStatus 2 a cancellation. Flattening both to "closed" hid
+        # every award this platform publishes — 224 of Broward's 708 archive
+        # rows on the day this was verified.
+        if status == "closed":
+            sub = str(p.get("ProjectSubStatusID") or "")
+            if p.get("IsPublicAward") or sub == "3":
+                status = "award"
+            elif sub == "2":
+                status = "cancelled"
+
         fields = enrich(title, external_id=ref)
         return Opportunity(
             **self._base_kwargs(),
@@ -187,10 +203,33 @@ class BonfireAdapter(SourceAdapter):
             offer_type=fields["offer_type"],
             categories=fields["categories"],
             keywords=fields["keywords"],
-            due_date=parse_dt(p.get("DateClose")),
+            due_date=_close_dt(p.get("DateClose")),
             status=status,
             raw={"project": p},
         )
+
+
+def _as_bool(value: Any):
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("1", "true", "yes")
+
+
+def _close_dt(value: Any):
+    """Bonfire's DateClose is naive **UTC**, not Eastern.
+
+    The portal's own JS parses it as UTC and renders in America/New_York
+    (verified live: "2026-08-10 18:00:00" displays as 2:00 PM EDT). `parse_dt`
+    treats a bare string as Eastern wall clock, which put every Bonfire
+    deadline 4-5 hours late. Converted here with the real zone, DST included,
+    then returned naive like every other adapter's dates.
+    """
+    dt = parse_dt(value)
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc).astimezone(_NEW_YORK).replace(tzinfo=None)
 
 
 def _department_name(departments: Any, dept_id: Any) -> Optional[str]:

@@ -228,14 +228,16 @@ function RuleBuilder({ initial, emailAvailable, onClose, onSaved }: {
   const [minValue, setMinValue] = useState(initial?.rules.min_value?.toString() ?? "");
   const [noBond, setNoBond] = useState(initial?.rules.no_bond ?? false);
   const [recurring, setRecurring] = useState(initial?.rules.recurring_only ?? false);
+  const [includeStatewide, setIncludeStatewide] = useState(initial?.rules.include_statewide ?? false);
   const [emailDigest, setEmailDigest] = useState(initial?.email_digest ?? false);
 
   const rules: WatchlistRules = useMemo(() => ({
     keywords, counties, offers, categories,
     min_value: minValue ? parseInt(minValue.replace(/\D/g, ""), 10) || null : null,
     max_value: maxValue ? parseInt(maxValue.replace(/\D/g, ""), 10) || null : null,
-    no_bond: noBond, recurring_only: recurring,
-  }), [keywords, counties, offers, categories, minValue, maxValue, noBond, recurring]);
+    no_bond: noBond, recurring_only: recurring, include_statewide: includeStatewide,
+  }), [keywords, counties, offers, categories, minValue, maxValue, noBond, recurring,
+       includeStatewide]);
 
   const categoryOptions: MultiSelectOption[] = useMemo(
     () =>
@@ -287,7 +289,16 @@ function RuleBuilder({ initial, emailAvailable, onClose, onSaved }: {
     const pool = (snapshot?.opportunities ?? []).filter(
       (o) => o.status === "open" || o.status === "upcoming");
     return pool.filter((o) => {
-      if (counties.length && !counties.includes(o.county)) return false;
+      if (counties.length && !counties.includes(o.county)) {
+        // Mirror the server: a statewide bid still matches when it *names* a
+        // wanted county (adapters stamp them into keywords; FDOT's district
+        // counties arrive that way), or when the rule opted into unlocated
+        // statewide work. Prose inference stays server-side; keywords cover
+        // the measured majority.
+        if (o.county !== "statewide") return false;
+        const named = (o.keywords ?? []).filter((k) => counties.includes(k));
+        if (named.length === 0 && !includeStatewide) return false;
+      }
       if (offers.length && !offers.includes(o.offer_type)) return false;
       if (categories.length && !o.categories.some((c) => categories.includes(c))) return false;
       const amount = o.budget_amount;
@@ -302,7 +313,8 @@ function RuleBuilder({ initial, emailAvailable, onClose, onSaved }: {
       }
       return true;
     }).length;
-  }, [snapshot, rules, counties, offers, categories, keywords, noBond, recurring]);
+  }, [snapshot, rules, counties, offers, categories, keywords, noBond, recurring,
+      includeStatewide]);
 
   const addKeyword = () => {
     const kw = kwInput.trim().toLowerCase();
@@ -416,6 +428,12 @@ function RuleBuilder({ initial, emailAvailable, onClose, onSaved }: {
       <div className="mb-4 flex flex-wrap gap-1.5">
         <FilterChip active={noBond} onClick={() => setNoBond(!noBond)}>No bond required</FilterChip>
         <FilterChip active={recurring} onClick={() => setRecurring(!recurring)}>Recurring buys only</FilterChip>
+        {counties.length > 0 && (
+          <FilterChip active={includeStatewide}
+                      onClick={() => setIncludeStatewide(!includeStatewide)}>
+            + unlocated statewide bids
+          </FilterChip>
+        )}
       </div>
 
       <label className={`mb-4 flex items-center gap-2.5 rounded-[10px] border border-line px-3 py-2.5 ${

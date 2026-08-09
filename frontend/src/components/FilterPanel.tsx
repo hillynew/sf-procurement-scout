@@ -8,8 +8,14 @@ import { countyLabel, fmtMoney, OFFER_LABEL } from "../lib/format";
 import MultiSelect, { type MultiSelectOption } from "./MultiSelect";
 import { FilterChip } from "./ui";
 
+const TIER_OPTIONS: [string, string][] = [
+  ["state", "State"], ["county", "County"], ["municipal", "City"],
+  ["school_district", "Schools"], ["higher_ed", "Higher ed"],
+  ["special_district", "Districts"], ["federal", "Federal"],
+];
+
 const STATUS_OPTIONS = [
-  ["open", "Open"], ["upcoming", "Upcoming"], ["closed", "Closed"],
+  ["open", "Open"], ["upcoming", "Upcoming"], ["award", "Awarded"], ["closed", "Closed"],
 ] as const;
 const DUE_OPTIONS = [
   [null, "Any time"], [7, "7 days"], [14, "14 days"], [30, "30 days"],
@@ -144,6 +150,17 @@ export default function FilterPanel({ filters, onChange, matchCount }: {
                 <div key={value} className="mr-1.5 inline-block">
                   <FilterChip active={filters.statuses.includes(value)}
                               onClick={() => set({ statuses: toggle(filters.statuses, value) })}>
+                    {label}
+                  </FilterChip>
+                </div>
+              ))}
+            </Section>
+
+            <Section label="Tier" hint="which level of government">
+              {TIER_OPTIONS.map(([value, label]) => (
+                <div key={value} className="mr-1.5 inline-block">
+                  <FilterChip active={filters.tiers.includes(value)}
+                              onClick={() => set({ tiers: toggle(filters.tiers, value) })}>
                     {label}
                   </FilterChip>
                 </div>

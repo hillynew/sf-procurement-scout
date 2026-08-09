@@ -35,6 +35,7 @@ import os
 import threading
 import time
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, Optional
 from urllib.parse import urlsplit
 
@@ -274,7 +275,16 @@ def pace(url: str) -> None:
 
 #: Unset disables logging. A path turns it on; the crawl appends one JSON
 #: object per request.
-FETCH_LOG = os.getenv("SF_SCOUT_FETCH_LOG", "").strip()
+# On by default: the defense file is only useful if it was already running
+# before anyone asks for it. Set SF_SCOUT_FETCH_LOG=off to disable, or to a
+# path to relocate it.
+FETCH_LOG = os.getenv("SF_SCOUT_FETCH_LOG", "data/fetches.jsonl").strip()
+if FETCH_LOG.lower() in ("off", "0", "false", "none"):
+    FETCH_LOG = ""
+
+#: The log rotates by truncation when it outgrows this — it is a rolling
+#: defense file, not an archive.
+FETCH_LOG_MAX_BYTES = 20 * 1024 * 1024
 
 _log_lock = threading.Lock()
 
@@ -293,7 +303,13 @@ def log_fetch(url: str, *, status, robots_note: str, ua: str, elapsed_ms: int = 
     }
     try:
         with _log_lock:
-            with open(FETCH_LOG, "a", encoding="utf-8") as fh:
+            path = Path(FETCH_LOG)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if path.exists() and path.stat().st_size > FETCH_LOG_MAX_BYTES:
+                # Keep the newer half so a rotation never leaves an empty file.
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+                path.write_text("\n".join(lines[len(lines) // 2:]) + "\n", encoding="utf-8")
+            with open(path, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(record) + "\n")
     except Exception:  # noqa: BLE001 — logging must never break a fetch
         pass

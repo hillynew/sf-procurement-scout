@@ -210,6 +210,41 @@ def health():
     console.print(f"[bold]Opportunities in snapshot:[/bold] {len(opps)}")
 
 
+@app.command()
+def quality():
+    """Field-population percentages per source — the honesty meter."""
+    from web.services.stats import quality_report
+    from src.db import store as db
+
+    db.bootstrap()
+    report = quality_report(db.load_opportunities())
+    overall = report["overall"]
+    if not overall["records"]:
+        console.print("[yellow]No records stored yet. Run: python run.py fetch[/yellow]")
+        raise typer.Exit(1)
+
+    table = Table(title=f"Data quality — {overall['records']} records")
+    table.add_column("Source")
+    table.add_column("Records", justify="right")
+    for key in ("due_date", "category", "documents", "budget", "contact"):
+        table.add_column(overall["fields"][key]["label"], justify="right")
+    table.add_column("Award $", justify="right")
+
+    def fmt(cell):
+        return "—" if cell["pct"] is None else f"{cell['pct']}%"
+
+    rows = [dict(source_name="ALL SOURCES", **overall)] + report["sources"]
+    for entry in rows:
+        f = entry["fields"]
+        table.add_row(
+            entry["source_name"],
+            str(entry["records"]),
+            *[fmt(f[k]) for k in ("due_date", "category", "documents", "budget", "contact")],
+            fmt(f["award_amount"]),
+        )
+    console.print(table)
+
+
 @app.command("auth-status")
 def auth_status():
     """Show which Bonfire agencies have a signed-in vendor session configured.

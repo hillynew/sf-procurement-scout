@@ -337,6 +337,8 @@ class IonwaveAdapter(SourceAdapter):
             offer_type=fields["offer_type"],
             categories=fields["categories"],
             keywords=fields["keywords"],
+            department=(row.get("organization") or "").strip() or None,
+            award_date=decided.date() if decided and status == "award" else None,
             posted_date=(posted or decided).date() if (posted or decided) else None,
             due_date=_when(row.get("bid close date/time")),
             # An award with no clock cannot be acted on; one with a clock goes

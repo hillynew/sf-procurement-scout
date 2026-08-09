@@ -257,3 +257,46 @@ def test_fair_share_handles_undated_and_empty_input(opp_factory):
 def test_fair_share_returns_everything_under_the_limit(opp_factory):
     cands = [_cand(opp_factory, s, d) for s in ("a", "b") for d in range(3)]
     assert len(_fair_share(cands, limit=100)) == 6
+
+
+class TestAwardLinkage:
+    def _pair(self, **award_kw):
+        from src.models.opportunity import Opportunity
+
+        sol = Opportunity(
+            source_id="s", source_name="S", title="Janitorial Services Citywide",
+            url="https://x.gov/1", county="broward", agency="City of Testville",
+            status="closed", external_id="ITB-24-011",
+        )
+        award = Opportunity(
+            source_id="s", source_name="S", title="Award: Janitorial Services",
+            url="https://x.gov/2", county="broward", agency="City of Testville",
+            status="award", awarded_vendor="CleanCo", award_amount=193500,
+            **award_kw,
+        )
+        return sol, award
+
+    def test_ref_linkage_wins_and_stamps_both_sides(self):
+        from src.pipeline.linkage import link_awards
+
+        sol, award = self._pair(linked_ref="ITB 24-011")
+        assert link_awards([sol, award]) == 1
+        assert award.award_linkage == "ref"
+        assert sol.awarded_vendor == "CleanCo"
+        assert sol.award_amount == 193500
+
+    def test_fuzzy_linkage_is_marked_fuzzy(self):
+        from src.pipeline.linkage import link_awards
+
+        sol, award = self._pair()
+        assert link_awards([sol, award]) == 1
+        assert award.award_linkage == "fuzzy"
+        assert award.linked_ref == "ITB-24-011"
+
+    def test_no_cross_agency_fuzzy_match(self):
+        from src.pipeline.linkage import link_awards
+
+        sol, award = self._pair()
+        award.agency = "City of Elsewhere"
+        assert link_awards([sol, award]) == 0
+        assert sol.awarded_vendor is None

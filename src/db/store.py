@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 
 from ..models.opportunity import Opportunity, SourceHealth
 from .engine import init_db, session_scope
@@ -116,6 +116,7 @@ def save_snapshot(
 ) -> SnapshotResult:
     now = datetime.utcnow()
     with session_scope() as s:
+        _flag_source_drops(s, health)
         existing_ids = set(s.execute(select(OpportunityRow.opportunity_id)).scalars())
         tracked_ids = set(s.execute(select(TrackedBid.opportunity_id)).scalars())
 
@@ -140,17 +141,24 @@ def save_snapshot(
             row.last_seen_at = now
             row.present = True
 
-        # Untracked rows that vanished from the portals are dropped; tracked
-        # rows are kept (archive) and merely flagged absent.
+        # Rows that vanished from the portals are kept and flagged absent —
+        # never deleted. A captured record is the archive: award linkage joins
+        # against closed solicitations, and "what was open last month" has to
+        # come from somewhere. A vanished open row is also aged to closed,
+        # since a bid a portal no longer lists is over even if we never saw a
+        # close date.
         gone = existing_ids - incoming_ids
-        drop = [oid for oid in gone if oid not in tracked_ids]
-        keep_flag = [oid for oid in gone if oid in tracked_ids]
-        if drop:
-            s.execute(delete(OpportunityRow).where(OpportunityRow.opportunity_id.in_(drop)))
-        for oid in keep_flag:
+        for oid in gone:
             row = s.get(OpportunityRow, oid)
-            if row is not None:
-                row.present = False
+            if row is None:
+                continue
+            row.present = False
+            if row.status in ("open", "upcoming") and oid not in tracked_ids:
+                row.status = "closed"
+                payload = dict(row.payload or {})
+                if payload.get("status") in ("open", "upcoming"):
+                    payload["status"] = "closed"
+                    row.payload = payload
 
         run = FetchRun(
             started_at=started_at or now,
@@ -164,6 +172,82 @@ def save_snapshot(
         s.add(run)
         s.flush()
         return SnapshotResult(run_id=run.id, count=len(opportunities), new_ids=new_ids)
+
+
+#: How many past runs a source is judged against, and the floor below which a
+#: history is too thin to say anything.
+_DROP_LOOKBACK_RUNS = 8
+_DROP_MIN_NORM = 3
+
+
+def _flag_source_drops(s, health: List[SourceHealth]) -> None:
+    """Compare each source's run to its own history; flag what fell off a cliff.
+
+    A scraper that quietly returns nothing must show as broken, not as an
+    empty result. "Broken" is judged against the source's own recent norm:
+    zero rows from a source that usually yields a dozen is a breakage even
+    when the fetch itself succeeded, and a sharp drop (< 30% of norm) is
+    worth a note even when it isn't zero.
+    """
+    runs = s.execute(
+        select(FetchRun).where(FetchRun.status == "done")
+        .order_by(FetchRun.id.desc()).limit(_DROP_LOOKBACK_RUNS)
+    ).scalars().all()
+    history: Dict[str, List[int]] = {}
+    for run in runs:
+        for row in run.health or []:
+            if isinstance(row, dict) and row.get("source_id"):
+                history.setdefault(row["source_id"], []).append(int(row.get("count") or 0))
+
+    for h in health:
+        counts = history.get(h.source_id)
+        if not counts:
+            continue
+        norm = sorted(counts)[len(counts) // 2]  # median of recent runs
+        if norm < _DROP_MIN_NORM:
+            continue
+        status = str(h.status)
+        if h.count == 0 and status in ("ok", "empty"):
+            h.status = "degraded"
+            h.note = f"returned 0 rows; this source's recent norm is {norm}"
+            _notify_in_session(
+                s, "source_drop",
+                f"Source went quiet: {h.name}",
+                f"0 rows this run; recent norm {norm}. The portal may have "
+                "changed or the agency may have migrated.",
+                key=f"src:{h.source_id}"[:32],
+            )
+        elif h.count < norm * 0.3 and norm >= 10:
+            h.note = (f"{h.note}; " if h.note else "") + (
+                f"sharp drop: {h.count} rows vs recent norm {norm}"
+            )
+            _notify_in_session(
+                s, "source_drop",
+                f"Source dropped sharply: {h.name}",
+                f"{h.count} rows this run vs a recent norm of {norm}.",
+                key=f"src:{h.source_id}"[:32],
+            )
+
+
+def _notify_in_session(s, kind: str, title: str, body: str, *, key: str) -> None:
+    """Deduped notification inside an already-open session.
+
+    `add_notification` opens its own session; calling it mid-snapshot would
+    stack a second write transaction on SQLite. The `key` rides in the
+    opportunity_id column so one live notification exists per source.
+    """
+    existing = s.execute(
+        select(Notification)
+        .where(Notification.kind == kind)
+        .where(Notification.opportunity_id == key)
+        .where(Notification.read.is_(False))
+    ).scalars().first()
+    if existing is not None:
+        existing.title, existing.body = title, body
+        existing.created_at = datetime.utcnow()
+        return
+    s.add(Notification(created_at=datetime.utcnow(), kind=kind, title=title,
+                       body=body, opportunity_id=key, read=False))
 
 
 def record_failed_run(started_at: datetime, error: str) -> None:
@@ -184,6 +268,15 @@ def load_opportunities(*, present_only: bool = False) -> List[Opportunity]:
         except Exception:  # noqa: BLE001 — one stale payload must not 500 the app
             continue
     return out
+
+
+def first_seen_map() -> Dict[str, str]:
+    """opportunity_id -> ISO first-seen timestamp, for 'new since last visit'."""
+    with session_scope() as s:
+        rows = s.execute(
+            select(OpportunityRow.opportunity_id, OpportunityRow.first_seen_at)
+        ).all()
+    return {oid: ts.isoformat() for oid, ts in rows if ts is not None}
 
 
 def get_opportunity(opportunity_id: str) -> Optional[Opportunity]:
@@ -468,8 +561,22 @@ def delete_watchlist(wl_id: str) -> bool:
 
 
 def add_notification(kind: str, title: str, body: str = "",
-                     opportunity_id: Optional[str] = None) -> None:
+                     opportunity_id: Optional[str] = None,
+                     dedupe: bool = False) -> None:
     with session_scope() as s:
+        if dedupe and opportunity_id:
+            # One live notification per (kind, bid): re-raising the same alarm
+            # every day buried the bell in near-identical rows.
+            existing = s.execute(
+                select(Notification)
+                .where(Notification.kind == kind)
+                .where(Notification.opportunity_id == opportunity_id)
+                .where(Notification.read.is_(False))
+            ).scalars().first()
+            if existing is not None:
+                existing.title, existing.body = title, body
+                existing.created_at = datetime.utcnow()
+                return
         s.add(Notification(created_at=datetime.utcnow(), kind=kind, title=title,
                            body=body, opportunity_id=opportunity_id, read=False))
 
@@ -479,7 +586,11 @@ def list_notifications(limit: int = 50) -> Tuple[int, List[dict]]:
         rows = s.execute(
             select(Notification).order_by(Notification.id.desc()).limit(limit)
         ).scalars().all()
-        unread = sum(1 for r in rows if not r.read)
+        # Counted over the whole table, not the visible slice — the badge was
+        # capping out (wrongly) once more than `limit` unread rows piled up.
+        unread = s.execute(
+            select(func.count()).select_from(Notification).where(Notification.read.is_(False))
+        ).scalar() or 0
     items = [
         {
             "id": r.id, "kind": r.kind, "title": r.title, "body": r.body,
@@ -994,6 +1105,12 @@ def save_contracts(contracts: Iterable["Contract"]) -> int:
             row.url = c.url
             row.amount = c.amount
             row.method = c.method
+            row.extendable = c.extendable
+            row.commodity = c.commodity
+            row.executed = c.executed
+            row.justification = c.justification
+            row.state_term_id = c.state_term_id
+            row.agency_ref = c.agency_ref
             row.refreshed_at = now
             count += 1
     return count
@@ -1020,6 +1137,12 @@ def load_contracts() -> List["Contract"]:
             url=row.url,
             amount=row.amount,
             method=row.method,
+            extendable=row.extendable,
+            commodity=row.commodity,
+            executed=row.executed,
+            justification=row.justification,
+            state_term_id=row.state_term_id,
+            agency_ref=row.agency_ref,
         )
         for row in rows
     ]

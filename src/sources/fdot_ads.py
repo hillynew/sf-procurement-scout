@@ -215,6 +215,23 @@ class FdotAdsAdapter(SourceAdapter):
             if county not in keywords:
                 keywords.append(county)
 
+        # The work types are FDOT's own classification of the job — for a
+        # CCNA/design-build feed, the single most useful classifier published.
+        major = _text(row.get("MajorWorkTypesText"))
+        minor = _text(row.get("MinorWorkTypesText")).replace("<br/>", " | ")
+        raw_category = " | ".join(p for p in (major, minor) if p) or None
+        work_codes = [w.strip() for w in raw_category.split("|")] if raw_category else []
+
+        requirements: List[str] = []
+        prequal = _text(row.get("ProjectThresholdTypeName"))
+        if prequal:
+            requirements.append(f"FDOT prequalification: {prequal}")
+        if _text(row.get("BDI")).lower() == "yes":
+            requirements.append("Business Development Initiative set-aside")
+        selection = _text(row.get("SelectionMethodText"))
+        if selection:
+            requirements.append(f"Selection method: {selection}")
+
         return Opportunity(
             **self._base_kwargs(),
             external_id=fields["external_id"] or ref,
@@ -227,6 +244,9 @@ class FdotAdsAdapter(SourceAdapter):
             offer_type=fields["offer_type"],
             categories=fields["categories"],
             keywords=keywords,
+            commodity_codes=work_codes,
+            raw_category=raw_category,
+            requirements=requirements,
             posted_date=_date(row.get("LastDateAdvertised")),
             due_date=parse_dt(_text(row.get("ResponseDeadlineDateTime"))),
             budget=_amount(row.get("AdContractAmount")),
