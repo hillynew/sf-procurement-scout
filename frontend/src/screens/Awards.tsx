@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAwards, usePricing, useVendors } from "../api/hooks";
+import { toast } from "sonner";
+import { useAwards, usePricing, useRecordsMutation, useRecordsQueue, useVendors } from "../api/hooks";
 import { CountyPill, EmptyState, Spinner, StatCard, LoadFailed } from "../components/ui";
 import { fmtDate, fmtMoney } from "../lib/format";
 
@@ -14,6 +15,8 @@ export default function Awards() {
   const { data, isLoading, isError, refetch } = useAwards();
   const { data: pricing } = usePricing();
   const { data: vendorData } = useVendors();
+  const { data: recordsData } = useRecordsQueue();
+  const recordsMutation = useRecordsMutation();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
 
@@ -217,6 +220,59 @@ export default function Awards() {
           )}
         </div>
       </div>
+
+      {recordsData && recordsData.requests.length > 0 && (
+        <div className="card mt-4 p-4">
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+            Records requests — bid tabs requestable under Ch. 119
+          </div>
+          <p className="mb-2.5 text-xs text-ink-soft">
+            Sealed bids stop being exempt 30 days after opening with no award posted
+            (s. 119.071(1)(b)2). Each row carries a ready-to-send letter — copy it or
+            open your mail app; mark it sent so nothing is chased twice.
+          </p>
+          <div className="space-y-1.5">
+            {recordsData.requests.filter((r) => r.status !== "skipped").slice(0, 30).map((r) => (
+              <div key={r.opportunity_id}
+                   className="flex flex-wrap items-center gap-2 rounded-[10px] border border-line px-3 py-2">
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold">{r.title}</span>
+                  <span className="block truncate text-xs text-ink-soft">
+                    {r.agency}
+                    {r.external_id ? ` · #${r.external_id}` : ""}
+                    {r.ripe_on ? ` · requestable since ${fmtDate(r.ripe_on)}` : ""}
+                  </span>
+                </span>
+                <button
+                  className="shrink-0 rounded-[10px] border border-line px-2.5 py-1 text-xs font-semibold hover:border-accent hover:text-accent"
+                  onClick={() => {
+                    navigator.clipboard.writeText(r.letter);
+                    toast.success("Letter copied");
+                  }}>
+                  Copy letter
+                </button>
+                {r.contact_email && (
+                  <a className="shrink-0 rounded-[10px] border border-line px-2.5 py-1 text-xs font-semibold hover:border-accent hover:text-accent"
+                     href={`mailto:${r.contact_email}?subject=${encodeURIComponent(
+                       `Public records request — ${r.external_id ?? r.title}`)}&body=${encodeURIComponent(r.letter)}`}>
+                    Email {r.contact_email}
+                  </a>
+                )}
+                <select
+                  value={r.status}
+                  onChange={(e) => recordsMutation.mutate({ id: r.opportunity_id, patch: { status: e.target.value } })}
+                  className="shrink-0 rounded-[10px] border border-line bg-surface px-2 py-1 text-xs font-semibold">
+                  <option value="ready">Ready</option>
+                  <option value="sent">Sent{r.sent_on ? ` ${fmtDate(r.sent_on)}` : ""}</option>
+                  <option value="received">Received</option>
+                  <option value="no_response">No response</option>
+                  <option value="skipped">Skip</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

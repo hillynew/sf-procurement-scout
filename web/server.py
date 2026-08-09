@@ -24,7 +24,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 
 from src.db import store as db
-from web.api import (awards, bids, contractors, fetch, misc, opportunities, sources,
+from web.api import (awards, bids, contractors, fetch, misc, opportunities, records, sources,
                      taxonomy, watchlists)
 
 DIST = ROOT / "frontend" / "dist"
@@ -75,7 +75,7 @@ def create_app() -> FastAPI:
             db_ok = False
         return {"status": "ok", "db": "ok" if db_ok else "error"}
 
-    for router in (opportunities.router, awards.router, bids.router,
+    for router in (opportunities.router, awards.router, records.router, bids.router,
                    contractors.router, watchlists.router, sources.router,
                    fetch.router, taxonomy.router, misc.router):
         app.include_router(router, prefix="/api")

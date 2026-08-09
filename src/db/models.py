@@ -296,3 +296,29 @@ class PdfCacheEntry(Base):
     url_hash: Mapped[str] = mapped_column(String(40), primary_key=True)
     text: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class RecordsRequest(Base):
+    """One Chapter 119 request for a bid tabulation, from ripe to resolved.
+
+    A row is minted when a closed solicitation crosses day 31 unawarded
+    (s. 119.071(1)(b)2) and carries the letter `src/records.py` wrote at that
+    moment — stored, not regenerated, so the text a user actually sent never
+    drifts under them. Sending is the user's act; this table only remembers.
+    """
+
+    __tablename__ = "records_requests"
+
+    opportunity_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    agency: Mapped[str] = mapped_column(String(256), default="")
+    title: Mapped[str] = mapped_column(Text, default="")
+    external_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    contact_email: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    letter: Mapped[str] = mapped_column(Text, default="")
+    #: ready | sent | received | no_response | skipped
+    status: Mapped[str] = mapped_column(String(16), default="ready")
+    ripe_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    sent_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    received_on: Mapped[Optional[date]] = mapped_column(Date, nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
