@@ -58,6 +58,7 @@ export interface Opportunity {
   protest_deadline?: string | null;
   first_seen_at?: string | null;
   detail_fetched?: boolean;
+  keywords?: string[];
   last_cycle_closed: string | null;
   days_until_due: number | null;
   detail_score: number;
@@ -203,6 +204,8 @@ export interface WatchlistRules {
   max_value?: number | null;
   no_bond?: boolean;
   recurring_only?: boolean;
+  // With `counties`: also keep statewide bids that name no county at all.
+  include_statewide?: boolean;
 }
 
 export interface Watchlist {
