@@ -11,8 +11,15 @@ from src.db import store as db
 
 from ..services.pricing import build_pricing
 from ..services.serialize import opp_out
+from ..services.vendors import build_vendors
 
 router = APIRouter()
+
+
+@router.get("/vendors")
+def vendors():
+    """Who wins what — vendor profiles from awards and the contract registers."""
+    return build_vendors()
 
 
 @router.get("/pricing")

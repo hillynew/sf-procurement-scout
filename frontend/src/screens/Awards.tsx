@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAwards, usePricing } from "../api/hooks";
+import { useAwards, usePricing, useVendors } from "../api/hooks";
 import { CountyPill, EmptyState, Spinner, StatCard, LoadFailed } from "../components/ui";
 import { fmtDate, fmtMoney } from "../lib/format";
 
@@ -13,6 +13,7 @@ import { fmtDate, fmtMoney } from "../lib/format";
 export default function Awards() {
   const { data, isLoading, isError, refetch } = useAwards();
   const { data: pricing } = usePricing();
+  const { data: vendorData } = useVendors();
   const navigate = useNavigate();
   const [q, setQ] = useState("");
 
@@ -65,6 +66,47 @@ export default function Awards() {
         placeholder="Filter by title, agency, or vendor…"
         className="input mb-4 w-full max-w-md"
       />
+
+      {vendorData && vendorData.vendors.length > 0 && (
+        <div className="card mb-4 p-4">
+          <div className="mb-2.5 flex items-baseline justify-between">
+            <div className="text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+              Who wins — from awards and contract registers
+            </div>
+            <div className="text-xs text-ink-faint">{vendorData.total} firms seen</div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-ink-faint">
+                  <th className="px-2 py-1 text-left font-semibold">Vendor</th>
+                  <th className="px-2 py-1 text-right font-semibold">Awards</th>
+                  <th className="px-2 py-1 text-right font-semibold">Awarded $</th>
+                  <th className="px-2 py-1 text-right font-semibold">Contracts held</th>
+                  <th className="px-2 py-1 text-left font-semibold">Wins with</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vendorData.vendors.slice(0, 10).map((v) => (
+                  <tr key={v.name} className="cursor-pointer border-t border-line hover:bg-bg"
+                      onClick={() => setQ(v.name)}
+                      title="Click to filter the lists below to this firm">
+                    <td className="max-w-[220px] truncate px-2 py-1.5 text-sm font-semibold">{v.name}</td>
+                    <td className="px-2 py-1.5 text-right text-sm tabular-nums">{v.awards || "—"}</td>
+                    <td className="px-2 py-1.5 text-right text-sm font-bold tabular-nums">
+                      {v.awarded_total != null ? fmtMoney(v.awarded_total) : "—"}
+                    </td>
+                    <td className="px-2 py-1.5 text-right text-sm tabular-nums">{v.contracts || "—"}</td>
+                    <td className="max-w-[220px] truncate px-2 py-1.5 text-xs text-ink-soft">
+                      {v.agencies.join(", ") || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {pricing && pricing.categories.length > 0 && (
         <div className="card mb-4 p-4">

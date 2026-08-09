@@ -643,3 +643,33 @@ def test_thin_samples_stay_out_of_pricing(client):
     db.save_snapshot([lonely], [SourceHealth(source_id="s", name="S", ok=True, count=1)])
     data = client.get("/api/pricing").json()
     assert not any(c["slug"] == "roofing" for c in data["categories"])
+
+
+def test_vendor_profiles_group_name_variants(client):
+    from datetime import date
+
+    from src.contracts import Contract
+    from src.db import store as db
+    from src.models.opportunity import Opportunity, SourceHealth
+
+    awards = [
+        Opportunity(
+            source_id="s", source_name="S", title=f"Paving {i}", url=f"https://x.gov/p{i}",
+            county="broward", agency="Broward County", status="award",
+            categories=["paving_roadway"], awarded_vendor=name, award_amount=100_000,
+            award_date=date(2026, 8, 1),
+        )
+        for i, name in enumerate(["Apex Paving LLC", "APEX PAVING, INC."])
+    ]
+    db.save_snapshot(awards, [SourceHealth(source_id="s", name="S", ok=True, count=2)])
+    db.save_contracts([Contract(
+        contract_id="P1", agency="FDOT", name="Roadway Term Contract",
+        source_id="facts", vendor="Apex Paving", amount=1.0,
+    )])
+
+    data = client.get("/api/vendors").json()
+    apex = next(v for v in data["vendors"] if v["name"].lower().startswith("apex"))
+    assert apex["awards"] == 2
+    assert apex["contracts"] == 1
+    assert apex["awarded_total"] == 200_000
+    assert "Broward County" in apex["agencies"]

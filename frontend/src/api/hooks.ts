@@ -8,6 +8,7 @@ import type {
   AwardsResponse,
   Contractor,
   PricingReport,
+  VendorsResponse,
   ContractorMatchesStatus,
   DeepDiveStatus,
   DetectResponse,
@@ -106,6 +107,14 @@ export function useAwards() {
     queryKey: ["awards"],
     queryFn: () => api.get<AwardsResponse>("/api/awards"),
     staleTime: 60_000,
+  });
+}
+
+export function useVendors() {
+  return useQuery({
+    queryKey: ["vendors"],
+    queryFn: () => api.get<VendorsResponse>("/api/vendors"),
+    staleTime: 120_000,
   });
 }
 
