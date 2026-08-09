@@ -85,14 +85,19 @@ class FetchJob:
 
     async def _run(self) -> None:
         started = datetime.utcnow()
+        run_id: Optional[int] = None
         try:
+            # The row goes in before the fetch so an OOM kill mid-run leaves
+            # evidence: the next run finds it still 'running' and flags it
+            # 'died'. Without this, a killed fetch simply never happened.
+            run_id = db.record_run_started(started)
             opps, health = await asyncio.to_thread(
                 run_fetch,
                 include_catalog=False,
                 quiet=True,
                 on_progress=self._on_progress_from_thread,
             )
-            result = db.save_snapshot(opps, health, started_at=started)
+            result = db.save_snapshot(opps, health, started_at=started, run_id=run_id)
             new_matches = self._post_fetch(opps, result.new_ids)
             summary = {
                 "event": "done",
@@ -109,7 +114,7 @@ class FetchJob:
             await asyncio.to_thread(self._auto_summarize, opps)
         except Exception as exc:  # noqa: BLE001 — surfaced, never crashes the app
             message = f"{type(exc).__name__}: {exc}"
-            db.record_failed_run(started, message)
+            db.record_failed_run(started, message, run_id=run_id)
             settings = db.get_settings()
             if settings["notifications"].get("fetch_events", True):
                 db.add_notification("fetch_failed", "Fetch failed", message)

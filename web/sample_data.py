@@ -406,15 +406,35 @@ def _sample_health() -> List[SourceHealth]:
 
 
 def load_sample() -> dict:
-    """Write the sample snapshot to the database and seed a matching pipeline."""
+    """Write the sample snapshot to the database and seed a matching pipeline.
+
+    Refused outright while real captured records exist: saving a snapshot
+    marks every row not in it absent and ages open ones to closed, so a demo
+    load against a live database replaces the pipeline with fiction. That is
+    exactly what happened in production on 2026-08-09 — this endpoint is
+    reachable by one click from the Settings screen. Loading over a previous
+    *demo* snapshot stays allowed, so the button is still re-runnable where
+    it belongs: a fresh or demo-only database.
+    """
     from src.db import store as db
 
-    bids, health = build_sample()
     db.bootstrap()
+    real = db.count_real_opportunities()
+    if real:
+        return {"count": 0, "seeded_pipeline": False, "loaded": False,
+                "real_rows": real}
+
+    bids, health = build_sample()
+    # A sentinel health row marks the run as demo-born, so `purge("demo")`
+    # can find and remove it without touching real run history.
+    health.insert(0, SourceHealth(
+        source_id="sample", name="Sample data", ok=True, count=len(bids),
+        status=HealthStatus.OK, note="demo snapshot — nothing was fetched",
+    ))
     result = db.save_snapshot(list(bids.values()), health)
 
     if db.workflow_state():
-        return {"count": result.count, "seeded_pipeline": False}
+        return {"count": result.count, "seeded_pipeline": False, "loaded": True}
 
     seed_stages = {
         "r3": "watching", "r6": "watching", "w3": "watching", "w4": "watching",
@@ -457,4 +477,4 @@ def load_sample() -> dict:
                   notes="Lost on bonding capacity.",
                   decided_on=date.today() - timedelta(days=41))
     db.update_tracked(bids["r1"].opportunity_id, checks={"0": True})
-    return {"count": result.count, "seeded_pipeline": True}
+    return {"count": result.count, "seeded_pipeline": True, "loaded": True}

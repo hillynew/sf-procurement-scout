@@ -338,14 +338,16 @@ export default function SettingsScreen() {
             <Radar size={13} /> Open sources
           </Link>
         </Row>
-        <Row label="Demo data" hint="Load the sample snapshot (never overwrites a real pipeline)">
+        <Row label="Demo data" hint="Load the sample snapshot — refused while real captured data exists">
           <Button kind="ghost" onClick={() => demo.mutate(undefined, {
             onSuccess: () => toast.success("Sample data loaded"),
+            onError: (e) => toast.error(e instanceof Error ? e.message : "Demo load refused"),
           })}>
             Load sample
           </Button>
         </Row>
         {[
+          ["demo", "Remove demo data", "Deletes sample bids, contracts and runs; real records untouched"],
           ["snapshot", "Clear bid snapshot", "Removes fetched bids and run history"],
           ["workflow", "Clear my pipeline", "Removes tracked bids, notes, results"],
           ["summaries", "Clear AI briefs", "Regenerate summaries from scratch"],

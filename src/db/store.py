@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import String, cast, delete, func, select, update
 
 from ..models.opportunity import Opportunity, SourceHealth
 from .engine import init_db, session_scope
@@ -109,12 +109,22 @@ class SnapshotResult:
     new_ids: List[str] = field(default_factory=list)
 
 
+#: Snapshot writes touch every stored row; these bound how many of them sit
+#: in the session at once. Loading the whole table held every old payload and
+#: every new one together, and on a 512MB instance that peak — stacked on the
+#: fetch's own — is what got the process OOM-killed. `_IN_CHUNK` also stays
+#: under SQLite's ~999 bound-parameter limit for IN() lists.
+_SNAPSHOT_CHUNK = 200
+_IN_CHUNK = 500
+
+
 def save_snapshot(
     opportunities: List[Opportunity],
     health: List[SourceHealth],
     *,
     started_at: Optional[datetime] = None,
     error: Optional[str] = None,
+    run_id: Optional[int] = None,
 ) -> SnapshotResult:
     now = datetime.utcnow()
     with session_scope() as s:
@@ -124,56 +134,113 @@ def save_snapshot(
 
         incoming_ids = set()
         new_ids: List[str] = []
-        for opp in opportunities:
-            oid = opp.opportunity_id
-            incoming_ids.add(oid)
-            payload = opp.model_dump(mode="json")
-            row = s.get(OpportunityRow, oid)
-            if row is None:
-                new_ids.append(oid)
-                row = OpportunityRow(opportunity_id=oid, first_seen_at=now)
-                s.add(row)
-            row.payload = payload
-            row.county = opp.county or ""
-            row.status = str(opp.status or "open")
-            row.offer_type = str(payload.get("offer_type") or "unknown")
-            row.due_date = opp.due_date
-            row.posted_date = opp.posted_date
-            row.budget_amount = opp.budget_amount
-            row.last_seen_at = now
-            row.present = True
+        for start in range(0, len(opportunities), _SNAPSHOT_CHUNK):
+            for opp in opportunities[start : start + _SNAPSHOT_CHUNK]:
+                oid = opp.opportunity_id
+                incoming_ids.add(oid)
+                payload = opp.model_dump(mode="json")
+                row = s.get(OpportunityRow, oid)
+                if row is None:
+                    new_ids.append(oid)
+                    row = OpportunityRow(opportunity_id=oid, first_seen_at=now)
+                    s.add(row)
+                row.payload = payload
+                row.county = opp.county or ""
+                row.status = str(opp.status or "open")
+                row.offer_type = str(payload.get("offer_type") or "unknown")
+                row.due_date = opp.due_date
+                row.posted_date = opp.posted_date
+                row.budget_amount = opp.budget_amount
+                row.last_seen_at = now
+                row.present = True
+            # Write the chunk and drop its payloads from memory; the expired
+            # rows stay in the identity map as shells and are never re-read.
+            s.flush()
+            s.expire_all()
 
         # Rows that vanished from the portals are kept and flagged absent —
         # never deleted. A captured record is the archive: award linkage joins
         # against closed solicitations, and "what was open last month" has to
         # come from somewhere. A vanished open row is also aged to closed,
         # since a bid a portal no longer lists is over even if we never saw a
-        # close date.
-        gone = existing_ids - incoming_ids
-        for oid in gone:
-            row = s.get(OpportunityRow, oid)
-            if row is None:
-                continue
-            row.present = False
-            if row.status in ("open", "upcoming") and oid not in tracked_ids:
+        # close date. Flipping `present` needs no payload, so it happens in
+        # bulk; only the rows being aged are actually loaded.
+        gone = sorted(existing_ids - incoming_ids)
+        aged: List[str] = []
+        for start in range(0, len(gone), _IN_CHUNK):
+            chunk = gone[start : start + _IN_CHUNK]
+            aged.extend(
+                oid
+                for oid, status in s.execute(
+                    select(OpportunityRow.opportunity_id, OpportunityRow.status)
+                    .where(OpportunityRow.opportunity_id.in_(chunk))
+                )
+                if status in ("open", "upcoming") and oid not in tracked_ids
+            )
+            s.execute(
+                update(OpportunityRow)
+                .where(OpportunityRow.opportunity_id.in_(chunk))
+                .values(present=False),
+                execution_options={"synchronize_session": False},
+            )
+        s.expire_all()
+        for start in range(0, len(aged), _SNAPSHOT_CHUNK):
+            for oid in aged[start : start + _SNAPSHOT_CHUNK]:
+                row = s.get(OpportunityRow, oid)
+                if row is None:
+                    continue
                 row.status = "closed"
                 payload = dict(row.payload or {})
                 if payload.get("status") in ("open", "upcoming"):
                     payload["status"] = "closed"
                     row.payload = payload
+            s.flush()
+            s.expire_all()
 
-        run = FetchRun(
-            started_at=started_at or now,
-            finished_at=now,
-            status="error" if error else "done",
-            opp_count=len(opportunities),
-            new_count=len(new_ids),
-            health=[h.model_dump(mode="json") for h in health],
-            error=error,
-        )
-        s.add(run)
+        run = s.get(FetchRun, run_id) if run_id is not None else None
+        if run is None:
+            run = FetchRun(started_at=started_at or now)
+            s.add(run)
+        run.finished_at = now
+        run.status = "error" if error else "done"
+        run.opp_count = len(opportunities)
+        run.new_count = len(new_ids)
+        run.health = [h.model_dump(mode="json") for h in health]
+        run.error = error
         s.flush()
         return SnapshotResult(run_id=run.id, count=len(opportunities), new_ids=new_ids)
+
+
+def record_run_started(started_at: datetime) -> int:
+    """Open a 'running' run row before fetching, so a death leaves evidence.
+
+    A process the kernel kills for memory writes no error row — its run just
+    never appears, and the failure is invisible. The row opened here is
+    finalized by ``save_snapshot``/``record_failed_run`` via ``run_id``; one
+    fetch runs at a time, so any 'running' row still present when a new run
+    starts is a predecessor that died mid-run, and is flagged as such.
+    """
+    with session_scope() as s:
+        stale = s.execute(
+            select(FetchRun).where(FetchRun.status == "running")
+        ).scalars().all()
+        for run in stale:
+            run.status = "died"
+            run.finished_at = run.finished_at or datetime.utcnow()
+            run.error = ("the process stopped mid-run without recording an "
+                         "error — most likely killed for memory")
+        if stale:
+            _notify_in_session(
+                s, "fetch_died", "A fetch died mid-run",
+                "The previous fetch never finished; the process most likely "
+                "ran out of memory. The run is marked 'died' in run history.",
+                key="fetch:died",
+            )
+        run = FetchRun(started_at=started_at, finished_at=None, status="running",
+                       opp_count=0, new_count=0, health=[], error=None)
+        s.add(run)
+        s.flush()
+        return run.id
 
 
 #: How many past runs a source is judged against, and the floor below which a
@@ -252,10 +319,29 @@ def _notify_in_session(s, kind: str, title: str, body: str, *, key: str) -> None
                        body=body, opportunity_id=key, read=False))
 
 
-def record_failed_run(started_at: datetime, error: str) -> None:
+def record_failed_run(started_at: datetime, error: str,
+                      run_id: Optional[int] = None) -> None:
     with session_scope() as s:
-        s.add(FetchRun(started_at=started_at, finished_at=datetime.utcnow(),
-                       status="error", opp_count=0, new_count=0, health=[], error=error))
+        run = s.get(FetchRun, run_id) if run_id is not None else None
+        if run is None:
+            run = FetchRun(started_at=started_at, opp_count=0, new_count=0, health=[])
+            s.add(run)
+        run.finished_at = datetime.utcnow()
+        run.status = "error"
+        run.error = error
+
+
+def count_real_opportunities() -> int:
+    """Stored rows that came from a portal rather than the demo seed."""
+    with session_scope() as s:
+        return int(
+            s.execute(
+                select(func.count())
+                .select_from(OpportunityRow)
+                .where(OpportunityRow.payload["source_id"].as_string() != "sample")
+            ).scalar_one()
+            or 0
+        )
 
 
 def load_opportunities(*, present_only: bool = False) -> List[Opportunity]:
@@ -1043,6 +1129,28 @@ def purge(target: str) -> None:
 
             s.execute(delete(ContractorMatchSet))
             s.execute(delete(Contractor))
+        elif target == "demo":
+            # Only what load_sample() wrote: seeded bids, the pipeline rows
+            # seeded on top of them (tracked bids, results, any AI briefs),
+            # seeded contracts, and demo run rows (identified by the sentinel
+            # health entry the loader stamps). Real captured records are
+            # untouched.
+            from .models import ContractRow
+
+            sample_ids = select(OpportunityRow.opportunity_id).where(
+                OpportunityRow.payload["source_id"].as_string() == "sample"
+            )
+            for table in (BidResult, TrackedBid, AiSummary, DeepDive):
+                s.execute(delete(table).where(
+                    table.opportunity_id.in_(sample_ids.scalar_subquery())
+                ))
+            s.execute(delete(OpportunityRow).where(
+                OpportunityRow.payload["source_id"].as_string() == "sample"
+            ))
+            s.execute(delete(ContractRow).where(ContractRow.source_id == "sample"))
+            s.execute(delete(FetchRun).where(
+                cast(FetchRun.health, String).like('%"source_id": "sample"%')
+            ))
         else:
             raise ValueError(f"unknown purge target {target!r}")
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -57,6 +58,11 @@ MAX_DETAIL_FETCHES = 400
 # Bid packages are megabytes each, so the PDF pass is capped harder than the
 # HTML one. Extracted text is cached on disk, so repeat refreshes are cheap.
 MAX_PACKAGE_PARSES = 60
+# ...and its concurrency is capped harder still. Each in-flight package holds
+# its download plus pypdf's parse structures, which run several times the file
+# size; a dozen at once is a memory spike the 512MB instance was OOM-killed
+# for. Four bounds the spike, and the pass is network-bound anyway.
+PACKAGE_WORKERS = 4
 
 
 def _normalize_status(opps: List[Opportunity]) -> None:
@@ -227,7 +233,9 @@ def parse_packages(
             return url, None
 
     parsed = 0
-    with ThreadPoolExecutor(max_workers=max(1, min(max_workers, len(by_url)))) as pool:
+    with ThreadPoolExecutor(
+        max_workers=max(1, min(max_workers, PACKAGE_WORKERS, len(by_url)))
+    ) as pool:
         for url, facts in pool.map(read, list(by_url)):
             if facts is None or facts.is_empty():
                 continue
@@ -409,6 +417,12 @@ def run_fetch(
     order = {a.source_id: i for i, a in enumerate(adapters)}
     health.sort(key=lambda h: order.get(h.source_id, 99))
 
+    # Parse trees are cycle-heavy (every bs4 node points back at its parent),
+    # so a fetch's soups sit around until a generational GC pass happens to
+    # run. Collecting at the phase seams keeps that debt out of the peak —
+    # this process gets OOM-killed at 512MB, and has been.
+    gc.collect()
+
     _normalize_status(all_opps)
     all_opps = dedupe(all_opps)
     # Detail runs after dedupe so we never spend a request on a row that is
@@ -418,12 +432,14 @@ def run_fetch(
         fetch_details(
             all_opps, adapters, max_workers=max_workers, limit=detail_limit, quiet=quiet
         )
+        gc.collect()
         # Packages are discovered by the detail pass, so this must follow it.
         if with_packages:
             progress({"event": "phase", "phase": "packages"})
             parse_packages(
                 all_opps, max_workers=max_workers, limit=package_limit, quiet=quiet
             )
+            gc.collect()
     progress({"event": "phase", "phase": "finalize"})
     derive_fields(all_opps)
     link_awards(all_opps)

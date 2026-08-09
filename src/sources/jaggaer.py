@@ -64,7 +64,7 @@ from bs4 import BeautifulSoup
 from ..classify import enrich
 from ..dates import parse_dt
 from ..protest import protest_deadline
-from ..http_util import get, session
+from ..http_util import get, read_bounded, session
 from ..models.opportunity import Opportunity
 from .base import SourceAdapter
 
@@ -320,6 +320,10 @@ def _date(value: Optional[str]):
 #: nothing is cacheable and every read is a real download.
 MAX_AWARD_DOCS = 8
 
+#: A tabulation sheet or intent-to-award notice is kilobytes; anything bigger
+#: is a full bid package that would be buffered into memory for two regexes.
+MAX_DOC_BYTES = 15 * 1024 * 1024
+
 _AWARD_VENDOR_PDF = re.compile(
     r"(?:intent\s+to\s+award|award(?:ed)?)\s+(?:\w+\s+){0,3}?to[:\s]+"
     r"([A-Z][\w&.,'()\- ]{2,80}?)(?=[,;\n]|\s{2,}|$)",
@@ -330,9 +334,11 @@ _MONEY_ANY = re.compile(r"\$\s?([\d,]+(?:\.\d{2})?)")
 
 def _award_facts_from_doc(name: str, url: str, session) -> tuple:
     """(vendor, amount) from one award attachment; (None, None) when unreadable."""
-    resp = session.get(url, timeout=60)
+    resp = session.get(url, timeout=60, stream=True)
     resp.raise_for_status()
-    body = resp.content
+    body = read_bounded(resp, MAX_DOC_BYTES)
+    if not body:
+        return None, None
 
     if body[:4] == b"PK\x03\x04" and re.search(r"\.xlsx?", name, re.I):
         return _facts_from_xlsx(body)

@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .http_util import get
+from .http_util import get, read_bounded
 
 # Bid packages run to hundreds of pages of boilerplate; the terms are at the
 # front. These caps keep a refresh bounded in both time and memory.
@@ -116,12 +116,15 @@ def fetch_text(url: str, *, use_cache: bool = True, headers: Optional[dict] = No
             return from_db
 
     try:
-        resp = get(url, timeout=FETCH_TIMEOUT, retries=1, headers=headers or None)
+        # Streamed so the size cap applies while downloading — `.content`
+        # would buffer an arbitrarily large file before any check could run.
+        resp = get(url, timeout=FETCH_TIMEOUT, retries=1, headers=headers or None,
+                   stream=True)
+        raw = read_bounded(resp, MAX_BYTES)
     except Exception:  # noqa: BLE001 — a missing package must not fail the bid
         return ""
 
-    raw = resp.content or b""
-    if len(raw) > MAX_BYTES or not raw.startswith(b"%PDF"):
+    if raw is None or not raw.startswith(b"%PDF"):
         return ""
 
     text = _extract(raw)

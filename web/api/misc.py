@@ -158,7 +158,7 @@ def test_digest_email():
 
 
 class PurgeBody(BaseModel):
-    target: str  # snapshot | workflow | summaries | notifications | pdf_cache | contractors
+    target: str  # snapshot | workflow | summaries | notifications | pdf_cache | contractors | demo
 
 
 @router.post("/settings/data/purge")
@@ -180,4 +180,13 @@ def load_demo():
     from web.sample_data import load_sample
 
     result = load_sample()
+    if not result.get("loaded", True):
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"{result.get('real_rows', 0)} real records are in the "
+                "database; loading demo data would replace the live snapshot. "
+                "Purge the snapshot first if you really want the demo."
+            ),
+        )
     return result
