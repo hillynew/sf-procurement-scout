@@ -284,7 +284,7 @@ def test_award_docs_are_captured_and_parsed(monkeypatch):
 
     from openpyxl import Workbook
 
-    from src.sources.jaggaer import JaggaerAdapter, _facts_from_xlsx
+    from src.sources.jaggaer import _facts_from_xlsx
 
     wb = Workbook()
     ws = wb.active
