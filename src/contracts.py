@@ -64,6 +64,9 @@ class Contract:
     amount: Optional[float] = None
     #: Method of procurement, same caveat.
     method: Optional[str] = None
+    #: Renewal option remaining, where the register says (Bonfire's
+    #: IsExtendable column). None = the register doesn't publish it.
+    extendable: Optional[bool] = None
 
     def days_until_expiry(self, today: Optional[date] = None) -> Optional[int]:
         if self.end_date is None:

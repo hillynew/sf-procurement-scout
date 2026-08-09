@@ -70,7 +70,8 @@ def test_open_opportunities_are_parsed(monkeypatch):
     assert o.title == "Roof Repair"
     assert o.external_id == "ITB-1"
     assert o.status == "open"
-    assert o.due_date == datetime(2026, 8, 19, 18, 0)
+    # DateClose is UTC on the wire; 18:00Z on an August day is 2:00 PM EDT.
+    assert o.due_date == datetime(2026, 8, 19, 14, 0)
     assert o.department == "Public Works"
     assert o.url == "https://broward.bonfirehub.com/opportunities/100"
 
@@ -181,3 +182,46 @@ def test_missing_host_config_raises():
     del bad_cfg["bonfire_host"]
     with pytest.raises(ValueError):
         BonfireAdapter(bad_cfg).fetch()
+
+
+def test_past_awarded_row_becomes_award_status(monkeypatch):
+    """SubStatus 3 / IsPublicAward is an award, not a generic closed row."""
+    awarded = _project("300", "ITB-9", "Awarded Roofing")
+    awarded["ProjectSubStatusID"] = "3"
+    awarded["IsPublicAward"] = True
+    _stub(monkeypatch, {"getPastPublicOpportunitiesSectionData": _payload(awarded)})
+    (o,) = BonfireAdapter(CFG).fetch_history()
+    assert o.status == "award"
+
+
+def test_past_cancelled_row_becomes_cancelled_status(monkeypatch):
+    cancelled = _project("301", "ITB-10", "Cancelled Roofing")
+    cancelled["ProjectSubStatusID"] = "2"
+    cancelled["IsPublicAward"] = False
+    _stub(monkeypatch, {"getPastPublicOpportunitiesSectionData": _payload(cancelled)})
+    (o,) = BonfireAdapter(CFG).fetch_history()
+    assert o.status == "cancelled"
+
+
+def test_contract_extendable_flag_is_captured(monkeypatch):
+    payload = {
+        "success": 1,
+        "payload": {
+            "publicContracts": {
+                "10": {
+                    "ContractID": "10",
+                    "Name": "Janitorial",
+                    "VendorID": "5",
+                    "ContractStatusID": "2",
+                    "StartDate": "2025-01-01 00:00:00",
+                    "EndDate": "2027-01-01 00:00:00",
+                    "IsExtendable": "1",
+                }
+            },
+            "vendors": {"5": {"VendorID": "5", "VendorContactOrganizationName": "CleanCo"}},
+        },
+    }
+    _stub(monkeypatch, {"getPublicContractsSectionData": payload})
+    (c,) = BonfireAdapter(CFG).fetch_contracts()
+    assert c.vendor == "CleanCo"
+    assert c.extendable is True
