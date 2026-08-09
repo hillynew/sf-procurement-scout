@@ -46,3 +46,40 @@ services:
         sync: false
       - key: SF_SCOUT_BONFIRE_COOKIE  # enables an authenticated Bonfire session
         sync: false
+
+  # Scheduled fetch — wakes the (possibly sleeping) web service and kicks a
+  # background fetch every 4 hours, so data stays fresh around the clock even
+  # on the free web tier. Stdlib-only; a 409 means a fetch is already running
+  # and counts as success. Created live on 2026-08-09 (scout-fetch-cron);
+  # this block keeps the Blueprint in step with it.
+  - type: cron
+    name: scout-fetch-cron
+    runtime: python
+    plan: starter
+    region: oregon
+    branch: main
+    schedule: "0 */4 * * *"
+    buildCommand: echo "no build needed — stdlib only"
+    startCommand: |
+      python - <<'PYEOF'
+      import os, sys, time, urllib.error, urllib.request
+
+      url = os.environ.get("SCOUT_URL", "https://sf-procurement-scout.onrender.com") + "/api/fetch"
+      for attempt in range(3):
+          try:
+              r = urllib.request.urlopen(urllib.request.Request(url, method="POST"), timeout=180)
+              print("fetch started:", r.status, r.read()[:200])
+              sys.exit(0)
+          except urllib.error.HTTPError as e:
+              if e.code == 409:
+                  print("a fetch is already running - that's fine")
+                  sys.exit(0)
+              print("http error", e.code, "- attempt", attempt + 1)
+          except Exception as e:
+              print("retry after:", e)
+          time.sleep(30)
+      sys.exit(1)
+      PYEOF
+    envVars:
+      - key: SCOUT_URL
+        value: https://sf-procurement-scout.onrender.com
