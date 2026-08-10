@@ -35,9 +35,12 @@ console = Console()
 
 # Portals are independent, so fetch them concurrently. Every source targets a
 # different host and each adapter still paces its own requests, so the limit is
-# about not opening an unbounded number of sockets rather than politeness to any
-# one site.
-MAX_WORKERS = 12
+# about memory rather than politeness to any one site: each in-flight adapter
+# holds its page buffers and parse trees, and the same pool size drives the
+# detail pass. Twelve workers put the statewide fetch's peak at 527MB on the
+# 512MB instance — the kernel killed it, repeatedly. Eight keeps the overlap
+# ~a third smaller and costs a few minutes on a four-hour cadence.
+MAX_WORKERS = 8
 
 # An "open" listing with no published due date is only credible for so long;
 # some portals never retire their rows.
