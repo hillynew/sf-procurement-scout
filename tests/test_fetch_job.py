@@ -55,6 +55,26 @@ def _wait_done(client, timeout=5.0):
     raise AssertionError(f"fetch never finished: {status}")
 
 
+def _wait_idle(client, timeout=5.0):
+    """Wait until the job is genuinely finished, not merely reporting "done".
+
+    `_run_once` publishes state "done" and *then* awaits auto-summaries; only
+    the outer `finally` clears `running`. So there is a real window where the
+    status endpoint says done while a start would still be refused as
+    already-running. Polling on status alone makes any follow-up POST a coin
+    flip.
+    """
+    from web.services import fetch_job as fj
+
+    _wait_done(client, timeout=timeout)
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        if not fj.job.running:
+            return
+        time.sleep(0.05)
+    raise AssertionError("job still running after it reported done")
+
+
 def test_fetch_lifecycle_and_snapshot(client):
     assert client.get("/api/fetch/status").json()["state"] == "idle"
     assert client.post("/api/fetch").status_code == 202
@@ -143,3 +163,31 @@ def test_release_memory_is_safe_to_call():
     from web.services import fetch_job as fj
 
     fj._release_memory()
+
+
+def test_a_second_fetch_inside_the_gap_is_refused(client):
+    """The cron and the "on open" refresh are independent schedules. On
+    2026-08-10 they landed 11 minutes apart and the second run peaked at
+    502MB against a 512MB limit."""
+    assert client.post("/api/fetch").status_code == 202
+    _wait_idle(client)
+
+    resp = client.post("/api/fetch")
+    assert resp.status_code == 409
+    assert "less than" in resp.json()["detail"]
+
+
+def test_fetch_now_overrides_the_gap(client):
+    """The guard is for schedules, not for the human at the keyboard."""
+    assert client.post("/api/fetch").status_code == 202
+    _wait_idle(client)
+
+    assert client.post("/api/fetch?force=true").status_code == 202
+    assert _wait_done(client)["state"] == "done"
+
+
+def test_the_gap_never_blocks_the_very_first_fetch(client):
+    """No prior run means nothing to be too soon after — a fresh deployment
+    must not sit idle waiting out a window that never started."""
+    assert client.post("/api/fetch").status_code == 202
+    assert _wait_done(client)["state"] == "done"

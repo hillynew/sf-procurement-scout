@@ -502,7 +502,11 @@ export function useMarkNotificationsRead() {
 export function useStartFetch() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post("/api/fetch"),
+    // `force` is the human pressing "Fetch now" — it bypasses the server's
+    // minimum-gap guard. The "on open" refresh deliberately does not, so it
+    // cannot stack a fetch onto one that just finished.
+    mutationFn: (force?: boolean) =>
+      api.post(force ? "/api/fetch?force=true" : "/api/fetch"),
     onSuccess: () => qc.invalidateQueries({ queryKey: keys.fetchStatus }),
   });
 }

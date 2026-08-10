@@ -92,7 +92,7 @@ export default function FetchButton() {
     setLive(null);
     setOpen(true);
     try {
-      await start.mutateAsync();
+      await start.mutateAsync(true);
       setLive({ state: "running", sources: [], done_count: 0, total: 0 });
     } catch {
       toast.info("A fetch is already running");
