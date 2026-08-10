@@ -247,12 +247,41 @@ repo's own rule and every agency converted to a catalog pointer. The
 sanctioned restore path is VendorLink's statewide subscription (~$175/yr) —
 an owner decision.
 
-**Open (deferred, tracked for later phases)** — B7 CivicPlus tenant drift
-(needs a fingerprint recheck sweep — recommend running
-`scripts/fingerprint_agencies.py --recheck`) · D24 `include_statewide`
+**Open (deferred, tracked for later phases)** — D24 `include_statewide`
 watchlist flag (frontend, Phase 6) · D25 preview-count divergence (Phase 6) ·
 D26 dead auto-fetch options (Phase 6 settings rework) · D27 award status
 invisible in UI (Phase 6, now with real award data to show) · D28-D31 UI
 niceties (Phase 6) · E35 pdf-cache disk pruning · E37 `datetime.utcnow()`
 deprecation sweep · F38-F46 dead code (removed opportunistically as files are
 touched).
+
+---
+
+## B7 recheck (2026-08-10) — the drift hypothesis was wrong, the honesty gap is bigger
+
+`scripts/fingerprint_agencies.py --recheck` swept the 222 entities already
+placed on a platform: **220 unchanged, 0 moved, 2 no longer readable**
+(Broward Solid Waste Disposal District — HTTPError; Town of Redington Shores —
+no platform signature; both read as a slow host or a WAF, not a move). No
+tenant has migrated. B7 as written — "CivicPlus tenant drift" — is **not
+happening**, and is closed on that evidence.
+
+What the sweep did surface is the same worry in a larger shape. Against
+production's own `/api/sources`, **108 of 281 live sources (38%) report
+`ok: true` with zero rows and no `degraded_reason`** — including `hollywood`,
+the abandoned board B7 named. The bulk are CivicPlus (≈55) and OpenGov (≈23),
+plus `jaggaer_usf`, `plantation`, `swa_pbc`, four Legistar bodies, and two
+Workday tenants. Some are honestly quiet — a small town with nothing open
+today is a real state. Others are dead. **The system cannot tell the two
+apart, and reports both as healthy.**
+
+The Phase 4 drop-detection does not close this: it alarms when a source falls
+below *its own established norm*, and a source that has never returned a row
+has a norm of zero, so it never alarms. The silence is structural, not a bug
+in the detector.
+
+Recommended fix (not built): a liveness class distinct from health — a source
+that has been fetched N times across M days and has *never* yielded a record
+is `unverified`, not `ok`. That is a change to health semantics and to the
+Sources screen, so it is recorded here for an owner decision rather than
+taken unilaterally.
