@@ -341,28 +341,31 @@ turned out to be:
 
 | Triage | pointers | What it means |
 |---|---:|---|
-| already read live by a bid adapter | 23 | the pointer is redundant — we cover this agency today |
+| already read live by a bid adapter | 26 | the pointer is redundant — we cover this agency today |
 | no roster entity | 23 | co-ops, chambers, sheriffs, clerks: no website on file to read |
-| worth re-reading | 74 | resolving to **68** distinct agencies — a few platforms list one buyer as two boards |
+| worth re-reading | 71 | resolving to **65** distinct agencies — a few platforms list one buyer as two boards |
 
-Then what re-reading those 68 agency websites found:
+Coverage is checked twice, on two different keys, because one key was not
+enough. Matching the platform's agency name against a configured source's name
+finds 23. The other 3 are found only by *identity*: take what the entity's
+fingerprint says it runs, turn it into the tenant the generator would use, and
+look for that. `og_pcsb` reads Pinellas County School District and says so
+nowhere a string match can see — the OpenGov discoverer names its sources after
+the tenant, not the buyer. Central Florida Expressway (`cfxway`) and Hernando
+County (`hernandocounty`) hid the same way.
+
+Then what re-reading those 65 agency websites found:
 
 | Outcome | agencies | What it means |
 |---|---:|---|
-| named a platform we may read | 5 | but only **1** is new — see below |
+| named a platform we may read | 2 | **1** of them new: New Smyrna Beach |
 | a lead — no adapter for it | 3 | 2× BidSync, 1× a self-hosted board needing a page reader |
 | confirmed nowhere but the forbidden platform | 20 | the irreducible gap: 9 VendorLink, 10 BidNet, 1 DemandStar |
 | site unreadable today | 40 | 15 no procurement link, 11 no signature, 7 WAF, 4 JS shell, 3 network |
 
-Of the 5: **New Smyrna Beach** is the one new live source (its own CivicPlus
-board). Hernando County was already configured under the tenant
-`hernandocounty`, which the name-based check missed and the generator caught.
-Flagler County School District matched only weakly — a lead, not a tenant.
-Central Florida Expressway Authority and Pinellas County School District both
-landed on an `/portal/embed` URL that names no tenant; CFX is already covered
-as `cfxway`, so **Pinellas County School District is the one agency this sweep
-proved is reachable and still is not configured** — it needs its OpenGov tenant
-identified by hand.
+**New Smyrna Beach** — its own CivicPlus board — is the single new live source
+out of 65 agencies. The other of the 2 is Flagler County School District, a
+weak match on OpenGov: a lead, not a tenant.
 
 The honest headline is the first table, not the second. **The gap was never 120
 agencies; a fifth of it was already covered and nobody had checked.** One new
@@ -375,15 +378,30 @@ That last row is a queue, not a verdict. A WAF-blocked homepage today is
 readable next month, so this is worth re-running with the quarterly
 fingerprint sweep rather than treating as settled.
 
-**A bug it turned up.** Two recoveries pointed at
-`procurement.opengov.com/portal/embed` — OpenGov's embeddable-widget endpoint,
-where the tenant goes to the widget rather than into the path. The generator's
-`/portal/(...)` pattern read `embed` as the tenant, minted a source whose board
-404s, and — the part that mattered — *claimed* the `embed` identity, so every
-later agency whose fingerprint landed on an embed URL was skipped as "already
-configured" with nothing in the report to say so. Five were. Same shape as the
-match-on-host-alone bug already recorded in `sources_from_fingerprints.py`, one
-level down, and now guarded by `NON_TENANTS`.
+**The embed bug, and what it was actually hiding.** Two recoveries pointed at
+`procurement.opengov.com/portal/embed` — the iframe an agency drops into its
+own page. The `/portal/(...)` pattern read `embed` as the tenant, minted a
+source whose board 404s, and — the part that mattered — *claimed* the `embed`
+identity, so every later agency whose fingerprint landed on an embed URL was
+skipped as "already configured" with nothing in the report to say so. Five
+were. Same shape as the match-on-host-alone bug already recorded in
+`sources_from_fingerprints.py`, one level down, and guarded by `NON_TENANTS`.
+
+Reading those five properly was the obvious follow-up, and it is worth writing
+down that **it recovered nothing.** The tenant is in the URL after all, one
+segment deeper — `/portal/embed/pcsb/project-list` — and `portal_url_for` was
+truncating it before anything downstream could see it. Both patterns now accept
+the embed form. All five tenants (`bartowfl`, `districtgov`, `cityoftampa`,
+`cfxway`, `pcsb`) turned out to be **already configured live**, found earlier by
+`scripts/discover_opengov_tenants.py`, which reads OpenGov's own tenant list and
+never needed a fingerprint.
+
+So the fix buys no coverage. What it buys is a report that says "already
+configured" rather than "the URL does not name the tenant" — a closed question
+instead of an open one, and five fewer agencies that look like unfinished work.
+That is the same lesson as the section above, one more time: the gap was
+smaller than the pointer count, and most of what looked missing was already
+covered by a route nobody had cross-checked.
 
 ## 4. What is worth buying
 

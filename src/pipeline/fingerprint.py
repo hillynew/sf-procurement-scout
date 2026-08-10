@@ -185,7 +185,11 @@ def portal_url_for(platform: str, html: str, base: str) -> Optional[str]:
         "bidsync_periscope": r"https?://[^\"'\s<>]*(?:bidsync|buyspeed)\.com[^\"'\s<>]*",
         "bidexpress": r"https?://[^\"'\s<>]*bid(?:express|x)\.com[^\"'\s<>]*",
         "questcdn": r"https?://[^\"'\s<>]*questcdn\.com[^\"'\s<>]*",
-        "opengov": r"https?://procurement\.opengov\.com/portal/[a-z0-9_-]+",
+        # `/portal/<tenant>` is the portal; `/portal/embed/<tenant>/project-list`
+        # is the iframe an agency drops into its own page. The tenant sits one
+        # segment deeper in the second form, and without `embed/` here the
+        # match stopped at the literal word and recorded a URL naming nobody.
+        "opengov": r"https?://procurement\.opengov\.com/portal/(?:embed/)?[a-z0-9_-]+",
         "vendor_registry": r"https?://vrapp\.vendorregistry\.com/Bids/View/[^\"'\s<>]*",
         # Either the vendor's host or a county-hosted instance.
         "vendorlink": r"https?://[^\"'\s<>]*(?:myvendorlink\.com/external[^\"'\s<>]*|vendorlink\.[a-z0-9.-]+/[^\"'\s<>]*)",

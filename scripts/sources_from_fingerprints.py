@@ -65,7 +65,9 @@ CONFIG_DIR = Path("config")
 PLATFORM_ADAPTERS: Dict[str, tuple] = {
     "civicplus": ("civicplus", None, None),
     "bonfire": ("bonfire", "bonfire_host", r"https?://([a-z0-9-]+\.bonfirehub\.com)"),
-    "opengov": ("opengov", "opengov_code", r"/portal/([a-z0-9_-]+)"),
+    # Both portal shapes: `/portal/<tenant>` and the embeddable
+    # `/portal/embed/<tenant>/project-list` an agency iframes into its own page.
+    "opengov": ("opengov", "opengov_code", r"/portal/(?:embed/)?([a-z0-9_-]+)"),
     "ionwave": ("ionwave", "ionwave_host", r"https?://([a-z0-9-]+\.ionwave\.net)"),
     "jaggaer": ("jaggaer", "jaggaer_org", r"[?&]CustomerOrg=([A-Za-z0-9_-]+)"),
     # Either host carries the tenant as its first label. The auth host is the
