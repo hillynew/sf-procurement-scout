@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import AsyncIterator, Dict, List, Optional, Set
 
 from src.db import store as db
@@ -20,6 +20,12 @@ from src.pipeline.runner import run_fetch
 from .matching import wl_matches
 
 HEARTBEAT_SECONDS = 15
+
+#: Minimum gap between unforced fetches. The four-hourly cron and the "on
+#: open" refresh are independent schedules; this stops the second from
+#: stacking onto the first while the process is still carrying the last
+#: run's footprint. "Fetch now" bypasses it.
+MIN_FETCH_GAP_MINUTES = 30
 
 
 class FetchJob:
@@ -42,8 +48,26 @@ class FetchJob:
         with self._state_lock:
             return json.loads(json.dumps(self._state, default=str))
 
-    async def start(self) -> bool:
-        """Kick off a fetch. False when one is already running."""
+    async def start(self, *, force: bool = False) -> bool:
+        """Kick off a fetch. False when one is already running, or when an
+        unforced fetch would stack onto one that just finished.
+
+        Two schedules drive this — Render's four-hourly cron and the app's
+        own "on open" refresh — and nothing used to stop them landing on top
+        of each other. On 2026-08-10 they did: a fetch finished at 19:49 and
+        the cron started another at 20:00, from a floor still 100MB above
+        baseline. That run peaked at 502MB against the instance's 512MB
+        limit — a 10MB margin, the closest this has come to the OOM killer
+        since the memory work landed. Back-to-back runs are also pointless:
+        the portals do not repopulate in eleven minutes.
+
+        `force` is the human pressing "Fetch now", which stays unconditional.
+        """
+        with self._state_lock:
+            if self._running:
+                return False
+        if not force and _too_soon():
+            return False
         with self._state_lock:
             if self._running:
                 return False
@@ -210,6 +234,23 @@ class FetchJob:
                 )
         except Exception:  # noqa: BLE001
             pass
+
+
+def _too_soon() -> bool:
+    """True when the last completed run is younger than the minimum gap.
+
+    Read outside the state lock's critical section: it touches the database,
+    and holding a threading lock across that would serialise every caller of
+    `status()` behind a query.
+    """
+    try:
+        run = db.latest_run()
+    except Exception:  # noqa: BLE001 — a health check must never block a fetch
+        return False
+    last = run.get("finished_at") if run else None
+    if last is None:
+        return False
+    return (datetime.utcnow() - last) < timedelta(minutes=MIN_FETCH_GAP_MINUTES)
 
 
 def _release_memory() -> None:
