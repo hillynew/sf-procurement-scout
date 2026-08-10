@@ -607,3 +607,11 @@ sources:
   adapter: civicplus
   platform: civicplus
   portal_url: https://cityofmascotte.com/Bids.aspx
+- id: fp_mun_city_of_new_smyrna_beach
+  name: City of New Smyrna Beach (Civicplus)
+  county: volusia
+  agency: City of New Smyrna Beach
+  live_fetch: true
+  adapter: civicplus
+  platform: civicplus
+  portal_url: https://www.cityofnsb.com/Bids.aspx
