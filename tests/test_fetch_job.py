@@ -136,3 +136,10 @@ def test_watchlist_match_notification_on_new_bids(client):
     notes = client.get("/api/notifications").json()["items"]
     match = [n for n in notes if n["kind"] == "watchlist_match"]
     assert match and "Fakes" in match[0]["title"]
+
+
+def test_release_memory_is_safe_to_call():
+    """gc + malloc_trim; must be a no-op-at-worst on any platform."""
+    from web.services import fetch_job as fj
+
+    fj._release_memory()
