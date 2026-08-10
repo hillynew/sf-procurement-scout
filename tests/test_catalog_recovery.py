@@ -22,7 +22,7 @@ from __future__ import annotations
 import pytest
 
 from src.pipeline import fingerprint as fp
-from src.terms import FORBIDS_ADAPTER, TERMS
+from src.terms import FORBIDS_ADAPTER, GRANDFATHERED, TERMS
 
 
 class _Resp:
@@ -197,7 +197,7 @@ def test_a_recovered_platform_is_one_the_terms_table_allows():
     """Whatever this recovers has to clear the same bar as anything else. The
     recovery would be worthless — worse, a laundering route — if it could hand
     the generator a platform the terms forbid."""
-    from src.terms import GRANDFATHERED, may_build_adapter
+    from src.terms import may_build_adapter
 
     for platform in ("civicplus", "bonfire", "ionwave"):
         assert may_build_adapter(platform) is True
@@ -214,11 +214,22 @@ def test_the_avoid_set_is_the_terms_table_not_a_second_list():
     """The recovery script derives `avoid` from `src/terms.py`. A hand-kept
     copy would drift, and the direction it drifts is a platform quietly
     becoming readable."""
-    import scripts.recover_catalog_coverage as rec  # noqa: F401
+    import scripts.recover_catalog_coverage as rec
 
-    forbidden = {p for p, v in TERMS.items() if v.status in FORBIDS_ADAPTER}
+    from_terms = {p for p, v in TERMS.items() if v.status in FORBIDS_ADAPTER}
 
-    assert {"vendorlink", "demandstar", "vendor_registry", "bidnet"} <= forbidden
+    assert {"vendorlink", "demandstar", "vendor_registry", "bidnet"} <= from_terms
+    # Everything the terms table forbids, less what already has an adapter.
+    assert rec.forbidden_platforms() == from_terms - GRANDFATHERED
+
+
+def test_a_grandfathered_platform_is_not_swept():
+    """`jaggaer` is UNREADABLE and still has an adapter, so its agencies are
+    already read. Sweeping them would spend requests to rediscover coverage we
+    have, and the debt against it belongs in `src/terms.py`, not here."""
+    import scripts.recover_catalog_coverage as rec
+
+    assert "jaggaer" not in rec.forbidden_platforms()
 
 
 # -- resolving a platform's name for a buyer to the state's ------------------

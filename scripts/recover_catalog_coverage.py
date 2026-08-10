@@ -200,6 +200,22 @@ def configured_agencies() -> Dict[str, List[str]]:
     return out
 
 
+def forbidden_platforms() -> set:
+    """The platforms this sweep looks past, straight from the terms table.
+
+    Derived rather than listed. A hand-kept copy would drift, and the direction
+    it drifts is a platform quietly becoming readable.
+
+    Grandfathered platforms are excluded: `jaggaer` is UNREADABLE and still has
+    an adapter, so its agencies are already read and there is no gap here to
+    close. That is debt recorded in `src/terms.py`, not this script's to pay.
+    """
+    return {
+        p for p, v in TERMS.items()
+        if v.status in FORBIDS_ADAPTER and p not in GRANDFATHERED
+    }
+
+
 def catalog_entries(platforms: set) -> List[Dict]:
     """Catalog pointers for the platforms in question, across every config."""
     out = []
@@ -233,15 +249,7 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=WORKERS)
     args = ap.parse_args()
 
-    # Grandfathered platforms are excluded from the default: `jaggaer` is
-    # UNREADABLE and still has an adapter, so its agencies are already read and
-    # there is no gap here to close. That is debt recorded in `src/terms.py`,
-    # and it is not this script's debt to pay.
-    forbidden = {
-        p for p, v in TERMS.items()
-        if v.status in FORBIDS_ADAPTER and p not in GRANDFATHERED
-    }
-    platforms = set(args.platform) if args.platform else forbidden
+    platforms = set(args.platform) if args.platform else forbidden_platforms()
     unknown = platforms - set(TERMS)
     if unknown:
         print(f"no terms verdict for: {sorted(unknown)}")
