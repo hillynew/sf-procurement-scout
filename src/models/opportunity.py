@@ -275,6 +275,13 @@ class HealthStatus(str, Enum):
 
     OK = "ok"
     EMPTY = "empty"  # fetched cleanly, portal genuinely has nothing listed
+    # Fetched cleanly many times across many days and never once yielded a
+    # record. `empty` cannot carry this: a town with nothing open today and a
+    # board abandoned two years ago both fetch cleanly and both return zero,
+    # and the drop detector is blind to them by construction (it judges a
+    # source against its own norm, and their norm is zero). This says the
+    # weaker, true thing — nothing has ever proved this source works.
+    UNVERIFIED = "unverified"
     DEGRADED = "degraded"  # blocked or parsed nothing where rows were expected
     ERROR = "error"
 

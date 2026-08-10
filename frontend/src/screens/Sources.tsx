@@ -15,7 +15,8 @@ const SOURCE_SORT_KEYS: SortKeyDef[] = [
   { value: "status", label: "Status", defaultDir: "asc" },
 ];
 
-const STATUS_ORDER: Record<string, number> = { error: 0, degraded: 1, empty: 2, ok: 3 };
+const STATUS_ORDER: Record<string, number> =
+  { error: 0, degraded: 1, unverified: 2, empty: 3, ok: 4 };
 
 function sortSources(list: SourceInfo[], key: string, dir: "asc" | "desc"): SourceInfo[] {
   const sign = dir === "desc" ? -1 : 1;
@@ -49,6 +50,7 @@ function sortSources(list: SourceInfo[], key: string, dir: "asc" | "desc"): Sour
 const STATUS_META: Record<string, { label: string; color: string; icon: string }> = {
   ok: { label: "OK", color: "var(--color-open)", icon: "●" },
   empty: { label: "No listings", color: "var(--color-ink-faint)", icon: "○" },
+  unverified: { label: "Never verified", color: "var(--color-warn)", icon: "◍" },
   degraded: { label: "Degraded", color: "var(--color-warn)", icon: "◒" },
   error: { label: "Error", color: "var(--color-danger)", icon: "✗" },
 };
@@ -135,7 +137,7 @@ export default function Sources() {
 
   const sources = data?.sources ?? [];
   const counts = useMemo(() => {
-    const c = { ok: 0, empty: 0, degraded: 0, error: 0, silent: 0 };
+    const c = { ok: 0, empty: 0, unverified: 0, degraded: 0, error: 0, silent: 0 };
     for (const s of sources) {
       if (!s.health) { c.silent += 1; continue; }
       const st = s.health.status as keyof typeof c;
@@ -196,6 +198,7 @@ export default function Sources() {
       <div className="mb-4 flex flex-wrap gap-3">
         <StatCard label="Healthy" value={counts.ok} accent />
         <StatCard label="No listings" value={counts.empty} />
+        <StatCard label="Never verified" value={counts.unverified} />
         <StatCard label="Degraded" value={counts.degraded} />
         <StatCard label="Errors" value={counts.error} />
       </div>
@@ -213,7 +216,8 @@ export default function Sources() {
         <div className="scrollbar-none flex gap-2 overflow-x-auto pb-1">
           {[
             ["", "All"], ["attention", "Needs attention"], ["ok", "OK"],
-            ["empty", "No listings"], ["custom", "My additions"],
+            ["empty", "No listings"], ["unverified", "Never verified"],
+            ["custom", "My additions"],
           ].map(([key, label]) => (
             <FilterChip key={key} active={filter === key} onClick={() => setFilter(key)}>
               {label}

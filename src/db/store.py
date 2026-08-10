@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
 
 from sqlalchemy import String, cast, delete, func, select, update
 
-from ..models.opportunity import Opportunity, SourceHealth
+from ..models.opportunity import HealthStatus, Opportunity, SourceHealth
 from .engine import init_db, session_scope
 
 if TYPE_CHECKING:  # pragma: no cover — import cycle at runtime, fine for typing
@@ -129,6 +129,7 @@ def save_snapshot(
     now = datetime.utcnow()
     with session_scope() as s:
         _flag_source_drops(s, health)
+        _flag_never_verified(s, health)
         existing_ids = set(s.execute(select(OpportunityRow.opportunity_id)).scalars())
         tracked_ids = set(s.execute(select(TrackedBid.opportunity_id)).scalars())
 
@@ -248,6 +249,15 @@ def record_run_started(started_at: datetime) -> int:
 _DROP_LOOKBACK_RUNS = 8
 _DROP_MIN_NORM = 3
 
+#: A source is called `unverified` only once its silence is long enough to
+#: mean something: seen in this many runs, spanning this many days, never
+#: once yielding a row. The lookback is deliberately wider than the drop
+#: window — at a four-hour cadence, eight runs is barely a day, and a day of
+#: quiet is what a normal weekend looks like.
+_UNVERIFIED_LOOKBACK_RUNS = 120
+_UNVERIFIED_MIN_RUNS = 6
+_UNVERIFIED_MIN_DAYS = 7
+
 
 def _flag_source_drops(s, health: List[SourceHealth]) -> None:
     """Compare each source's run to its own history; flag what fell off a cliff.
@@ -296,6 +306,67 @@ def _flag_source_drops(s, health: List[SourceHealth]) -> None:
                 f"{h.count} rows this run vs a recent norm of {norm}.",
                 key=f"src:{h.source_id}"[:32],
             )
+
+
+def _flag_never_verified(s, health: List[SourceHealth]) -> None:
+    """Say the weaker, true thing about a source that has never yielded a row.
+
+    `empty` conflates two states the scout must not confuse: a small town
+    with nothing open this week, and a board the agency abandoned. Both
+    fetch cleanly, both return zero, and `_flag_source_drops` cannot tell
+    them apart — it judges a source against its own recent norm, and for
+    these the norm is zero, so it returns early and nothing ever escalates.
+    Hollywood's dead CivicPlus board sat that way through every sweep.
+
+    So this does not claim a source is broken. It claims only that nothing
+    has ever demonstrated it works: fetched cleanly `_UNVERIFIED_MIN_RUNS`
+    times across `_UNVERIFIED_MIN_DAYS` days, never once a record. A quiet
+    portal that later lists something clears itself on the next run.
+    """
+    runs = s.execute(
+        select(FetchRun).where(FetchRun.status == "done")
+        .order_by(FetchRun.id.desc()).limit(_UNVERIFIED_LOOKBACK_RUNS)
+    ).scalars().all()
+    if not runs:
+        return
+
+    # Per source: how many runs saw it, the highest row count any of them
+    # recorded, and when the earliest of those runs happened.
+    seen: Dict[str, int] = {}
+    best: Dict[str, int] = {}
+    first_at: Dict[str, datetime] = {}
+    for run in runs:
+        stamp = run.finished_at or run.started_at
+        for row in run.health or []:
+            if not isinstance(row, dict) or not row.get("source_id"):
+                continue
+            sid = row["source_id"]
+            seen[sid] = seen.get(sid, 0) + 1
+            best[sid] = max(best.get(sid, 0), int(row.get("count") or 0))
+            if stamp is not None and (sid not in first_at or stamp < first_at[sid]):
+                first_at[sid] = stamp
+
+    now = datetime.utcnow()
+    for h in health:
+        # A row this run proves the source works; nothing else to decide.
+        if h.count > 0 or str(h.status) != HealthStatus.EMPTY.value:
+            continue
+        if best.get(h.source_id, 0) > 0:
+            continue
+        runs_seen = seen.get(h.source_id, 0) + 1  # + this run
+        if runs_seen < _UNVERIFIED_MIN_RUNS:
+            continue
+        since = first_at.get(h.source_id)
+        if since is None or (now - since) < timedelta(days=_UNVERIFIED_MIN_DAYS):
+            continue
+        days = (now - since).days
+        h.status = HealthStatus.UNVERIFIED.value
+        h.note = (f"{h.note}; " if h.note else "") + (
+            f"no record in {runs_seen} fetches over {days} days — "
+            "never verified as a live board"
+        )
+
+    return
 
 
 def _notify_in_session(s, kind: str, title: str, body: str, *, key: str) -> None:
