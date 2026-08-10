@@ -247,12 +247,64 @@ repo's own rule and every agency converted to a catalog pointer. The
 sanctioned restore path is VendorLink's statewide subscription (~$175/yr) —
 an owner decision.
 
-**Open (deferred, tracked for later phases)** — B7 CivicPlus tenant drift
-(needs a fingerprint recheck sweep — recommend running
-`scripts/fingerprint_agencies.py --recheck`) · D24 `include_statewide`
+**Open (deferred, tracked for later phases)** — D24 `include_statewide`
 watchlist flag (frontend, Phase 6) · D25 preview-count divergence (Phase 6) ·
 D26 dead auto-fetch options (Phase 6 settings rework) · D27 award status
 invisible in UI (Phase 6, now with real award data to show) · D28-D31 UI
 niceties (Phase 6) · E35 pdf-cache disk pruning · E37 `datetime.utcnow()`
 deprecation sweep · F38-F46 dead code (removed opportunistically as files are
 touched).
+
+---
+
+## B7 recheck (2026-08-10) — the drift hypothesis was wrong; a narrower gap is real
+
+`scripts/fingerprint_agencies.py --recheck` swept the 222 entities already
+placed on a platform: **220 unchanged, 0 moved, 2 no longer readable**
+(Broward Solid Waste Disposal District — HTTPError; Town of Redington Shores —
+no platform signature; both read as a slow host or a WAF, not a move). No
+tenant has migrated. B7 as written — "CivicPlus tenant drift" — is **not
+happening**, and is closed on that evidence.
+
+What the sweep did surface is a different, narrower gap. Against production's
+own `/api/sources`, **108 of 281 live sources (38%) return zero rows** —
+including `hollywood`, the abandoned board B7 named. The bulk are CivicPlus
+(≈55) and OpenGov (≈23), plus `jaggaer_usf`, `plantation`, `swa_pbc`, four
+Legistar bodies, and two Workday tenants.
+
+To be precise about what was and was not wrong here — an earlier draft of this
+entry said the system "reports both as healthy", and that is false. These
+sources carry `status: "empty"`, not `ok`; `SourceHealth.healthy` already
+excludes them, and the Sources screen already renders them as "No listings"
+in faint grey, sorted below `ok`, with their own stat card and filter chip.
+The distinction between a clean fetch and a useful one exists and works.
+
+The real gap is one level down. `empty` cannot separate:
+
+* a small town with nothing open **this week** — an honest zero that will
+  yield later, and
+* a board the agency **abandoned** — which will never yield again.
+
+Both fetch cleanly, both return zero, both render "No listings". And the
+Phase 4 drop detector is blind to the second by construction: it judges a
+source against *its own recent norm*, and for a board that has never returned
+a row the norm is zero, so `_flag_source_drops` returns early. Nothing in the
+build could ever escalate a permanently dead source. That is the structural
+part, and it is real.
+
+**Fixed (2026-08-10)** — `HealthStatus.UNVERIFIED`, set by
+`_flag_never_verified` in `src/db/store.py`: a source fetched cleanly in at
+least 6 runs spanning at least 7 days that has never once yielded a record
+reads `unverified` rather than `empty`. The lookback is 120 runs, deliberately
+wider than the drop window — at a four-hour cadence 8 runs is barely a day,
+and a day of silence is what a normal weekend looks like. The state is not
+sticky: one listing clears it on the next run. It raises no notification —
+108 sources would arrive as 108 alerts — and instead surfaces on the Sources
+screen as "Never verified" with its own stat card and filter. It deliberately
+does not join the "needs attention" filter, which stays reserved for
+`degraded`/`error`, i.e. things that were working and stopped.
+
+Note this asserts the weaker, true thing. `unverified` does not claim a board
+is dead; it claims nothing has ever demonstrated it is alive. Deciding which
+of the 108 to demote to catalog pointers is a separate judgement, and still
+an owner's call.

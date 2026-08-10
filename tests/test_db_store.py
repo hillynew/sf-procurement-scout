@@ -408,3 +408,79 @@ def test_purge_demo_removes_the_demo_run_but_keeps_real_runs(db):
     remaining = db.recent_runs()
     assert len(remaining) == 1
     assert remaining[0]["opp_count"] == 1
+
+
+def _rewind_runs(days: int) -> None:
+    """Backdate every recorded run — `finished_at` is stamped `utcnow()` and
+    the never-verified window is measured in days, so tests cannot get there
+    through the public API alone."""
+    from datetime import timedelta as _td
+
+    from src.db.engine import session_scope
+    from src.db.models import FetchRun
+
+    with session_scope() as s:
+        for run in s.query(FetchRun).all():
+            if run.started_at:
+                run.started_at = run.started_at - _td(days=days)
+            if run.finished_at:
+                run.finished_at = run.finished_at - _td(days=days)
+
+
+def test_a_source_that_never_yields_a_row_reads_unverified(db):
+    """Long enough silence stops being 'no listings' and starts being
+    'nothing has ever shown this board works'."""
+    for _ in range(6):
+        db.save_snapshot([], _health(0, status="empty"))
+    _rewind_runs(10)
+
+    still_quiet = _health(0, status="empty")
+    db.save_snapshot([], still_quiet)
+    assert str(still_quiet[0].status) == "unverified"
+    assert "never verified" in (still_quiet[0].note or "")
+
+
+def test_a_source_with_any_history_of_rows_is_never_unverified(db):
+    """A board that has produced work before is quiet, not unproven — even
+    after a long dry spell. Counts stay under the drop threshold so the
+    norm check abstains and only the never-verified rule is under test."""
+    for _ in range(6):
+        db.save_snapshot([make_opp("Bid")], _health(2))
+    _rewind_runs(10)
+
+    quiet = _health(0, status="empty")
+    db.save_snapshot([], quiet)
+    assert str(quiet[0].status) == "empty"
+
+
+def test_recent_silence_is_not_yet_unverified(db):
+    """Six fetches inside a single day is what a normal weekend looks like."""
+    for _ in range(6):
+        db.save_snapshot([], _health(0, status="empty"))
+
+    quiet = _health(0, status="empty")
+    db.save_snapshot([], quiet)
+    assert str(quiet[0].status) == "empty"
+
+
+def test_too_few_fetches_is_not_yet_unverified(db):
+    """Age alone is not evidence; the source has to have been asked enough
+    times for its silence to mean something."""
+    for _ in range(2):
+        db.save_snapshot([], _health(0, status="empty"))
+    _rewind_runs(30)
+
+    quiet = _health(0, status="empty")
+    db.save_snapshot([], quiet)
+    assert str(quiet[0].status) == "empty"
+
+
+def test_a_row_clears_an_unverified_source_immediately(db):
+    """The state is not sticky: one listing proves the board is live."""
+    for _ in range(6):
+        db.save_snapshot([], _health(0, status="empty"))
+    _rewind_runs(10)
+
+    alive = _health(1)
+    db.save_snapshot([make_opp("First real bid")], alive)
+    assert str(alive[0].status) == "ok"
