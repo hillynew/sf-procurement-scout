@@ -84,6 +84,20 @@ class FetchJob:
     # -- internals ----------------------------------------------------------
 
     async def _run(self) -> None:
+        try:
+            await self._run_once()
+        finally:
+            with self._state_lock:
+                self._running = False
+            # After the run's locals are unreachable: a completed statewide
+            # fetch otherwise leaves the process ~300MB above baseline —
+            # the rows are gone but their small-object arenas are fragmented,
+            # so glibc keeps them. The next fetch then starts from that
+            # plateau and the kernel kills it at 512MB: warm-start fetches
+            # died overnight where cold-start ones survived.
+            await asyncio.to_thread(_release_memory)
+
+    async def _run_once(self) -> None:
         started = datetime.utcnow()
         run_id: Optional[int] = None
         try:
@@ -121,9 +135,6 @@ class FetchJob:
             with self._state_lock:
                 self._state = {"state": "error", "error": message}
             self._publish({"event": "error", "error": message})
-        finally:
-            with self._state_lock:
-                self._running = False
 
     def _on_progress_from_thread(self, event: Dict) -> None:
         """Called by pipeline worker threads."""
@@ -199,6 +210,23 @@ class FetchJob:
                 )
         except Exception:  # noqa: BLE001
             pass
+
+
+def _release_memory() -> None:
+    """Return a finished fetch's memory to the OS.
+
+    gc first (parse trees and payload graphs are cycle-heavy), then
+    malloc_trim hands the freed arenas back to the kernel — RSS is what the
+    OOM killer judges, and Python never trims it on its own.
+    """
+    import ctypes
+    import gc
+
+    gc.collect()
+    try:
+        ctypes.CDLL("libc.so.6").malloc_trim(0)
+    except Exception:  # noqa: BLE001 — not glibc; nothing to trim, nothing to do
+        pass
 
 
 def _frame(event: str, data: Dict) -> str:
