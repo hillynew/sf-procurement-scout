@@ -13,7 +13,7 @@ from datetime import date, datetime, timedelta
 from src.db import store as db
 
 from . import maintenance
-from .fetch_job import job
+from .fetch_job import _release_memory, job
 
 TICK_SECONDS = 60
 
@@ -29,6 +29,16 @@ async def loop() -> None:
 
 async def tick(now: datetime | None = None) -> None:
     now = now or datetime.utcnow()
+
+    # Keep RSS honest between fetches. Serving the full table fragments the
+    # allocator a little on every request and glibc never hands the arenas
+    # back on its own: the idle floor had crept to 287MB by 04:00 one night,
+    # and the fetch that then needed its ~300MB working set was OOM-killed
+    # from the head start. The fetch does its own end-of-run release; this
+    # covers the hours in between.
+    if not job.running and now.minute % 5 == 0:
+        await asyncio.to_thread(_release_memory)
+
     settings = db.get_settings()
 
     # Interval auto-fetch.
