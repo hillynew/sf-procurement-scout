@@ -315,6 +315,76 @@ Bonfire feeds that replaced Vendor Registry at those agencies — 10 of 22
 currently open bids there carried a prior cycle because of it. The agencies
 themselves are not lost: all five post on platforms this build already reads.
 
+### 3c. Catalog recovery: asking the agency instead of the platform
+
+§3, §3a and §3b each end the same way — the platform is off limits, the agencies
+become catalog pointers, the gap stays visible. What none of them did was ask
+the obvious follow-up: **do these agencies post anywhere else?** Most public
+buyers advertise the same solicitation in more than one place, and the answer
+was never looked for.
+
+It could not have been, as it happens. `fingerprint_agency` stops at the first
+strong signature, because the question it was built for is "what does this
+agency run". The moment a purchasing page said VendorLink, the question was
+answered and the CivicPlus board at `/Bids.aspx` one URL away was never
+fetched. `scripts/recover_catalog_coverage.py` asks the narrower question —
+"does this agency *also* run something we may read" — by passing `avoid` to the
+fingerprinter, which makes a forbidden platform a match that does not stop the
+search. The forbidden platform is kept in `also`, never dropped: an agency that
+double-posts is a fact worth recording.
+
+Nothing in it reads a forbidden platform. Every fetch goes to the agency's own
+website, which is `AGENCY_SITE` in `src/terms.py`.
+
+**Run over all 120 catalog pointers (2026-08-10).** First, what the pointers
+turned out to be:
+
+| Triage | pointers | What it means |
+|---|---:|---|
+| already read live by a bid adapter | 23 | the pointer is redundant — we cover this agency today |
+| no roster entity | 23 | co-ops, chambers, sheriffs, clerks: no website on file to read |
+| worth re-reading | 74 | resolving to **68** distinct agencies — a few platforms list one buyer as two boards |
+
+Then what re-reading those 68 agency websites found:
+
+| Outcome | agencies | What it means |
+|---|---:|---|
+| named a platform we may read | 5 | but only **1** is new — see below |
+| a lead — no adapter for it | 3 | 2× BidSync, 1× a self-hosted board needing a page reader |
+| confirmed nowhere but the forbidden platform | 20 | the irreducible gap: 9 VendorLink, 10 BidNet, 1 DemandStar |
+| site unreadable today | 40 | 15 no procurement link, 11 no signature, 7 WAF, 4 JS shell, 3 network |
+
+Of the 5: **New Smyrna Beach** is the one new live source (its own CivicPlus
+board). Hernando County was already configured under the tenant
+`hernandocounty`, which the name-based check missed and the generator caught.
+Flagler County School District matched only weakly — a lead, not a tenant.
+Central Florida Expressway Authority and Pinellas County School District both
+landed on an `/portal/embed` URL that names no tenant; CFX is already covered
+as `cfxway`, so **Pinellas County School District is the one agency this sweep
+proved is reachable and still is not configured** — it needs its OpenGov tenant
+identified by hand.
+
+The honest headline is the first table, not the second. **The gap was never 120
+agencies; a fifth of it was already covered and nobody had checked.** One new
+source is a fair measure of how much double-posting actually survives once the
+already-covered agencies are excluded: most of the rest are small bodies whose
+only board is the one we cannot read, and 40 sites this build could not read at
+all on the day.
+
+That last row is a queue, not a verdict. A WAF-blocked homepage today is
+readable next month, so this is worth re-running with the quarterly
+fingerprint sweep rather than treating as settled.
+
+**A bug it turned up.** Two recoveries pointed at
+`procurement.opengov.com/portal/embed` — OpenGov's embeddable-widget endpoint,
+where the tenant goes to the widget rather than into the path. The generator's
+`/portal/(...)` pattern read `embed` as the tenant, minted a source whose board
+404s, and — the part that mattered — *claimed* the `embed` identity, so every
+later agency whose fingerprint landed on an embed URL was skipped as "already
+configured" with nothing in the report to say so. Five were. Same shape as the
+match-on-host-alone bug already recorded in `sources_from_fingerprints.py`, one
+level down, and now guarded by `NON_TENANTS`.
+
 ## 4. What is worth buying
 
 | What | Cost | Why |

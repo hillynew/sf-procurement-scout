@@ -156,6 +156,19 @@ def _slug(entity_id: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", entity_id.lower()).strip("_")
 
 
+#: Path segments that sit where a tenant key does but name no tenant.
+#: `procurement.opengov.com/portal/embed` is the embeddable-widget endpoint an
+#: agency drops into its own page; the tenant is passed to the widget, not
+#: carried in the path. Left unguarded it does double damage: it mints a source
+#: whose board 404s, and — worse, because it is silent — the bogus `embed`
+#: identity is *claimed*, so every other agency whose fingerprint landed on an
+#: embed URL is skipped as "already configured". Two were, and the report said
+#: nothing. Same failure as matching on host alone, one level down.
+NON_TENANTS = {
+    "opengov": {"embed", "portal", "signin", "login", "search"},
+}
+
+
 def _portal_for(platform: str, tenant: str, portal: str) -> str:
     """The URL a configured source should carry, given its tenant.
 
@@ -194,6 +207,11 @@ def to_source(row: Dict) -> Optional[Dict]:
             # tenant. Nothing configurable, and inventing one would be a guess.
             return None
         tenant = m.group(1)
+        if tenant.lower() in NON_TENANTS.get(row["platform"], ()):
+            # The pattern matched a path segment that names no agency. Treated
+            # exactly like a URL that never named a tenant, because that is
+            # what it is — and reported, rather than silently claimed.
+            return None
         portal = _portal_for(row["platform"], tenant, portal)
 
     name = row["name"]

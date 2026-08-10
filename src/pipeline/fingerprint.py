@@ -139,6 +139,21 @@ class Fingerprint:
         }
 
 
+def usable(hits: List[str], avoid: frozenset) -> List[str]:
+    """The matches that answer the question, given platforms we cannot read.
+
+    A fingerprint normally stops at the first strong signature, because the
+    question is "what does this agency run". When the answer is a platform whose
+    terms forbid reading it, that stop is the wrong one: the agency may also
+    post the same solicitations to a board we are allowed to read, and the sweep
+    never looked because it already had an answer.
+
+    So `avoid` makes a match true but not final. The avoided platform is still
+    recorded — in `also`, never dropped — and the search keeps going.
+    """
+    return [p for p in hits if p not in avoid]
+
+
 def identify(html: str) -> Tuple[List[str], List[str]]:
     """(strong matches, weak matches) for this page, best first within each.
 
@@ -194,18 +209,36 @@ def portal_url_for(platform: str, html: str, base: str) -> Optional[str]:
     return base if platform == "civicplus" else None
 
 
-def procurement_link(html: str, base: str) -> Optional[str]:
+def _needles_for(platforms: frozenset) -> Tuple[str, ...]:
+    """Every strong signature belonging to these platforms."""
+    return tuple(
+        needle
+        for p, strong, _w in PLATFORM_SIGNATURES if p in platforms
+        for needle in strong
+    )
+
+
+def procurement_link(html: str, base: str, avoid: frozenset = frozenset()) -> Optional[str]:
     """The most promising procurement link on a homepage.
 
     Scored rather than first-match: municipal homepages carry a lot of anchors,
     and "Bid Opportunities" is a better bet than a "Vendor Registration" link
     that happens to appear higher up.
+
+    A link into an avoided platform is not followed at all. It would score
+    highest of anything on the page — an off-site link to a known platform gets
+    +20 precisely because it is usually the answer — and spending the fetch on
+    it buys a page we already know we cannot use. Skipping it is what lets the
+    probe budget reach the CivicPlus board instead.
     """
+    banned = _needles_for(avoid)
     best: Optional[Tuple[int, str]] = None
     for m in re.finditer(r"<a\b[^>]*href=[\"']([^\"']+)[\"'][^>]*>(.*?)</a>", html, re.I | re.S):
         href, text = m.group(1), re.sub(r"<[^>]+>", " ", m.group(2))
         blob = f"{href} {text}".lower()
         if not _LINK_RE.search(blob):
+            continue
+        if any(n.lower() in href.lower() for n in banned):
             continue
         score = 0
         for i, hint in enumerate(_LINK_HINTS):
@@ -351,7 +384,7 @@ def _probe_candidates(base: str) -> List[str]:
     return paths[:_PATHS_FIRST] + subs + paths[_PATHS_FIRST:]
 
 
-def _probe_for_board(base: str, *, timeout: int):
+def _probe_for_board(base: str, *, timeout: int, avoid: frozenset = frozenset()):
     """Look for a bid board where the homepage linked none.
 
     Returns the response, not a URL, because the caller needs the body and
@@ -361,8 +394,13 @@ def _probe_for_board(base: str, *, timeout: int):
     signature or a list of live solicitations. A page that merely answers is
     kept as a fallback, so "we read their purchasing page and it named no
     platform" stays distinguishable from "there was nothing to read".
+
+    With `avoid`, a page carrying only an avoided platform's signature does not
+    stop the search — it is worth less than the next URL in the budget, but more
+    than nothing, so it is kept as a fallback behind any readable page.
     """
     fallback = None
+    fallback_has_signature = False
     for url in _probe_candidates(base)[:_PROBE_BUDGET]:
         try:
             resp = get(url, timeout=timeout, retries=0)
@@ -374,10 +412,13 @@ def _probe_for_board(base: str, *, timeout: int):
         if len(html) <= _MIN_HTML:
             continue
         strong, _weak = identify(html)
-        if strong or looks_like_a_bid_board(html):
+        if usable(strong, avoid) or (not strong and looks_like_a_bid_board(html)):
             return resp
-        if fallback is None:
-            fallback = resp
+        # Nothing readable here. Keep the best near-miss: a page proving the
+        # avoided platform beats a page proving nothing, because it confirms
+        # where this agency actually posts when no permitted board turns up.
+        if fallback is None or (strong and not fallback_has_signature):
+            fallback, fallback_has_signature = resp, bool(strong)
     return fallback
 
 
@@ -390,8 +431,22 @@ def _normalise(website: str) -> str:
     return site
 
 
-def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int = 20) -> Fingerprint:
-    """Two fetches, one verdict. Never raises — a failure is a recorded result."""
+def fingerprint_agency(
+    entity_id: str,
+    name: str,
+    website: str,
+    *,
+    timeout: int = 20,
+    avoid: frozenset = frozenset(),
+) -> Fingerprint:
+    """Two fetches, one verdict. Never raises — a failure is a recorded result.
+
+    `avoid` names platforms that are not an acceptable answer — in practice the
+    ones whose terms forbid reading them, from `src.terms`. A signature for one
+    of those is recorded in `also` and the search continues, so an agency that
+    posts to both VendorLink and its own CivicPlus board comes back as CivicPlus
+    rather than stopping at whichever the sweep happened to see first.
+    """
     site = _normalise(website)
     fp = Fingerprint(entity_id=entity_id, name=name, website=site)
     if not site:
@@ -414,16 +469,45 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
     # The homepage sometimes *is* the answer, when a city links its portal in
     # the nav or embeds the widget.
     strong, _weak = identify(home_html)
+    #: Avoided platforms seen along the way. Carried into `also` on whatever
+    #: verdict this ends at, so "we looked past VendorLink" stays on the record
+    #: rather than reading as an agency that never ran it.
+    passed_over: List[str] = []
+    #: The page the avoided platform was proved on, kept so a search that finds
+    #: nothing better can still return that evidence rather than `unknown`.
+    seen_at: Tuple[str, str] = ("", "")
     if strong:
-        fp.platform, fp.also = strong[0], strong[1:]
+        good = usable(strong, avoid)
+        if good:
+            fp.platform, fp.also = good[0], [p for p in strong if p != good[0]]
+            fp.confidence = "strong"
+            fp.checked_url = str(home.url)
+            fp.portal_url = portal_url_for(fp.platform, home_html, str(home.url))
+            fp.note = "matched on homepage"
+            return fp
+        passed_over, seen_at = strong, (home_html, str(home.url))
+
+    def settle(note: str) -> Fingerprint:
+        """Give back what we did prove, when the search for better came up dry.
+
+        Without this, looking past VendorLink and finding nothing would report
+        `unknown` — which reads as "we could not identify this agency" and would
+        undo a fingerprint the sweep had already got right. What is true is that
+        they run VendorLink and nothing we can read, and that is a coverage gap
+        worth seeing rather than a hole in the survey.
+        """
+        if not passed_over:
+            fp.note = note
+            return fp
+        fp.platform = passed_over[0]
+        fp.also = _merge(fp.also, passed_over[1:])
         fp.confidence = "strong"
-        fp.checked_url = str(home.url)
-        fp.portal_url = portal_url_for(fp.platform, home_html, str(home.url))
-        fp.note = "matched on homepage"
+        fp.portal_url = portal_url_for(fp.platform, seen_at[0], seen_at[1])
+        fp.note = f"{note}; no readable board besides {fp.platform}"
         return fp
 
     page = None
-    link = procurement_link(home_html, str(home.url))
+    link = procurement_link(home_html, str(home.url), avoid)
     if not link:
         # Plenty of homepages never link bids from the front page — the board
         # lives under Business or Departments, two hops down, or on its own
@@ -432,53 +516,67 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
         # every CivicPlus city; `procurement.<domain>` recovers the
         # universities, which never link procurement from a homepage aimed at
         # students.
-        page = _probe_for_board(str(home.url), timeout=timeout)
+        page = _probe_for_board(str(home.url), timeout=timeout, avoid=avoid)
         if page is None:
             fp.checked_url = str(home.url)
             # Distinguish the two misses, because only one of them is worth a
             # human's time: a few kilobytes of homepage is a client-rendered
             # app whose nav we never saw, not a site without a bid board.
-            fp.note = (
+            return settle(
                 "homepage renders client-side (too small to read)"
                 if len(home_html) < _JS_SHELL
                 else "no procurement link found"
             )
-            return fp
         link = str(page.url)
 
     if page is None:
         try:
             page = get(link, timeout=timeout, retries=1)
         except RobotsDisallowed as e:
-            fp.note = f"robots refused: {str(e)[:80]}"
             fp.checked_url = link
-            return fp
+            return settle(f"robots refused: {str(e)[:80]}")
         except SourceBlocked:
-            fp.note = "procurement page blocked (WAF)"
             fp.checked_url = link
-            return fp
+            return settle("procurement page blocked (WAF)")
         except Exception as e:  # noqa: BLE001
-            fp.note = f"procurement page unreachable ({type(e).__name__})"
             fp.checked_url = link
-            return fp
+            return settle(f"procurement page unreachable ({type(e).__name__})")
 
     fp.checked_url = str(page.url)
     html = page.text or ""
     if len(html) < _MIN_HTML:
-        fp.note = "procurement page too small to read"
-        return fp
+        return settle("procurement page too small to read")
 
     strong, weak = identify(html)
-    if not strong and not weak:
+    if not usable(strong, avoid) and not weak:
         # A procurement landing page is often only a signpost: contacts, terms,
         # and a link to where the bids actually are. One more hop off it is
         # what separates UF and USF — both Jaggaer, both behind a
         # `procurement.` page that names no platform — from a dead end.
-        hop = _second_hop(html, str(page.url), timeout=timeout)
+        hop = _second_hop(html, str(page.url), timeout=timeout, avoid=avoid)
         if hop is not None:
             page, html = hop, (hop.text or "")
             fp.checked_url = str(page.url)
             strong, weak = identify(html)
+
+    if strong and not usable(strong, avoid):
+        # The page proves the avoided platform and nothing else. That is not the
+        # end of the search here, only the end of *this* page: the same agency
+        # very often keeps a CivicPlus board at `/Bids.aspx` alongside whatever
+        # portal its purchasing page advertises. Spend the probe budget before
+        # settling for a platform we are not allowed to read.
+        passed_over = _merge(strong, passed_over)
+        seen_at = (html, str(page.url))
+        alt = _probe_for_board(str(home.url), timeout=timeout, avoid=avoid)
+        if alt is not None:
+            alt_html = alt.text or ""
+            alt_strong, alt_weak = identify(alt_html)
+            if usable(alt_strong, avoid) or (
+                not alt_strong and looks_like_a_bid_board(alt_html)
+            ):
+                page, html = alt, alt_html
+                fp.checked_url = str(page.url)
+                strong, weak = alt_strong, alt_weak
 
     if not strong and not weak:
         if looks_like_a_bid_board(html):
@@ -488,18 +586,27 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
             fp.platform = "selfhosted"
             fp.confidence = "page"
             fp.portal_url = str(page.url)
+            fp.also = _merge(fp.also, passed_over)
             fp.note = "solicitations listed on the agency's own page"
             return fp
+        fp.also = _merge(fp.also, passed_over)
         fp.note = "no platform signature"
         return fp
 
-    if strong:
-        fp.platform, fp.also = strong[0], strong[1:] + weak
+    good_strong, good_weak = usable(strong, avoid), usable(weak, avoid)
+    if good_strong or (strong and not good_weak):
+        # `strong[0]` when nothing survived `avoid`: the honest answer is still
+        # the platform that is demonstrably there, recorded as what it is.
+        head = (good_strong or strong)[0]
+        fp.platform = head
+        fp.also = _merge([p for p in strong + weak if p != head], passed_over)
         fp.confidence = "strong"
         fp.note = "matched on procurement page"
     else:
         # Named but not demonstrated: usually "register with us over there".
-        fp.platform, fp.also = weak[0], weak[1:]
+        head = (good_weak or weak)[0]
+        fp.platform = head
+        fp.also = _merge([p for p in weak if p != head], passed_over)
         fp.confidence = "weak"
         fp.note = "platform named in text, not linked"
     fp.portal_url = portal_url_for(fp.platform, html, str(page.url))
@@ -516,7 +623,21 @@ def fingerprint_agency(entity_id: str, name: str, website: str, *, timeout: int 
     return fp
 
 
-def _second_hop(html: str, base: str, *, timeout: int):
+def _merge(*lists: List[str]) -> List[str]:
+    """Concatenate, first occurrence wins, order preserved.
+
+    `also` is read by humans and by the source generator, and a platform listed
+    twice because two pages both showed it reads as two findings.
+    """
+    out: List[str] = []
+    for items in lists:
+        for item in items or []:
+            if item not in out:
+                out.append(item)
+    return out
+
+
+def _second_hop(html: str, base: str, *, timeout: int, avoid: frozenset = frozenset()):
     """One more hop from a procurement page that named no platform.
 
     Bounded to one fetch and guarded on where it goes. A procurement page links
@@ -527,7 +648,7 @@ def _second_hop(html: str, base: str, *, timeout: int):
     itself a known platform. Anything else would file one agency's platform
     under another's name.
     """
-    link = procurement_link(html, base)
+    link = procurement_link(html, base, avoid)
     if not link or link.rstrip("/") == base.rstrip("/"):
         return None
     if _domain_of(link) != _domain_of(base) and not any(

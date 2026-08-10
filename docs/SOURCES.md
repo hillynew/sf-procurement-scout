@@ -39,7 +39,7 @@ Each link must record `linkage_method` (`ref` | `fuzzy`) so a bad match is trace
 | **FACTS** | Every executed state contract, 31 agencies | **Vendor + amount + method, structured** (Total Amount; payments-to-date on detail) | Already live. 42 of 52 CSV columns still unread. State only — no locals, ever. |
 | **OpenGov API** | 91 FL tenants (~14k projects) | Status signal only (`closeOutReason` free text); vendor/amount 401-gated; public planholders | Already live. Largest capture-gap fix in the plan. |
 | **Legistar Web API** | County/city commission agendas: **Broward Co., Jacksonville, Miami, Ft. Lauderdale, Polk, Coral Gables live-verified**; Brevard, Clearwater, Pensacola, Ocala, Deltona by UI | **Vendor + amount + bid number in matter titles** — "MOTION TO AWARD … Crown USA, Inc. … Bid No. OPN2131620B1 … $193,500" (verified) | **The best local-award source that exists. Not yet built.** Free JSON, OData filters. Miami-Dade's instance is dead (frozen 2018) — use its govaction HTML instead. |
-| **VendorLink** | 66 configured of 156 FL agencies | `/external/contracts` grid has **Amount / Total Amount + vendor columns** (agency-discretionary fill); bid tabs as detail docs | Already live list-only. **Detail is NOT login-gated** — stale premise, see §3. |
+| **VendorLink** | 66 catalog agencies of 156 FL | n/a | **Terms prohibit scraping** (§5(H), read 2026-08-09) — adapter removed, catalog only. Do not rebuild. |
 | **FDOT bidletting** | All state road construction lettings, by district | **Full bid tabs: every bidder + amount, low bid first, with county** (verified District 4) | Not built. Server-rendered HTML, no token. |
 | **SAM.gov v2** | Federal in FL | `ptype=a` award notices carry a structured `award{amount, date, awardee{name, ueiSAM}}` | Adapter exists but never asks for awards, NAICS, or `resourceLinks`. Needs free key. |
 | **Public Purchase** | 228 FL agencies | None (solicitation platform) | **Login wall covers even titles** (verified). Only path: free vendor registration + email alerts → bid mailbox. |
@@ -126,17 +126,22 @@ table** (= defects) → access → award amounts → fragility.
   PDFs**, planholders w/ timestamps, bidders table, **Anticipated Award Date**. Plus
   `/external/contracts?a=N`: contract number, title, status, **vendor**, approval/start/
   end dates, **Amount, Total Amount** (fill varies by agency).
-- **Captured**: list columns only. `supports_detail=False` on the stale premise that
-  detail needs a login — **disproven live**.
-- **Left**: the entire detail page and the contracts register.
-- **Access**: ViewState postbacks; detail is session-addressed (no bookmarkable URL — keep
-  board URL on the record). ⚠️ Before building the detail pass: VendorLink is in the
-  `GRANDFATHERED` set of `src/terms.py` (terms never read). Read their ToS first — the
-  robots file allows `/external/` for `*` but names AI-training crawlers (ClaudeBot etc.)
-  with `Disallow: /`; this scraper's token falls under `*`, but the terms check is the
-  gate the project's own policy requires.
-- **Award amounts**: `/external/contracts` grid (structured, sparse) + tabulation PDFs.
-- **Fragility**: moderate — ASP.NET control IDs, session flow.
+- **Captured**: **nothing. The adapter was removed on 2026-08-09** and these 66 agencies
+  are `catalog` pointers. Everything above describes what the platform publishes, not
+  what this build reads, and it is kept only so the size of the gap is legible.
+- **Access**: ⛔ **`PROHIBITED` in `src/terms.py`** — not `GRANDFATHERED`, which is what
+  this section said while the terms were still unread. §5(H) of their Terms and
+  Conditions forbids "any robot, spider, other automatic device, or manual process to
+  monitor or copy" their pages, under a browse-wrap that binds on use of the site. The
+  earlier check followed `/terms`, which redirects to a login; the operative document is
+  linked from every page footer at `/external/termsandconditions`. robots.txt allowing
+  `/external/` does not override prose terms — robots is not the test, in either
+  direction. **Do not build the detail pass.** The sanctioned path is their statewide
+  subscription (~$175/yr), ranked in `docs/statewide-coverage.md` §4.
+- **Award amounts**: n/a here — see the Legistar and FDOT bid-tab sources instead.
+- **Coverage recovered without them**: see `docs/statewide-coverage.md` §3c. Of the 66,
+  11 turned out to be read live already by another adapter, and one more (New Smyrna
+  Beach) was recovered by re-reading the agency's own site.
 
 ### Bonfire — mixed · JSON · 32 sources
 - **Publishes**: 9 fields per project (ref, title, close **in UTC**, dept, status ids);
@@ -283,7 +288,7 @@ where marked MANUAL.
 | 5 | **SAM.gov full capture + `ptype=a` awards** | Structured federal award amounts, docs, NAICS | S |
 | 6 | **FACTS full-width capture** (commodity, execution date, justification, STC id, agency ref) | Richer state awards from data already downloaded | S |
 | 7 | **Legistar award adapter** — Broward Co, Jax, Miami, Ft Laud, Polk, Coral Gables (+roster sweep) | **Local award amounts+vendors — the #1 gap — via free JSON** | M |
-| 8 | **VendorLink detail + contracts pass** (⚠️ read their ToS first, per project policy) | 66 sources gain codes/bonds/estimates/docs/tabs + an award-amount grid | M |
+| 8 | ~~VendorLink detail + contracts pass~~ — **cancelled 2026-08-09**: their ToS were read and §5(H) forbids it. Replaced by *catalog recovery* (`statewide-coverage.md` §3c), which reads the agencies' own sites instead. | 11 of the 66 already covered; 1 recovered; 20 confirmed unreachable without a subscription | done |
 | 9 | **CivicPlus award capture** — raw Category, awarded status, parse award-rec PDFs for vendor | 99 sources; awards for the small cities nothing else covers | M |
 | 10 | **FDOT bidletting adapter** | Construction bid tabs: bidder+amount+county | M |
 | 11 | **Workday query widen** (`description`, attachment filenames) | 3 sources, honest gain | S |
