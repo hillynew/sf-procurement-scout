@@ -310,6 +310,41 @@ def test_a_real_opengov_tenant_still_resolves():
     assert cfg["opengov_code"] == "hernandocounty"
 
 
+def test_an_embed_url_names_its_tenant_one_segment_deeper():
+    """`/portal/embed/pcsb/project-list` *does* carry the tenant — the pattern
+    just stopped at the literal `embed`. All five agencies found this way turned
+    out to be configured already, so reading it correctly buys no coverage; what
+    it buys is a report that says "already configured" instead of "the URL does
+    not name the tenant", which is the difference between a closed question and
+    an open one."""
+    mod = _generator()
+
+    cfg = mod.to_source({
+        "entity_id": "sch-pinellas-county-school-district",
+        "name": "Pinellas County School District",
+        "platform": "opengov",
+        "portal_url": "https://procurement.opengov.com/portal/embed/pcsb",
+        "confidence": "strong",
+    })
+
+    assert cfg is not None
+    assert cfg["opengov_code"] == "pcsb"
+
+
+def test_the_fingerprinter_keeps_the_tenant_off_an_embed_url():
+    """The truncation started here: `portal_url_for` recorded
+    `.../portal/embed` and threw the tenant away, so nothing downstream could
+    recover it however good its own pattern was."""
+    html = (
+        '<iframe src="https://procurement.opengov.com/portal/embed/pcsb'
+        '/project-list?departmentId=all&status=all"></iframe>'
+    )
+
+    url = fp.portal_url_for("opengov", html, "https://www.pcsb.org")
+
+    assert url == "https://procurement.opengov.com/portal/embed/pcsb"
+
+
 def test_a_non_tenant_cannot_claim_an_identity_and_hide_others():
     """The damage was never the bogus source — the probe 404s it and drops it.
     It was that `embed` got *claimed*, so the next agency whose fingerprint
@@ -326,6 +361,38 @@ def test_a_non_tenant_cannot_claim_an_identity_and_hide_others():
     ]
 
     assert [mod.to_source(r) for r in rows] == [None, None]
+
+
+def test_coverage_is_checked_on_identity_as_well_as_on_name():
+    """Three of the redundant pointers are invisible to a name match. The
+    OpenGov discoverer names its sources after the tenant — `og_pcsb`, not
+    "Pinellas County School District" — so a string comparison reports an
+    agency we read every day as an uncovered gap. Checking the tenant the
+    entity's own fingerprint implies is what catches them."""
+    import scripts.recover_catalog_coverage as rec
+
+    entities = {
+        "sch-pinellas-county-school-district",
+        "sd-central-florida-expressway-authority",
+        "co-hernando-county",
+    }
+
+    found = rec.covered_tenants(entities)
+
+    assert set(found) == entities, f"missed: {sorted(entities - set(found))}"
+    assert found["sch-pinellas-county-school-district"].endswith("#pcsb")
+
+
+def test_the_identity_check_borrows_the_generator_rather_than_copying_it():
+    """Deciding whether two rows are the same agency has been got wrong twice —
+    on host alone, and on `/portal/embed`. A second copy of that judgement is
+    how it gets got wrong a third time."""
+    import scripts.recover_catalog_coverage as rec
+
+    gen = rec._load_generator()
+
+    assert hasattr(gen, "identity") and hasattr(gen, "to_source")
+    assert "opengov" in gen.PLATFORM_ADAPTERS
 
 
 def test_award_readers_do_not_count_as_coverage():

@@ -53,6 +53,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.pipeline.fingerprint import fingerprint_agency  # noqa: E402
+from src.pipeline.platform_watch import recorded  # noqa: E402
 from src.terms import FORBIDS_ADAPTER, GRANDFATHERED, TERMS  # noqa: E402
 
 ROSTER = Path("data/registry/fl_agencies.csv")
@@ -185,7 +186,13 @@ BID_ADAPTERS = frozenset({
 
 
 def configured_agencies() -> Dict[str, List[str]]:
-    """Lower-cased agency name -> the live bid adapters already reading it."""
+    """Lower-cased agency name -> the live bid adapters already reading it.
+
+    Names only, and names are the weak half of this. `og_pcsb` reads Pinellas
+    County School District and says so nowhere a string match can see; the
+    OpenGov discoverer names sources after the tenant, not the agency. So this
+    is a floor on what is covered, and `covered_tenants` is the other half.
+    """
     out: Dict[str, List[str]] = {}
     for path in sorted(CONFIG_DIR.glob("sources*.yaml")):
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
@@ -197,6 +204,49 @@ def configured_agencies() -> Dict[str, List[str]]:
             who = (cfg.get("agency") or cfg.get("name") or "").strip().lower()
             if who:
                 out.setdefault(who, []).append(cfg["adapter"])
+    return out
+
+
+def _load_generator():
+    """`sources_from_fingerprints.py`, which owns tenant identity.
+
+    Imported rather than reimplemented on purpose. Deciding whether two rows
+    are the same agency is the one piece of this pipeline that has already been
+    got wrong twice — once on host alone, once on `/portal/embed` — and a
+    second copy of that judgement is how it gets got wrong a third time.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "sff_recover", Path(__file__).resolve().parent / "sources_from_fingerprints.py")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules["sff_recover"] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def covered_tenants(entity_ids: set) -> Dict[str, str]:
+    """entity_id -> the configured tenant already reading it, where one is.
+
+    The name check misses every source named after a tenant instead of an
+    agency, which is most of the OpenGov file. This closes that: take what the
+    entity's own fingerprint says it runs, turn it into the identity the
+    generator would use, and see whether that identity is already configured.
+    """
+    gen = _load_generator()
+    _ids, claimed = gen.existing()
+    out: Dict[str, str] = {}
+    for entity, row in recorded(FINGERPRINTS).items():
+        if entity not in entity_ids or row.get("confidence") != "strong":
+            continue
+        if row["platform"] not in gen.PLATFORM_ADAPTERS:
+            continue
+        cfg = gen.to_source(row)
+        if cfg is None:
+            continue
+        who = gen.identity(cfg)
+        if who in claimed:
+            out[entity] = who
     return out
 
 
@@ -269,6 +319,7 @@ def main() -> int:
     already: List[Tuple[Dict, List[str]]] = []
     unresolved: List[Dict] = []
 
+    resolved: Dict[str, Tuple[Dict, List[Dict]]] = {}
     for cfg in entries:
         agency = cfg.get("agency") or cfg.get("name") or ""
         live = covered.get(agency.strip().lower())
@@ -279,8 +330,18 @@ def main() -> int:
         if not row or not (row.get("website") or "").strip():
             unresolved.append(cfg)
             continue
-        entry = targets.setdefault(row["entity_id"], (row, []))
+        entry = resolved.setdefault(row["entity_id"], (row, []))
         entry[1].append(cfg)
+
+    # Second pass on identity rather than on name. Everything here is already
+    # read live; sweeping it would spend requests to rediscover our own
+    # coverage, and report it as a gap on the way.
+    by_tenant = covered_tenants(set(resolved))
+    for entity, (row, cfgs) in resolved.items():
+        if entity in by_tenant:
+            already.extend((c, [f"tenant {by_tenant[entity]}"]) for c in cfgs)
+        else:
+            targets[entity] = (row, cfgs)
 
     print(f"catalog entries on {sorted(platforms)}: {len(entries)}")
     print(f"  already read live by a bid adapter : {len(already)}")
