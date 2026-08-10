@@ -30,6 +30,12 @@ services:
         fromDatabase:
           name: scout-db
           property: connectionString
+      # Cap glibc's per-thread malloc arenas. The threaded fetch scatters
+      # small allocations across arenas, pinning ~150MB of RSS that no
+      # malloc_trim can release; two arenas keep the retained footprint small
+      # enough that back-to-back fetch cycles fit in the 512MB instance.
+      - key: MALLOC_ARENA_MAX
+        value: "2"
       # Optional integrations, all inert until set. `sync: false` means Render
       # prompts for a real value in its dashboard and never stores one here —
       # never fill these in directly in this file. See AGENTS.md.
